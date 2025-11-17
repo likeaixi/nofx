@@ -24,6 +24,7 @@ interface UseTraderActionsParams {
   setUserSignalSource: (config: {
     coinPoolUrl: string
     oiTopUrl: string
+    extraSignalUrl: string
   }) => void
   setShowCreateModal: (show: boolean) => void
   setShowEditModal: (show: boolean) => void
@@ -595,15 +596,16 @@ export function useTraderActions({
 
   const handleSaveSignalSource = async (
     coinPoolUrl: string,
-    oiTopUrl: string
+    oiTopUrl: string,
+    extraSignalUrl: string,
   ) => {
     try {
-      await toast.promise(api.saveUserSignalSource(coinPoolUrl, oiTopUrl), {
+      await toast.promise(api.saveUserSignalSource(coinPoolUrl, oiTopUrl, extraSignalUrl), {
         loading: '正在保存…',
         success: '保存成功',
         error: '保存失败',
       })
-      setUserSignalSource({ coinPoolUrl, oiTopUrl })
+      setUserSignalSource({ coinPoolUrl, oiTopUrl, extraSignalUrl })
       setShowSignalSourceModal(false)
     } catch (error) {
       console.error('Failed to save signal source:', error)

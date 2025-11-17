@@ -5,6 +5,7 @@ import { api } from '../lib/api'
 interface SignalSource {
   coinPoolUrl: string
   oiTopUrl: string
+  extraSignalUrl: string
 }
 
 interface TradersConfigState {
@@ -38,7 +39,7 @@ const initialState = {
   allExchanges: [],
   supportedModels: [],
   supportedExchanges: [],
-  userSignalSource: { coinPoolUrl: '', oiTopUrl: '' },
+  userSignalSource: { coinPoolUrl: '', oiTopUrl: '', extraSignalUrl: '' },
   configuredModels: [],
   configuredExchanges: [],
 }
@@ -115,6 +116,7 @@ export const useTradersConfigStore = create<TradersConfigState>((set, get) => ({
         get().setUserSignalSource({
           coinPoolUrl: signalSource.coin_pool_url || '',
           oiTopUrl: signalSource.oi_top_url || '',
+          extraSignalUrl: signalSource.extra_signal_url || '',
         })
       } catch (error) {
         console.log('📡 用户信号源配置暂未设置')

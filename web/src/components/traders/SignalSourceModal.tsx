@@ -4,7 +4,8 @@ import { t, type Language } from '../../i18n/translations'
 interface SignalSourceModalProps {
   coinPoolUrl: string
   oiTopUrl: string
-  onSave: (coinPoolUrl: string, oiTopUrl: string) => void
+  extraSignalUrl: string
+  onSave: (coinPoolUrl: string, oiTopUrl: string, extraSignal: string) => void
   onClose: () => void
   language: Language
 }
@@ -12,16 +13,18 @@ interface SignalSourceModalProps {
 export function SignalSourceModal({
   coinPoolUrl,
   oiTopUrl,
+  extraSignalUrl,
   onSave,
   onClose,
   language,
 }: SignalSourceModalProps) {
   const [coinPool, setCoinPool] = useState(coinPoolUrl || '')
   const [oiTop, setOiTop] = useState(oiTopUrl || '')
+  const [extraSignal, setExtraSignal] = useState(extraSignalUrl || '')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSave(coinPool.trim(), oiTop.trim())
+    onSave(coinPool.trim(), oiTop.trim(), extraSignal.trim())
   }
 
   return (
@@ -84,6 +87,30 @@ export function SignalSourceModal({
                   border: '1px solid #2B3139',
                   color: '#EAECEF',
                 }}
+              />
+              <div className="text-xs mt-1" style={{ color: '#848E9C' }}>
+                {t('oiTopDescription', language)}
+              </div>
+            </div>
+
+            <div>
+              <label
+                  className="block text-sm font-semibold mb-2"
+                  style={{ color: '#EAECEF' }}
+              >
+                EXTRA SIGNAL URL
+              </label>
+              <input
+                  type="url"
+                  value={extraSignal}
+                  onChange={(e) => setExtraSignal(e.target.value)}
+                  placeholder="https://api.example.com/signal"
+                  className="w-full px-3 py-2 rounded"
+                  style={{
+                    background: '#0B0E11',
+                    border: '1px solid #2B3139',
+                    color: '#EAECEF',
+                  }}
               />
               <div className="text-xs mt-1" style={{ color: '#848E9C' }}>
                 {t('oiTopDescription', language)}

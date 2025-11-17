@@ -1148,15 +1148,17 @@ func (s *Server) handleGetUserSignalSource(c *gin.Context) {
 	if err != nil {
 		// 如果配置不存在，返回空配置而不是404错误
 		c.JSON(http.StatusOK, gin.H{
-			"coin_pool_url": "",
-			"oi_top_url":    "",
+			"coin_pool_url":    "",
+			"oi_top_url":       "",
+			"extra_signal_url": "",
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"coin_pool_url": source.CoinPoolURL,
-		"oi_top_url":    source.OITopURL,
+		"coin_pool_url":    source.CoinPoolURL,
+		"oi_top_url":       source.OITopURL,
+		"extra_signal_url": source.ExtraSignalURL,
 	})
 }
 
@@ -1164,8 +1166,9 @@ func (s *Server) handleGetUserSignalSource(c *gin.Context) {
 func (s *Server) handleSaveUserSignalSource(c *gin.Context) {
 	userID := c.GetString("user_id")
 	var req struct {
-		CoinPoolURL string `json:"coin_pool_url"`
-		OITopURL    string `json:"oi_top_url"`
+		CoinPoolURL    string `json:"coin_pool_url"`
+		OITopURL       string `json:"oi_top_url"`
+		ExtraSignalURL string `json:"extra_signal_url"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -1173,13 +1176,13 @@ func (s *Server) handleSaveUserSignalSource(c *gin.Context) {
 		return
 	}
 
-	err := s.database.CreateUserSignalSource(userID, req.CoinPoolURL, req.OITopURL)
+	err := s.database.CreateUserSignalSource(userID, req.CoinPoolURL, req.OITopURL, req.ExtraSignalURL)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("保存用户信号源配置失败: %v", err)})
 		return
 	}
 
-	log.Printf("✓ 用户信号源配置已保存: user=%s, coin_pool=%s, oi_top=%s", userID, req.CoinPoolURL, req.OITopURL)
+	log.Printf("✓ 用户信号源配置已保存: user=%s, coin_pool=%s, oi_top=%s, extra_signal=%s", userID, req.CoinPoolURL, req.OITopURL, req.ExtraSignalURL)
 	c.JSON(http.StatusOK, gin.H{"message": "用户信号源配置已保存"})
 }
 

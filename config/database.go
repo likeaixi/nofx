@@ -139,6 +139,7 @@ func (d *Database) createTables() error {
 			user_id TEXT NOT NULL,
 			coin_pool_url TEXT DEFAULT '',
 			oi_top_url TEXT DEFAULT '',
+			extra_signal_url TEXT DEFAULT '',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -483,6 +484,7 @@ type TraderRecord struct {
 	TradingSymbols       string    `json:"trading_symbols"`        // 交易币种，逗号分隔
 	UseCoinPool          bool      `json:"use_coin_pool"`          // 是否使用COIN POOL信号源
 	UseOITop             bool      `json:"use_oi_top"`             // 是否使用OI TOP信号源
+	UseExtraSignal       bool      `json:"use_extra_signal"`       // 是否使用外部信号源
 	CustomPrompt         string    `json:"custom_prompt"`          // 自定义交易策略prompt
 	OverrideBasePrompt   bool      `json:"override_base_prompt"`   // 是否覆盖基础prompt
 	SystemPromptTemplate string    `json:"system_prompt_template"` // 系统提示词模板名称
@@ -493,12 +495,13 @@ type TraderRecord struct {
 
 // UserSignalSource 用户信号源配置
 type UserSignalSource struct {
-	ID          int       `json:"id"`
-	UserID      string    `json:"user_id"`
-	CoinPoolURL string    `json:"coin_pool_url"`
-	OITopURL    string    `json:"oi_top_url"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID             int       `json:"id"`
+	UserID         string    `json:"user_id"`
+	CoinPoolURL    string    `json:"coin_pool_url"`
+	OITopURL       string    `json:"oi_top_url"`
+	ExtraSignalURL string    `json:"extra_signal_url"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // GenerateOTPSecret 生成OTP密钥
@@ -1065,11 +1068,11 @@ func (d *Database) SetSystemConfig(key, value string) error {
 }
 
 // CreateUserSignalSource 创建用户信号源配置
-func (d *Database) CreateUserSignalSource(userID, coinPoolURL, oiTopURL string) error {
+func (d *Database) CreateUserSignalSource(userID, coinPoolURL, oiTopURL, extraSignal string) error {
 	_, err := d.db.Exec(`
-		INSERT OR REPLACE INTO user_signal_sources (user_id, coin_pool_url, oi_top_url, updated_at)
-		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-	`, userID, coinPoolURL, oiTopURL)
+		INSERT OR REPLACE INTO user_signal_sources (user_id, coin_pool_url, oi_top_url, extra_signal_url, updated_at)
+		VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+	`, userID, coinPoolURL, oiTopURL, extraSignal)
 	return err
 }
 
@@ -1077,10 +1080,10 @@ func (d *Database) CreateUserSignalSource(userID, coinPoolURL, oiTopURL string) 
 func (d *Database) GetUserSignalSource(userID string) (*UserSignalSource, error) {
 	var source UserSignalSource
 	err := d.db.QueryRow(`
-		SELECT id, user_id, coin_pool_url, oi_top_url, created_at, updated_at
+		SELECT id, user_id, coin_pool_url, oi_top_url, extra_signal_url, created_at, updated_at
 		FROM user_signal_sources WHERE user_id = ?
 	`, userID).Scan(
-		&source.ID, &source.UserID, &source.CoinPoolURL, &source.OITopURL,
+		&source.ID, &source.UserID, &source.CoinPoolURL, &source.OITopURL, &source.ExtraSignalURL,
 		&source.CreatedAt, &source.UpdatedAt,
 	)
 	if err != nil {
@@ -1090,11 +1093,11 @@ func (d *Database) GetUserSignalSource(userID string) (*UserSignalSource, error)
 }
 
 // UpdateUserSignalSource 更新用户信号源配置
-func (d *Database) UpdateUserSignalSource(userID, coinPoolURL, oiTopURL string) error {
+func (d *Database) UpdateUserSignalSource(userID, coinPoolURL, oiTopURL, extraSignal string) error {
 	_, err := d.db.Exec(`
-		UPDATE user_signal_sources SET coin_pool_url = ?, oi_top_url = ?, updated_at = CURRENT_TIMESTAMP
+		UPDATE user_signal_sources SET coin_pool_url = ?, oi_top_url = ?, extra_signal_url = ? updated_at = CURRENT_TIMESTAMP
 		WHERE user_id = ?
-	`, coinPoolURL, oiTopURL, userID)
+	`, coinPoolURL, oiTopURL, extraSignal, userID)
 	return err
 }
 

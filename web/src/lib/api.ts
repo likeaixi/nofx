@@ -309,10 +309,12 @@ export const api = {
   async getUserSignalSource(): Promise<{
     coin_pool_url: string
     oi_top_url: string
+    extra_signal_url: string
   }> {
     const result = await httpClient.get<{
       coin_pool_url: string
       oi_top_url: string
+      extra_signal_url: string
     }>(`${API_BASE}/user/signal-sources`)
     if (!result.success) throw new Error('获取用户信号源配置失败')
     return result.data!
@@ -320,11 +322,13 @@ export const api = {
 
   async saveUserSignalSource(
     coinPoolUrl: string,
-    oiTopUrl: string
+    oiTopUrl: string,
+    extraSignalUrl: string,
   ): Promise<void> {
     const result = await httpClient.post(`${API_BASE}/user/signal-sources`, {
       coin_pool_url: coinPoolUrl,
       oi_top_url: oiTopUrl,
+      extra_signal_url: extraSignalUrl,
     })
     if (!result.success) throw new Error('保存用户信号源配置失败')
   },

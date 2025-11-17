@@ -82,9 +82,11 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
   const [userSignalSource, setUserSignalSource] = useState<{
     coinPoolUrl: string
     oiTopUrl: string
+    extraSignalUrl: string
   }>({
     coinPoolUrl: '',
     oiTopUrl: '',
+    extraSignalUrl: '',
   })
 
   const { data: traders, mutate: mutateTraders } = useSWR<TraderInfo[]>(
@@ -134,6 +136,7 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
           setUserSignalSource({
             coinPoolUrl: signalSource.coin_pool_url || '',
             oiTopUrl: signalSource.oi_top_url || '',
+            extraSignalUrl: signalSource.extra_signal_url || '',
           })
         } catch (error) {
           console.log('📡 用户信号源配置暂未设置')
@@ -703,15 +706,16 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
 
   const handleSaveSignalSource = async (
     coinPoolUrl: string,
-    oiTopUrl: string
+    oiTopUrl: string,
+    extraSignalUrl: string,
   ) => {
     try {
-      await toast.promise(api.saveUserSignalSource(coinPoolUrl, oiTopUrl), {
+      await toast.promise(api.saveUserSignalSource(coinPoolUrl, oiTopUrl, extraSignalUrl), {
         loading: '正在保存…',
         success: '保存成功',
         error: '保存失败',
       })
-      setUserSignalSource({ coinPoolUrl, oiTopUrl })
+      setUserSignalSource({ coinPoolUrl, oiTopUrl, extraSignalUrl })
       setShowSignalSourceModal(false)
     } catch (error) {
       console.error('Failed to save signal source:', error)
@@ -1270,6 +1274,7 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
         <SignalSourceModal
           coinPoolUrl={userSignalSource.coinPoolUrl}
           oiTopUrl={userSignalSource.oiTopUrl}
+          extraSignalUrl={userSignalSource.extraSignalUrl}
           onSave={handleSaveSignalSource}
           onClose={() => setShowSignalSourceModal(false)}
           language={language}
@@ -1328,22 +1333,25 @@ function Tooltip({
 function SignalSourceModal({
   coinPoolUrl,
   oiTopUrl,
+  extraSignalUrl,
   onSave,
   onClose,
   language,
 }: {
   coinPoolUrl: string
   oiTopUrl: string
-  onSave: (coinPoolUrl: string, oiTopUrl: string) => void
+  extraSignalUrl: string
+  onSave: (coinPoolUrl: string, oiTopUrl: string, extraSignalUrl: string) => void
   onClose: () => void
   language: Language
 }) {
   const [coinPool, setCoinPool] = useState(coinPoolUrl || '')
   const [oiTop, setOiTop] = useState(oiTopUrl || '')
+  const [extraSignal, setExtraSignal] = useState(extraSignalUrl || '')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSave(coinPool.trim(), oiTop.trim())
+    onSave(coinPool.trim(), oiTop.trim(), extraSignal.trim())
   }
 
   return (
@@ -1406,6 +1414,30 @@ function SignalSourceModal({
                   border: '1px solid #2B3139',
                   color: '#EAECEF',
                 }}
+              />
+              <div className="text-xs mt-1" style={{ color: '#848E9C' }}>
+                {t('oiTopDescription', language)}
+              </div>
+            </div>
+
+            <div>
+              <label
+                  className="block text-sm font-semibold mb-2"
+                  style={{ color: '#EAECEF' }}
+              >
+                EXTRA SIGNAL URL
+              </label>
+              <input
+                  type="url"
+                  value={extraSignal}
+                  onChange={(e) => setExtraSignal(e.target.value)}
+                  placeholder="https://api.example.com/signal"
+                  className="w-full px-3 py-2 rounded"
+                  style={{
+                    background: '#0B0E11',
+                    border: '1px solid #2B3139',
+                    color: '#EAECEF',
+                  }}
               />
               <div className="text-xs mt-1" style={{ color: '#848E9C' }}>
                 {t('oiTopDescription', language)}

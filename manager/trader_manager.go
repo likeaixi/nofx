@@ -160,17 +160,18 @@ func (tm *TraderManager) LoadTradersFromDatabase(database *config.Database) erro
 		}
 
 		// 获取用户信号源配置
-		var coinPoolURL, oiTopURL string
+		var coinPoolURL, oiTopURL, extraSignalURL string
 		if userSignalSource, err := database.GetUserSignalSource(traderCfg.UserID); err == nil {
 			coinPoolURL = userSignalSource.CoinPoolURL
 			oiTopURL = userSignalSource.OITopURL
+			extraSignalURL = userSignalSource.ExtraSignalURL
 		} else {
 			// 如果用户没有配置信号源，使用空字符串
 			log.Printf("🔍 用户 %s 暂未配置信号源", traderCfg.UserID)
 		}
 
 		// 添加到TraderManager
-		err = tm.addTraderFromDB(traderCfg, aiModelCfg, exchangeCfg, coinPoolURL, oiTopURL, maxDailyLoss, maxDrawdown, stopTradingMinutes, defaultCoins, database, traderCfg.UserID)
+		err = tm.addTraderFromDB(traderCfg, aiModelCfg, exchangeCfg, coinPoolURL, oiTopURL, extraSignalURL, maxDailyLoss, maxDrawdown, stopTradingMinutes, defaultCoins, database, traderCfg.UserID)
 		if err != nil {
 			log.Printf("❌ 添加交易员 %s 失败: %v", traderCfg.Name, err)
 			continue
@@ -182,7 +183,7 @@ func (tm *TraderManager) LoadTradersFromDatabase(database *config.Database) erro
 }
 
 // addTraderFromConfig 内部方法：从配置添加交易员（不加锁，因为调用方已加锁）
-func (tm *TraderManager) addTraderFromDB(traderCfg *config.TraderRecord, aiModelCfg *config.AIModelConfig, exchangeCfg *config.ExchangeConfig, coinPoolURL, oiTopURL string, maxDailyLoss, maxDrawdown float64, stopTradingMinutes int, defaultCoins []string, database *config.Database, userID string) error {
+func (tm *TraderManager) addTraderFromDB(traderCfg *config.TraderRecord, aiModelCfg *config.AIModelConfig, exchangeCfg *config.ExchangeConfig, coinPoolURL, oiTopURL, extraSignalURL string, maxDailyLoss, maxDrawdown float64, stopTradingMinutes int, defaultCoins []string, database *config.Database, userID string) error {
 	if _, exists := tm.traders[traderCfg.ID]; exists {
 		return fmt.Errorf("trader ID '%s' 已存在", traderCfg.ID)
 	}
@@ -212,6 +213,12 @@ func (tm *TraderManager) addTraderFromDB(traderCfg *config.TraderRecord, aiModel
 		log.Printf("✓ 交易员 %s 启用 COIN POOL 信号源: %s", traderCfg.Name, coinPoolURL)
 	}
 
+	var effectiveExtraSignalURL string
+	if traderCfg.UseExtraSignal && extraSignalURL != "" {
+		effectiveExtraSignalURL = extraSignalURL
+		log.Printf("✓ 交易员 %s 启用 Extra Signal 信号源: %s", traderCfg.Name, extraSignalURL)
+	}
+
 	// 构建AutoTraderConfig
 	traderConfig := trader.AutoTraderConfig{
 		ID:                    traderCfg.ID,
@@ -223,6 +230,7 @@ func (tm *TraderManager) addTraderFromDB(traderCfg *config.TraderRecord, aiModel
 		HyperliquidPrivateKey: "",
 		HyperliquidTestnet:    exchangeCfg.Testnet,
 		CoinPoolAPIURL:        effectiveCoinPoolURL,
+		ExtraSignalURL:        effectiveExtraSignalURL,
 		UseQwen:               aiModelCfg.Provider == "qwen",
 		DeepSeekKey:           "",
 		QwenKey:               "",
@@ -286,7 +294,7 @@ func (tm *TraderManager) addTraderFromDB(traderCfg *config.TraderRecord, aiModel
 // AddTrader 从数据库配置添加trader (移除旧版兼容性)
 
 // AddTraderFromDB 从数据库配置添加trader
-func (tm *TraderManager) AddTraderFromDB(traderCfg *config.TraderRecord, aiModelCfg *config.AIModelConfig, exchangeCfg *config.ExchangeConfig, coinPoolURL, oiTopURL string, maxDailyLoss, maxDrawdown float64, stopTradingMinutes int, defaultCoins []string, database *config.Database, userID string) error {
+func (tm *TraderManager) AddTraderFromDB(traderCfg *config.TraderRecord, aiModelCfg *config.AIModelConfig, exchangeCfg *config.ExchangeConfig, coinPoolURL, oiTopURL, extraSignalURL string, maxDailyLoss, maxDrawdown float64, stopTradingMinutes int, defaultCoins []string, database *config.Database, userID string) error {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
 
@@ -319,6 +327,12 @@ func (tm *TraderManager) AddTraderFromDB(traderCfg *config.TraderRecord, aiModel
 		log.Printf("✓ 交易员 %s 启用 COIN POOL 信号源: %s", traderCfg.Name, coinPoolURL)
 	}
 
+	var effectiveExtraSignalURL string
+	if traderCfg.UseExtraSignal && extraSignalURL != "" {
+		effectiveExtraSignalURL = extraSignalURL
+		log.Printf("✓ 交易员 %s 启用 Extra Signal 信号源: %s", traderCfg.Name, extraSignalURL)
+	}
+
 	// 构建AutoTraderConfig
 	traderConfig := trader.AutoTraderConfig{
 		ID:                    traderCfg.ID,
@@ -330,6 +344,7 @@ func (tm *TraderManager) AddTraderFromDB(traderCfg *config.TraderRecord, aiModel
 		HyperliquidPrivateKey: "",
 		HyperliquidTestnet:    exchangeCfg.Testnet,
 		CoinPoolAPIURL:        effectiveCoinPoolURL,
+		ExtraSignalURL:        effectiveExtraSignalURL,
 		UseQwen:               aiModelCfg.Provider == "qwen",
 		DeepSeekKey:           "",
 		QwenKey:               "",
@@ -731,11 +746,12 @@ func (tm *TraderManager) LoadUserTraders(database *config.Database, userID strin
 	defaultCoinsStr, _ := database.GetSystemConfig("default_coins")
 
 	// 获取用户信号源配置
-	var coinPoolURL, oiTopURL string
+	var coinPoolURL, oiTopURL, extraSignalURL string
 	if userSignalSource, err := database.GetUserSignalSource(userID); err == nil {
 		coinPoolURL = userSignalSource.CoinPoolURL
 		oiTopURL = userSignalSource.OITopURL
-		log.Printf("📡 加载用户 %s 的信号源配置: COIN POOL=%s, OI TOP=%s", userID, coinPoolURL, oiTopURL)
+		extraSignalURL = userSignalSource.ExtraSignalURL
+		log.Printf("📡 加载用户 %s 的信号源配置: COIN POOL=%s, OI TOP=%s, Extra Signal=%s", userID, coinPoolURL, oiTopURL, extraSignalURL)
 	} else {
 		log.Printf("🔍 用户 %s 暂未配置信号源", userID)
 	}
@@ -838,7 +854,7 @@ func (tm *TraderManager) LoadUserTraders(database *config.Database, userID strin
 		}
 
 		// 使用现有的方法加载交易员
-		err = tm.loadSingleTrader(traderCfg, aiModelCfg, exchangeCfg, coinPoolURL, oiTopURL, maxDailyLoss, maxDrawdown, stopTradingMinutes, defaultCoins, database, userID)
+		err = tm.loadSingleTrader(traderCfg, aiModelCfg, exchangeCfg, coinPoolURL, oiTopURL, extraSignalURL, maxDailyLoss, maxDrawdown, stopTradingMinutes, defaultCoins, database, userID)
 		if err != nil {
 			log.Printf("⚠️ 加载交易员 %s 失败: %v", traderCfg.Name, err)
 		}
@@ -946,11 +962,12 @@ func (tm *TraderManager) LoadTraderByID(database *config.Database, userID, trade
 	defaultCoinsStr, _ := database.GetSystemConfig("default_coins")
 
 	// 6. 查询用户信号源配置
-	var coinPoolURL, oiTopURL string
+	var coinPoolURL, oiTopURL, extraSignalURL string
 	if userSignalSource, err := database.GetUserSignalSource(userID); err == nil {
 		coinPoolURL = userSignalSource.CoinPoolURL
 		oiTopURL = userSignalSource.OITopURL
-		log.Printf("📡 加载用户 %s 的信号源配置: COIN POOL=%s, OI TOP=%s", userID, coinPoolURL, oiTopURL)
+		extraSignalURL = userSignalSource.ExtraSignalURL
+		log.Printf("📡 加载用户 %s 的信号源配置: COIN POOL=%s, OI TOP=%s, Extra Signal=%s", userID, coinPoolURL, oiTopURL, extraSignalURL)
 	} else {
 		log.Printf("🔍 用户 %s 暂未配置信号源", userID)
 	}
@@ -987,6 +1004,7 @@ func (tm *TraderManager) LoadTraderByID(database *config.Database, userID, trade
 		aiModelCfg,
 		exchangeCfg,
 		coinPoolURL,
+		extraSignalURL,
 		oiTopURL,
 		maxDailyLoss,
 		maxDrawdown,
@@ -998,7 +1016,7 @@ func (tm *TraderManager) LoadTraderByID(database *config.Database, userID, trade
 }
 
 // loadSingleTrader 加载单个交易员（从现有代码提取的公共逻辑）
-func (tm *TraderManager) loadSingleTrader(traderCfg *config.TraderRecord, aiModelCfg *config.AIModelConfig, exchangeCfg *config.ExchangeConfig, coinPoolURL, oiTopURL string, maxDailyLoss, maxDrawdown float64, stopTradingMinutes int, defaultCoins []string, database *config.Database, userID string) error {
+func (tm *TraderManager) loadSingleTrader(traderCfg *config.TraderRecord, aiModelCfg *config.AIModelConfig, exchangeCfg *config.ExchangeConfig, coinPoolURL, oiTopURL, extraSignalURL string, maxDailyLoss, maxDrawdown float64, stopTradingMinutes int, defaultCoins []string, database *config.Database, userID string) error {
 	// 处理交易币种列表
 	var tradingCoins []string
 	if traderCfg.TradingSymbols != "" {
@@ -1024,6 +1042,12 @@ func (tm *TraderManager) loadSingleTrader(traderCfg *config.TraderRecord, aiMode
 		log.Printf("✓ 交易员 %s 启用 COIN POOL 信号源: %s", traderCfg.Name, coinPoolURL)
 	}
 
+	var effectiveExtraSignalURL string
+	if traderCfg.UseExtraSignal && extraSignalURL != "" {
+		effectiveExtraSignalURL = extraSignalURL
+		log.Printf("✓ 交易员 %s 启用 Extra Signal 信号源: %s", traderCfg.Name, extraSignalURL)
+	}
+
 	// 构建AutoTraderConfig
 	traderConfig := trader.AutoTraderConfig{
 		ID:                   traderCfg.ID,
@@ -1035,6 +1059,7 @@ func (tm *TraderManager) loadSingleTrader(traderCfg *config.TraderRecord, aiMode
 		AltcoinLeverage:      traderCfg.AltcoinLeverage,
 		ScanInterval:         time.Duration(traderCfg.ScanIntervalMinutes) * time.Minute,
 		CoinPoolAPIURL:       effectiveCoinPoolURL,
+		ExtraSignalURL:       effectiveExtraSignalURL,
 		CustomAPIURL:         aiModelCfg.CustomAPIURL,    // 自定义API URL
 		CustomModelName:      aiModelCfg.CustomModelName, // 自定义模型名称
 		UseQwen:              aiModelCfg.Provider == "qwen",

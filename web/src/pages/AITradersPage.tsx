@@ -238,6 +238,7 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
         <SignalSourceModal
           coinPoolUrl={userSignalSource.coinPoolUrl}
           oiTopUrl={userSignalSource.oiTopUrl}
+          extraSignalUrl={userSignalSource.extraSignalUrl}
           onSave={handleSaveSignalSource}
           onClose={() => setShowSignalSourceModal(false)}
           language={language}

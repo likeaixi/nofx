@@ -26,6 +26,7 @@ interface TraderConfigData {
   is_cross_margin: boolean
   use_coin_pool: boolean
   use_oi_top: boolean
+  use_extra_signal: boolean
   initial_balance?: number // 可选：创建时不需要，编辑时使用
   scan_interval_minutes: number
 }
@@ -63,6 +64,7 @@ export function TraderConfigModal({
     is_cross_margin: true,
     use_coin_pool: false,
     use_oi_top: false,
+    use_extra_signal: false,
     scan_interval_minutes: 3,
   })
   const [isSaving, setIsSaving] = useState(false)
@@ -98,6 +100,7 @@ export function TraderConfigModal({
         is_cross_margin: true,
         use_coin_pool: false,
         use_oi_top: false,
+        use_extra_signal: false,
         initial_balance: 1000,
         scan_interval_minutes: 3,
       })
@@ -253,6 +256,7 @@ export function TraderConfigModal({
         is_cross_margin: formData.is_cross_margin,
         use_coin_pool: formData.use_coin_pool,
         use_oi_top: formData.use_oi_top,
+        use_extra_signal: formData.use_extra_signal,
         scan_interval_minutes: formData.scan_interval_minutes,
       }
 
@@ -638,6 +642,20 @@ export function TraderConfigModal({
                 />
                 <label className="text-sm text-[#EAECEF]">
                   使用 OI Top 信号
+                </label>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                    type="checkbox"
+                    checked={formData.use_extra_signal}
+                    onChange={(e) =>
+                        handleInputChange('use_extra_signal', e.target.checked)
+                    }
+                    className="w-4 h-4"
+                />
+                <label className="text-sm text-[#EAECEF]">
+                  使用 Extra Signal 信号
                 </label>
               </div>
             </div>
