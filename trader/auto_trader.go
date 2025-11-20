@@ -10,6 +10,7 @@ import (
 	"nofx/market"
 	"nofx/mcp"
 	"nofx/pool"
+	"nofx/strategy"
 	"strings"
 	"sync"
 	"time"
@@ -86,6 +87,7 @@ type AutoTrader struct {
 	exchange              string // 交易平台名称
 	config                AutoTraderConfig
 	trader                Trader // 使用Trader接口（支持多平台）
+	strategy              strategy.Strategy
 	mcpClient             mcp.AIClient
 	decisionLogger        logger.IDecisionLogger // 决策日志记录器
 	initialBalance        float64
@@ -211,6 +213,10 @@ func NewAutoTrader(config AutoTraderConfig, database interface{}, userID string)
 		systemPromptTemplate = "adaptive"
 	}
 
+	// 初始化策略类型
+	var tradeStrategy strategy.Strategy
+	tradeStrategy = strategy.NewSpiderStrategy()
+
 	return &AutoTrader{
 		id:                    config.ID,
 		name:                  config.Name,
@@ -218,6 +224,7 @@ func NewAutoTrader(config AutoTraderConfig, database interface{}, userID string)
 		exchange:              config.Exchange,
 		config:                config,
 		trader:                trader,
+		strategy:              tradeStrategy,
 		mcpClient:             mcpClient,
 		decisionLogger:        decisionLogger,
 		initialBalance:        config.InitialBalance,
@@ -362,8 +369,12 @@ func (at *AutoTrader) runCycle() error {
 		ctx.Account.TotalEquity, ctx.Account.AvailableBalance, ctx.Account.PositionCount)
 
 	// 5. 调用AI获取完整决策
-	log.Printf("🤖 正在请求AI分析并决策... [模板: %s]", at.systemPromptTemplate)
-	decision, err := decision.GetFullDecisionWithCustomPrompt(ctx, at.mcpClient, at.customPrompt, at.overrideBasePrompt, at.systemPromptTemplate)
+	//log.Printf("🤖 正在请求AI分析并决策... [模板: %s]", at.systemPromptTemplate)
+	//decision, err := decision.GetFullDecisionWithCustomPrompt(ctx, at.mcpClient, at.customPrompt, at.overrideBasePrompt, at.systemPromptTemplate)
+
+	// 5.1 换成蜘蛛丝策略
+	log.Printf("🕷️ 正在请求Spider Strategy分析并决策")
+	decision, err := at.strategy.GetFullDecision(ctx)
 
 	if decision != nil && decision.AIRequestDurationMs > 0 {
 		record.AIRequestDurationMs = decision.AIRequestDurationMs
@@ -560,10 +571,13 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 		peakPnlPct := at.peakPnLCache[posKey]
 		at.peakPnLCacheMutex.RUnlock()
 
+		// TODO: 获取数据库的entry_level数据
+
 		positionInfos = append(positionInfos, decision.PositionInfo{
 			Symbol:           symbol,
 			Side:             side,
 			EntryPrice:       entryPrice,
+			EntryLevel:       entryPrice,
 			MarkPrice:        markPrice,
 			Quantity:         quantity,
 			Leverage:         leverage,
@@ -610,7 +624,13 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 		performance = nil
 	}
 
-	// 6. 构建上下文
+	// 6. 获取K线数据
+	klines, err := at.trader.GetKlines(candidateCoins)
+	if err != nil {
+		return nil, fmt.Errorf("获取候选K线失败: %w", err)
+	}
+
+	// 7. 构建上下文
 	ctx := &decision.Context{
 		CurrentTime:     time.Now().Format("2006-01-02 15:04:05"),
 		RuntimeMinutes:  int(time.Since(at.startTime).Minutes()),
@@ -629,6 +649,7 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 		},
 		Positions:      positionInfos,
 		CandidateCoins: candidateCoins,
+		Klines:         klines,
 		Performance:    performance, // 添加历史表现分析
 	}
 

@@ -5,13 +5,13 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/sonirico/go-hyperliquid"
 	"log"
+	"nofx/decision"
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/sonirico/go-hyperliquid"
 )
 
 // HyperliquidTrader Hyperliquid交易器
@@ -239,6 +239,12 @@ func (t *HyperliquidTrader) GetBalance() (map[string]interface{}, error) {
 	log.Printf("  ⭐ 总资产: %.2f USDC | Perp 可用: %.2f USDC | Spot 余额: %.2f USDC",
 		totalWalletBalance, availableBalance, spotUSDCBalance)
 
+	return result, nil
+}
+
+func (t *HyperliquidTrader) GetKlines(coins []decision.CandidateCoin) (map[string][]decision.Kline, error) {
+	// TODO: 暂未实现
+	var result map[string][]decision.Kline
 	return result, nil
 }
 

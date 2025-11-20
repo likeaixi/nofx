@@ -1,5 +1,7 @@
 package trader
 
+import "nofx/decision"
+
 // Trader 交易器统一接口
 // 支持多个交易平台（币安、Hyperliquid等）
 type Trader interface {
@@ -8,6 +10,8 @@ type Trader interface {
 
 	// GetPositions 获取所有持仓
 	GetPositions() ([]map[string]interface{}, error)
+
+	GetKlines(coins []decision.CandidateCoin) (map[string][]decision.Kline, error)
 
 	// OpenLong 开多仓
 	OpenLong(symbol string, quantity float64, leverage int) (map[string]interface{}, error)

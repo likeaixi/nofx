@@ -3,6 +3,7 @@ package decision
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/shopspring/decimal"
 	"log"
 	"math"
 	"nofx/market"
@@ -33,6 +34,7 @@ type PositionInfo struct {
 	Symbol           string  `json:"symbol"`
 	Side             string  `json:"side"` // "long" or "short"
 	EntryPrice       float64 `json:"entry_price"`
+	EntryLevel       float64 `json:"entry_level"`
 	MarkPrice        float64 `json:"mark_price"`
 	Quantity         float64 `json:"quantity"`
 	Leverage         int     `json:"leverage"`
@@ -62,6 +64,8 @@ type CandidateCoin struct {
 	Sources []string `json:"sources"` // 来源: "ai500" 和/或 "oi_top"
 }
 
+type Kline struct{ Open, High, Low, Close decimal.Decimal }
+
 // OITopData 持仓量增长Top数据（用于AI决策参考）
 type OITopData struct {
 	Rank              int     // OI Top排名
@@ -80,6 +84,7 @@ type Context struct {
 	Account         AccountInfo             `json:"account"`
 	Positions       []PositionInfo          `json:"positions"`
 	CandidateCoins  []CandidateCoin         `json:"candidate_coins"`
+	Klines          map[string][]Kline      `json:"klines"`
 	MarketDataMap   map[string]*market.Data `json:"-"` // 不序列化，但内部使用
 	OITopDataMap    map[string]*OITopData   `json:"-"` // OI Top数据映射
 	Performance     interface{}             `json:"-"` // 历史表现分析（logger.PerformanceAnalysis）
@@ -107,6 +112,8 @@ type Decision struct {
 	Confidence int     `json:"confidence,omitempty"` // 信心度 (0-100)
 	RiskUSD    float64 `json:"risk_usd,omitempty"`   // 最大美元风险
 	Reasoning  string  `json:"reasoning"`
+
+	Level float64 `json:"level"`
 }
 
 // FullDecision AI的完整决策（包含思维链）

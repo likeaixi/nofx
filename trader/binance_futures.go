@@ -5,7 +5,9 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"github.com/shopspring/decimal"
 	"log"
+	"nofx/decision"
 	"nofx/hook"
 	"strconv"
 	"strings"
@@ -57,7 +59,13 @@ type FuturesTrader struct {
 	positionsCacheTime  time.Time
 	positionsCacheMutex sync.RWMutex
 
-	// 缓存有效期（15秒）
+	// K线缓存
+	cachedKlines        map[string][]decision.Kline
+	klinesCacheTime     time.Time
+	klinesCacheMutex    sync.RWMutex
+	klinesCacheDuration time.Duration
+
+	// 缓存有效期（1秒）
 	cacheDuration time.Duration
 }
 
@@ -73,8 +81,9 @@ func NewFuturesTrader(apiKey, secretKey string, userId string) *FuturesTrader {
 	// 同步时间，避免 Timestamp ahead 错误
 	syncBinanceServerTime(client)
 	trader := &FuturesTrader{
-		client:        client,
-		cacheDuration: 15 * time.Second, // 15秒缓存
+		client:              client,
+		cacheDuration:       1 * time.Second,  // 1秒缓存
+		klinesCacheDuration: 30 * time.Second, // 30秒缓存
 	}
 
 	// 设置双向持仓模式（Hedge Mode）
@@ -157,6 +166,40 @@ func (t *FuturesTrader) GetBalance() (map[string]interface{}, error) {
 	t.cachedBalance = result
 	t.balanceCacheTime = time.Now()
 	t.balanceCacheMutex.Unlock()
+
+	return result, nil
+}
+
+func (t *FuturesTrader) GetKlines(coins []decision.CandidateCoin) (map[string][]decision.Kline, error) {
+	// 先检查缓存是否有效
+	t.klinesCacheMutex.RLock()
+	if t.cachedKlines != nil && time.Since(t.klinesCacheTime) < t.klinesCacheDuration {
+		cacheAge := time.Since(t.klinesCacheTime)
+		t.positionsCacheMutex.RUnlock()
+		log.Printf("✓ 使用缓存的K线数据（缓存时间: %.1f秒前）", cacheAge.Seconds())
+		return t.cachedKlines, nil
+	}
+	t.klinesCacheMutex.RUnlock()
+
+	// 缓存过期或不存在，调用API
+	log.Printf("🔄 缓存过期，正在调用币安API获取K线数据...")
+
+	var result map[string][]decision.Kline
+	for _, coin := range coins {
+		closed, err := t.KlinesClosed(coin.Symbol, 10, "1m")
+		if err != nil {
+			log.Printf("❌ 获取 %s K线出错", coin.Symbol)
+			continue
+		}
+
+		result[coin.Symbol] = closed
+	}
+
+	// 更新缓存
+	t.klinesCacheMutex.Lock()
+	t.cachedKlines = result
+	t.klinesCacheTime = time.Now()
+	t.klinesCacheMutex.Unlock()
 
 	return result, nil
 }
@@ -914,4 +957,28 @@ func stringContains(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func mustDec(s string) decimal.Decimal { v, _ := decimal.NewFromString(s); return v }
+
+// K线，返回“已收盘”的数据（剔除最后一根）
+func (t *FuturesTrader) KlinesClosed(sym string, limit int, interval string) ([]decision.Kline, error) {
+	raw, err := t.client.NewKlinesService().Symbol(sym).Interval(interval).Limit(limit + 1).Do(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) == 0 {
+		return nil, fmt.Errorf("no klines")
+	}
+	raw = raw[:len(raw)-1]
+	out := make([]decision.Kline, 0, len(raw))
+	for _, k := range raw {
+		out = append(out, decision.Kline{
+			Open:  mustDec(k.Open),
+			High:  mustDec(k.High),
+			Low:   mustDec(k.Low),
+			Close: mustDec(k.Close),
+		})
+	}
+	return out, nil
 }

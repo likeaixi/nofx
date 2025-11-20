@@ -13,6 +13,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"nofx/decision"
 	"nofx/hook"
 	"sort"
 	"strconv"
@@ -517,6 +518,12 @@ func (t *AsterTrader) GetBalance() (map[string]interface{}, error) {
 		"availableBalance":      availableBalance,   // 可用余额
 		"totalUnrealizedProfit": realUnrealizedPnl,  // 未实现盈亏（从持仓累加）
 	}, nil
+}
+
+func (t *AsterTrader) GetKlines(coins []decision.CandidateCoin) (map[string][]decision.Kline, error) {
+	// TODO: 暂未实现
+	var result map[string][]decision.Kline
+	return result, nil
 }
 
 // GetPositions 获取持仓信息
