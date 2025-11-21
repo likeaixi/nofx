@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"nofx/decision"
+	"nofx/logger"
 	"nofx/market"
 	"nofx/pool"
 	"os"
@@ -17,6 +18,7 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -116,6 +118,14 @@ func (s *SpiderStrategy) Configure(_ *decision.Context, cfg StrategyConfig) erro
 			s.confidence = mustInt(v, s.confidence)
 		}
 	}
+	logger.WithFields(logrus.Fields{
+		"strategy":       s.Name(),
+		"symbol":         s.symbol,
+		"entry_distance": s.entryDistance.String(),
+		"position_size":  s.positionSize.String(),
+		"leverage":       s.leverage,
+		"confidence":     s.confidence,
+	}).Info("spider strategy configured")
 	return nil
 }
 
@@ -130,19 +140,42 @@ func (s *SpiderStrategy) Decide(ctx *decision.Context) ([]decision.Decision, err
 
 	shorts, longs, err := s.data.FetchLevels(ctx, s.symbol)
 	if err != nil {
+		logger.WithFields(logrus.Fields{
+			"strategy": s.Name(),
+			"symbol":   s.symbol,
+		}).WithError(err).Error("spider fetch levels failed")
 		return nil, fmt.Errorf("fetch spider levels: %w", err)
 	}
+	logger.WithFields(logrus.Fields{
+		"strategy":     s.Name(),
+		"symbol":       s.symbol,
+		"short_levels": len(shorts),
+		"long_levels":  len(longs),
+	}).Debug("spider fetched levels")
 	if len(shorts) == 0 && len(longs) == 0 {
+		logger.WithFields(logrus.Fields{
+			"strategy": s.Name(),
+			"symbol":   s.symbol,
+		}).Debug("spider levels empty, skip decision")
 		return nil, nil
 	}
 
 	price, err := s.data.Price(ctx, s.symbol)
 	if err != nil {
+		logger.WithFields(logrus.Fields{
+			"strategy": s.Name(),
+			"symbol":   s.symbol,
+		}).WithError(err).Error("spider fetch price failed")
 		return nil, fmt.Errorf("fetch price: %w", err)
 	}
 
 	direction, level := s.pickEntry(price, shorts, longs)
 	if level == nil || direction == "" {
+		logger.WithFields(logrus.Fields{
+			"strategy": s.Name(),
+			"symbol":   s.symbol,
+			"price":    price.String(),
+		}).Debug("spider no eligible level near price")
 		return nil, nil
 	}
 
@@ -168,6 +201,18 @@ func (s *SpiderStrategy) Decide(ctx *decision.Context) ([]decision.Decision, err
 			direction, level.String(), price.String(), distance.String(),
 		),
 	}
+
+	logger.WithFields(logrus.Fields{
+		"strategy":          s.Name(),
+		"symbol":            s.symbol,
+		"action":            action,
+		"level":             level.String(),
+		"distance":          distance.String(),
+		"price":             price.String(),
+		"position_size_usd": sizeUSD,
+		"leverage":          s.leverage,
+		"confidence":        s.confidence,
+	}).Info("spider decision generated")
 
 	return []decision.Decision{dec}, nil
 }
