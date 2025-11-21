@@ -46,8 +46,11 @@ var (
 	leverage             = 50
 	accountEquityUSDT    = d("1000") // 备注
 	positionNotionalUSDT = d("200")  // 每次开仓名义 200U
-	STOP_LOSS_PCT        = d("0.05")
-	TAKE_PROFIT_PCT      = d("0.25")
+
+	STOP_LOSS_PCT   = d("0.05")
+	TAKE_PROFIT_PCT = d("0.25")
+
+	positionPercent = d("0.2")
 
 	// 可选硬止损（0 关闭）
 	slPctHard = d("0.05") // 5%
@@ -315,34 +318,9 @@ func decimalToFloat(v decimal.Decimal) float64 {
 	return f
 }
 
-// ================ 工具 ================
-
-func d(s string) decimal.Decimal { v, _ := decimal.NewFromString(s); return v }
-func getenv(k, def string) string {
-	v := strings.TrimSpace(os.Getenv(k))
-	if v == "" {
-		return def
-	}
-	return v
-}
-func absDec(v decimal.Decimal) decimal.Decimal {
-	if v.IsNegative() {
-		return v.Neg()
-	}
-	return v
-}
-
-// ================ 辅助 ================
-
-func mustDec(s string) decimal.Decimal { v, _ := decimal.NewFromString(s); return v }
-func sleepUntil(start time.Time, period time.Duration) {
-	if d := period - time.Since(start); d > 0 {
-		time.Sleep(d)
-	}
-}
-
 // 重写AI决策的方法
 func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullDecision, error) {
+	logger.Info("Decision start")
 	// 1. 为所有币种获取市场数据
 	if err := fetchMarketDataForContext(ctx); err != nil {
 		return nil, fmt.Errorf("获取市场数据失败: %w", err)
@@ -360,7 +338,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 	//	return nil, fmt.Errorf("调用AI API失败: %w", err)
 	//}
 
-	var fullDecision = &decision.FullDecision{
+	fullDecision := &decision.FullDecision{
 		SystemPrompt:        "",
 		UserPrompt:          "",
 		CoTTrace:            "",
@@ -370,140 +348,165 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 	}
 
 	// 计算所有币种的决策
-	var decisions = make([]decision.Decision, len(ctx.CandidateCoins))
+	decisions := make([]decision.Decision, 0, len(ctx.CandidateCoins))
 	for _, coin := range ctx.CandidateCoins {
-		var dec = decision.Decision{}
+		dec := decision.Decision{Symbol: coin.Symbol}
+
 		var p = decision.PositionInfo{}
+
 		for _, pos := range ctx.Positions {
 			if coin.Symbol == pos.Symbol {
 				p = pos
+				break
 			}
 		}
+
+		dec.Symbol = coin.Symbol
 
 		// 1) 有持仓先做退出逻辑
 		if p.Symbol != "" {
 			dec = checkExitConditions(p, ctx.Klines[coin.Symbol])
-		} else {
-			// 2) 无持仓，找入场
-			price := decimal.NewFromFloat(ctx.MarketDataMap[coin.Symbol].CurrentPrice)
-			closed := ctx.Klines[coin.Symbol]
-			//start := time.Now()
-
-			dec.Symbol = coin.Symbol
-
-			if closed == nil || len(closed) < 4 {
-				fmt.Println("[ENTRY] 获取K线失败:")
-				//sleepUntil(start, pollInterval)
-
-				dec.Action = "wait"
-				decisions = append(decisions, dec)
-				continue
-			}
-			c1, c3, c5 := fetchC3C5(coin.Symbol)
-			c1 = strings.ToUpper(c1)
-			c3 = strings.ToUpper(c3)
-			c5 = strings.ToUpper(c5)
-			if !((c3 == "UP" && c5 == "UP") || (c3 == "DOWN" && c5 == "DOWN")) {
-				//sleepUntil(start, pollInterval)
-				dec.Action = "wait"
-				decisions = append(decisions, dec)
-				continue
-			}
-
-			shortsRaw, longsRaw := fetchSpiderRaw()
-			if len(shortsRaw) == 0 || len(longsRaw) == 0 {
-				fmt.Println("[ENTRY] only one side spider, pause")
-				//sleepUntil(start, pollInterval)
-				dec.Action = "wait"
-				decisions = append(decisions, dec)
-				continue
-			}
-
-			shorts, longs := filterPairsForEntry(shortsRaw, longsRaw, pairMinGapUSD)
-			if len(shorts) == 0 && len(longs) == 0 {
-				fmt.Println("[ENTRY] after filter, no valid spider")
-				//sleepUntil(start, pollInterval)
-				dec.Action = "wait"
-				decisions = append(decisions, dec)
-				continue
-			}
-
-			allEntry := collectAllLevels(shorts, longs)
-			var candidates []decimal.Decimal
-			for _, lv := range allEntry {
-				if absDec(lv.Sub(price)).LessThanOrEqual(entryNearRangeUSD) {
-					candidates = append(candidates, lv)
-				}
-			}
-			if len(candidates) == 0 {
-				//sleepUntil(start, pollInterval)
-				dec.Action = "wait"
-				decisions = append(decisions, dec)
-				continue
-			}
-
-			var dcs []map[string]any
-			for _, lv := range candidates {
-				if m := decideOnLevel(lv, closed, c3, c5, priceBandUSD); m != nil {
-					dcs = append(dcs, m)
-				}
-			}
-			if len(dcs) == 0 {
-				//sleepUntil(start, pollInterval)
-				dec.Action = "wait"
-				decisions = append(decisions, dec)
-				continue
-			}
-
-			bestIdx := 0
-			bestDist := absDec(price.Sub(dcs[0]["level"].(decimal.Decimal)))
-			for i := 1; i < len(dcs); i++ {
-				d := absDec(price.Sub(dcs[i]["level"].(decimal.Decimal)))
-				if d.LessThan(bestDist) {
-					bestDist = d
-					bestIdx = i
-				}
-			}
-			best := dcs[bestIdx]
-			logTradeEvent("OPEN_SIGNAL", map[string]any{
-				"symbol":       coin.Symbol,
-				"direction":    best["side"],
-				"ref_level":    best["level"],
-				"reason":       best["reason"],
-				"price":        price,
-				"c3":           c3,
-				"c5":           c5,
-				"shorts_entry": shorts,
-				"longs_entry":  longs,
-			})
-
-			var action string
-			var sl, tp decimal.Decimal
-			if best["side"] == "LONG" {
-				action = "open_long"
-
-				sl = price.Mul(d("1").Sub(STOP_LOSS_PCT))
-				tp = price.Mul(d("1").Add(TAKE_PROFIT_PCT))
-
-				dec.StopLoss, _ = sl.Float64()
-				dec.TakeProfit, _ = tp.Float64()
-			}
-
-			if best["side"] == "SHORT" {
-				action = "open_short"
-
-				sl = price.Mul(d("1").Add(STOP_LOSS_PCT))
-				tp = price.Mul(d("1").Sub(TAKE_PROFIT_PCT))
-
-				dec.StopLoss, _ = sl.Float64()
-				dec.TakeProfit, _ = tp.Float64()
-			}
-
-			dec.Action = action
-			dec.Level, _ = d(best["level"].(string)).Float64()
-			dec.Reasoning = best["reason"].(string)
+			decisions = append(decisions, dec)
+			logger.Info(fmt.Printf("[ENTRY] 有持仓，先判断是否退出，symbol: %s，action: %s", p.Symbol, dec.Reasoning))
+			continue
 		}
 
+		// 2) 无持仓，找入场
+		marketData, ok1 := ctx.MarketDataMap[coin.Symbol]
+		klines, ok2 := ctx.Klines[coin.Symbol]
+		if !ok1 || !ok2 {
+			logger.Info("[ENTRY] 没有市场数据或者K线，wait")
+			dec.Action = "wait"
+			decisions = append(decisions, dec)
+			continue
+		}
+
+		price := decimal.NewFromFloat(marketData.CurrentPrice)
+		closed := klines
+		//start := time.Now()
+
+		if closed == nil || len(closed) < 4 {
+			logger.Info("[ENTRY] 获取K线失败:")
+			//sleepUntil(start, pollInterval)
+
+			dec.Action = "wait"
+			decisions = append(decisions, dec)
+			continue
+		}
+		c1, c3, c5 := fetchC3C5(coin.Symbol)
+		c1 = strings.ToUpper(c1)
+		c3 = strings.ToUpper(c3)
+		c5 = strings.ToUpper(c5)
+		if !((c3 == "UP" && c5 == "UP") || (c3 == "DOWN" && c5 == "DOWN")) {
+			//sleepUntil(start, pollInterval)
+			dec.Action = "wait"
+			decisions = append(decisions, dec)
+			continue
+		}
+
+		shortsRaw, longsRaw := fetchSpiderRaw()
+		if len(shortsRaw) == 0 || len(longsRaw) == 0 {
+			logger.Info("[ENTRY] 蜘蛛丝只有一边，wait")
+			//sleepUntil(start, pollInterval)
+			dec.Action = "wait"
+			decisions = append(decisions, dec)
+			continue
+		}
+
+		shorts, longs := filterPairsForEntry(shortsRaw, longsRaw, pairMinGapUSD)
+		if len(shorts) == 0 && len(longs) == 0 {
+			fmt.Println("[ENTRY] 没有可用的蜘蛛丝，wait")
+			//sleepUntil(start, pollInterval)
+			dec.Action = "wait"
+			decisions = append(decisions, dec)
+			continue
+		}
+
+		allEntry := collectAllLevels(shorts, longs)
+		var candidates []decimal.Decimal
+		for _, lv := range allEntry {
+			if absDec(lv.Sub(price)).LessThanOrEqual(entryNearRangeUSD) {
+				candidates = append(candidates, lv)
+			}
+		}
+		if len(candidates) == 0 {
+			logger.Info("[ENTRY] 没有满足条件的蜘蛛丝价格，wait")
+			//sleepUntil(start, pollInterval)
+			dec.Action = "wait"
+			decisions = append(decisions, dec)
+			continue
+		}
+
+		var dcs []map[string]any
+		for _, lv := range candidates {
+			if m := decideOnLevel(lv, closed, c3, c5, priceBandUSD); m != nil {
+				dcs = append(dcs, m)
+			}
+		}
+		if len(dcs) == 0 {
+			//sleepUntil(start, pollInterval)
+			logger.Info("[ENTRY] 没有满足条件的反转点位，wait")
+			dec.Action = "wait"
+			decisions = append(decisions, dec)
+			continue
+		}
+
+		bestIdx := 0
+		bestDist := absDec(price.Sub(dcs[0]["level"].(decimal.Decimal)))
+		for i := 1; i < len(dcs); i++ {
+			d := absDec(price.Sub(dcs[i]["level"].(decimal.Decimal)))
+			if d.LessThan(bestDist) {
+				bestDist = d
+				bestIdx = i
+			}
+		}
+		best := dcs[bestIdx]
+		logTradeEvent("OPEN_SIGNAL", map[string]any{
+			"symbol":       coin.Symbol,
+			"direction":    best["side"],
+			"ref_level":    best["level"],
+			"reason":       best["reason"],
+			"price":        price,
+			"c1":           c1,
+			"c3":           c3,
+			"c5":           c5,
+			"shorts_entry": shorts,
+			"longs_entry":  longs,
+		})
+
+		var action string
+		var sl, tp decimal.Decimal
+		if best["side"] == "LONG" {
+			action = "open_long"
+
+			sl = price.Mul(d("1").Sub(STOP_LOSS_PCT))
+			tp = price.Mul(d("1").Add(TAKE_PROFIT_PCT))
+
+			dec.StopLoss, _ = sl.Float64()
+			dec.TakeProfit, _ = tp.Float64()
+		}
+
+		if best["side"] == "SHORT" {
+			action = "open_short"
+
+			sl = price.Mul(d("1").Add(STOP_LOSS_PCT))
+			tp = price.Mul(d("1").Sub(TAKE_PROFIT_PCT))
+
+			dec.StopLoss, _ = sl.Float64()
+			dec.TakeProfit, _ = tp.Float64()
+		}
+
+		dec.Action = action
+		dec.Level, _ = d(best["level"].(string)).Float64()
+		dec.Reasoning = best["reason"].(string)
+
+		accountEquityUSDT := decimal.NewFromFloat(ctx.Account.TotalEquity)
+		l := decimal.NewFromInt(int64(leverage))
+
+		dec.PositionSizeUSD, _ = accountEquityUSDT.Mul(positionPercent).Mul(l).Float64()
+		dec.Leverage = leverage
+
+		logger.Info(fmt.Printf("[ENTRY] symbol: %s，action: %s", p.Symbol, dec.Reasoning))
 		decisions = append(decisions, dec)
 	}
 
@@ -521,6 +524,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		fullDecision.AIRequestDurationMs = aiCallEnd - aiCallStart
 	}
 
+	logger.Info("Decision end")
 	return fullDecision, nil
 }
 
@@ -1036,5 +1040,31 @@ func logTradeEvent(event string, payload map[string]any) {
 	if err == nil {
 		defer f.Close()
 		f.Write(append(b, '\n'))
+	}
+}
+
+// ================ 工具 ================
+
+func d(s string) decimal.Decimal { v, _ := decimal.NewFromString(s); return v }
+func getenv(k, def string) string {
+	v := strings.TrimSpace(os.Getenv(k))
+	if v == "" {
+		return def
+	}
+	return v
+}
+func absDec(v decimal.Decimal) decimal.Decimal {
+	if v.IsNegative() {
+		return v.Neg()
+	}
+	return v
+}
+
+// ================ 辅助 ================
+
+func mustDec(s string) decimal.Decimal { v, _ := decimal.NewFromString(s); return v }
+func sleepUntil(start time.Time, period time.Duration) {
+	if d := period - time.Since(start); d > 0 {
+		time.Sleep(d)
 	}
 }
