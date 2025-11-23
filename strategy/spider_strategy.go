@@ -519,7 +519,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		fullDecision.Timestamp = time.Now()
 		fullDecision.SystemPrompt = "Spider strategy" // 保存系统prompt
 		fullDecision.UserPrompt = "Spider strategy"   // 保存输入prompt
-		fullDecision.AIRequestDurationMs = aiCallEnd - aiCallStart
+		fullDecision.AIRequestDurationMs = (aiCallEnd - aiCallStart) / 1000
 	}
 
 	log.Printf("Decision end")
