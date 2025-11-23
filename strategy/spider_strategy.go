@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"nofx/decision"
-	"nofx/logger"
 	"nofx/market"
 	"nofx/pool"
 	"os"
@@ -18,7 +17,6 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -121,14 +119,14 @@ func (s *SpiderStrategy) Configure(_ *decision.Context, cfg StrategyConfig) erro
 			s.confidence = mustInt(v, s.confidence)
 		}
 	}
-	logger.WithFields(logrus.Fields{
-		"strategy":       s.Name(),
-		"symbol":         s.symbol,
-		"entry_distance": s.entryDistance.String(),
-		"position_size":  s.positionSize.String(),
-		"leverage":       s.leverage,
-		"confidence":     s.confidence,
-	}).Info("spider strategy configured")
+	//logger.WithFields(logrus.Fields{
+	//	"strategy":       s.Name(),
+	//	"symbol":         s.symbol,
+	//	"entry_distance": s.entryDistance.String(),
+	//	"position_size":  s.positionSize.String(),
+	//	"leverage":       s.leverage,
+	//	"confidence":     s.confidence,
+	//}).Info("spider strategy configured")
 	return nil
 }
 
@@ -143,42 +141,42 @@ func (s *SpiderStrategy) Decide(ctx *decision.Context) ([]decision.Decision, err
 
 	shorts, longs, err := s.data.FetchLevels(ctx, s.symbol)
 	if err != nil {
-		logger.WithFields(logrus.Fields{
-			"strategy": s.Name(),
-			"symbol":   s.symbol,
-		}).WithError(err).Error("spider fetch levels failed")
+		//logger.WithFields(logrus.Fields{
+		//	"strategy": s.Name(),
+		//	"symbol":   s.symbol,
+		//}).WithError(err).Error("spider fetch levels failed")
 		return nil, fmt.Errorf("fetch spider levels: %w", err)
 	}
-	logger.WithFields(logrus.Fields{
-		"strategy":     s.Name(),
-		"symbol":       s.symbol,
-		"short_levels": len(shorts),
-		"long_levels":  len(longs),
-	}).Debug("spider fetched levels")
+	//logger.WithFields(logrus.Fields{
+	//	"strategy":     s.Name(),
+	//	"symbol":       s.symbol,
+	//	"short_levels": len(shorts),
+	//	"long_levels":  len(longs),
+	//}).Debug("spider fetched levels")
 	if len(shorts) == 0 && len(longs) == 0 {
-		logger.WithFields(logrus.Fields{
-			"strategy": s.Name(),
-			"symbol":   s.symbol,
-		}).Debug("spider levels empty, skip decision")
+		//logger.WithFields(logrus.Fields{
+		//	"strategy": s.Name(),
+		//	"symbol":   s.symbol,
+		//}).Debug("spider levels empty, skip decision")
 		return nil, nil
 	}
 
 	price, err := s.data.Price(ctx, s.symbol)
 	if err != nil {
-		logger.WithFields(logrus.Fields{
-			"strategy": s.Name(),
-			"symbol":   s.symbol,
-		}).WithError(err).Error("spider fetch price failed")
+		//logger.WithFields(logrus.Fields{
+		//	"strategy": s.Name(),
+		//	"symbol":   s.symbol,
+		//}).WithError(err).Error("spider fetch price failed")
 		return nil, fmt.Errorf("fetch price: %w", err)
 	}
 
 	direction, level := s.pickEntry(price, shorts, longs)
 	if level == nil || direction == "" {
-		logger.WithFields(logrus.Fields{
-			"strategy": s.Name(),
-			"symbol":   s.symbol,
-			"price":    price.String(),
-		}).Debug("spider no eligible level near price")
+		//logger.WithFields(logrus.Fields{
+		//	"strategy": s.Name(),
+		//	"symbol":   s.symbol,
+		//	"price":    price.String(),
+		//}).Debug("spider no eligible level near price")
 		return nil, nil
 	}
 
@@ -205,17 +203,17 @@ func (s *SpiderStrategy) Decide(ctx *decision.Context) ([]decision.Decision, err
 		),
 	}
 
-	logger.WithFields(logrus.Fields{
-		"strategy":          s.Name(),
-		"symbol":            s.symbol,
-		"action":            action,
-		"level":             level.String(),
-		"distance":          distance.String(),
-		"price":             price.String(),
-		"position_size_usd": sizeUSD,
-		"leverage":          s.leverage,
-		"confidence":        s.confidence,
-	}).Info("spider decision generated")
+	//logger.WithFields(logrus.Fields{
+	//	"strategy":          s.Name(),
+	//	"symbol":            s.symbol,
+	//	"action":            action,
+	//	"level":             level.String(),
+	//	"distance":          distance.String(),
+	//	"price":             price.String(),
+	//	"position_size_usd": sizeUSD,
+	//	"leverage":          s.leverage,
+	//	"confidence":        s.confidence,
+	//}).Info("spider decision generated")
 
 	return []decision.Decision{dec}, nil
 }
@@ -320,7 +318,7 @@ func decimalToFloat(v decimal.Decimal) float64 {
 
 // 重写AI决策的方法
 func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullDecision, error) {
-	logger.Info("Decision start")
+	log.Printf("Decision start")
 	// 1. 为所有币种获取市场数据
 	if err := fetchMarketDataForContext(ctx); err != nil {
 		return nil, fmt.Errorf("获取市场数据失败: %w", err)
@@ -367,7 +365,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		if p.Symbol != "" {
 			dec = checkExitConditions(p, ctx.Klines[coin.Symbol])
 			decisions = append(decisions, dec)
-			logger.Info(fmt.Printf("[ENTRY] 有持仓，先判断是否退出，symbol: %s，action: %s", p.Symbol, dec.Reasoning))
+			log.Printf("[ENTRY] 有持仓，先判断是否退出，symbol: %s，action: %s", p.Symbol, dec.Reasoning)
 			continue
 		}
 
@@ -375,7 +373,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		marketData, ok1 := ctx.MarketDataMap[coin.Symbol]
 		klines, ok2 := ctx.Klines[coin.Symbol]
 		if !ok1 || !ok2 {
-			logger.Info("[ENTRY] 没有市场数据或者K线，wait")
+			log.Printf("[ENTRY] 没有市场数据或者K线，wait")
 			dec.Action = "wait"
 			decisions = append(decisions, dec)
 			continue
@@ -386,7 +384,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		//start := time.Now()
 
 		if closed == nil || len(closed) < 4 {
-			logger.Info("[ENTRY] 获取K线失败:")
+			log.Printf("[ENTRY] 获取K线失败:")
 			//sleepUntil(start, pollInterval)
 
 			dec.Action = "wait"
@@ -399,7 +397,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		c5 = strings.ToUpper(c5)
 		if !((c3 == "UP" && c5 == "UP") || (c3 == "DOWN" && c5 == "DOWN")) {
 			//sleepUntil(start, pollInterval)
-			logger.Info("[ENTRY] C3和C5方向不一致，wait")
+			log.Printf("[ENTRY] C3和C5方向不一致，wait")
 			dec.Action = "wait"
 			decisions = append(decisions, dec)
 			continue
@@ -407,7 +405,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 
 		shortsRaw, longsRaw := fetchSpiderRaw()
 		if len(shortsRaw) == 0 || len(longsRaw) == 0 {
-			logger.Info("[ENTRY] 蜘蛛丝只有一边，wait")
+			log.Printf("[ENTRY] 蜘蛛丝只有一边，wait")
 			//sleepUntil(start, pollInterval)
 			dec.Action = "wait"
 			decisions = append(decisions, dec)
@@ -416,7 +414,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 
 		shorts, longs := filterPairsForEntry(shortsRaw, longsRaw, pairMinGapUSD)
 		if len(shorts) == 0 && len(longs) == 0 {
-			fmt.Println("[ENTRY] 没有可用的蜘蛛丝，wait")
+			log.Printf("[ENTRY] 没有可用的蜘蛛丝，wait")
 			//sleepUntil(start, pollInterval)
 			dec.Action = "wait"
 			decisions = append(decisions, dec)
@@ -431,7 +429,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 			}
 		}
 		if len(candidates) == 0 {
-			logger.Info("[ENTRY] 没有满足条件的蜘蛛丝价格，wait")
+			log.Printf("[ENTRY] 没有满足条件的蜘蛛丝价格，wait")
 			//sleepUntil(start, pollInterval)
 			dec.Action = "wait"
 			decisions = append(decisions, dec)
@@ -446,7 +444,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		}
 		if len(dcs) == 0 {
 			//sleepUntil(start, pollInterval)
-			logger.Info("[ENTRY] 没有满足条件的反转点位，wait")
+			log.Printf("[ENTRY] 没有满足条件的反转点位，wait")
 			dec.Action = "wait"
 			decisions = append(decisions, dec)
 			continue
@@ -507,7 +505,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		dec.PositionSizeUSD, _ = accountEquityUSDT.Mul(positionPercent).Mul(l).Float64()
 		dec.Leverage = leverage
 
-		logger.Info(fmt.Printf("[ENTRY] symbol: %s，action: %s", p.Symbol, dec.Reasoning))
+		log.Printf("[ENTRY] symbol: %s，action: %s", p.Symbol, dec.Reasoning)
 		decisions = append(decisions, dec)
 	}
 
@@ -525,7 +523,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		fullDecision.AIRequestDurationMs = aiCallEnd - aiCallStart
 	}
 
-	logger.Info("Decision end")
+	log.Printf("Decision end")
 	return fullDecision, nil
 }
 
@@ -723,25 +721,25 @@ func fetchSpiderRaw() ([]decimal.Decimal, []decimal.Decimal) {
 	cli := &http.Client{Timeout: 2 * time.Second}
 	resp, err := cli.Do(req)
 	if err != nil {
-		fmt.Println("[SPIDER] fetch error:", err)
+		log.Println("[SPIDER] fetch error:", err)
 		return nil, nil
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode/100 != 2 {
 		b, _ := io.ReadAll(resp.Body)
-		fmt.Printf("[SPIDER] non-2xx: %d %s", resp.StatusCode, string(b))
+		log.Printf("[SPIDER] non-2xx: %d %s", resp.StatusCode, string(b))
 		return nil, nil
 	}
 	var data spiderResp
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		fmt.Println("[SPIDER] json error:", err)
+		log.Println("[SPIDER] json error:", err)
 		return nil, nil
 	}
 	shorts := toDecimals(data.SHORT)
 	longs := toDecimals(data.LONG)
 	shorts = dedupSort(shorts)
 	longs = dedupSort(longs)
-	fmt.Println("[SPIDER] RAW SHORT=", shorts, "LONG=", longs)
+	log.Println("[SPIDER] RAW SHORT=", shorts, "LONG=", longs)
 	return shorts, longs
 }
 
@@ -797,7 +795,7 @@ func filterPairsForEntry(shorts, longs []decimal.Decimal, minGap decimal.Decimal
 		}
 	}
 	if len(dropS) > 0 || len(dropL) > 0 {
-		fmt.Printf("[SPIDER] ENTRY-FILTER dropped pairs gap<%s", minGap)
+		log.Printf("[SPIDER] ENTRY-FILTER dropped pairs gap<%s", minGap)
 	}
 	return fs, fl
 }
@@ -965,23 +963,23 @@ func fetchC3C5(symbol string) (string, string, string) {
 
 	resp, err := cli.Do(req)
 	if err != nil {
-		fmt.Println("[C35] fetch error:", err)
+		log.Println("[C35] fetch error:", err)
 		return "NEUTRAL", "NEUTRAL", "NEUTRAL"
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode/100 != 2 {
 		b, _ := io.ReadAll(resp.Body)
-		fmt.Printf("[C35] non-2xx: %d %s", resp.StatusCode, string(b))
+		log.Printf("[C35] non-2xx: %d %s", resp.StatusCode, string(b))
 		return "NEUTRAL", "NEUTRAL", "NEUTRAL"
 	}
 
 	var payload c35APIResp
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		fmt.Println("[C35] json error:", err)
+		log.Println("[C35] json error:", err)
 		return "NEUTRAL", "NEUTRAL", "NEUTRAL"
 	}
 	if payload.Code != 0 {
-		fmt.Println("[C35] code!=0:", payload.Code, payload.Msg)
+		log.Println("[C35] code!=0:", payload.Code, payload.Msg)
 		return "NEUTRAL", "NEUTRAL", "NEUTRAL"
 	}
 
@@ -1036,7 +1034,7 @@ func logTradeEvent(event string, payload map[string]any) {
 		rec[k] = v
 	}
 	b, _ := json.Marshal(rec)
-	fmt.Println("[TRADE]", string(b))
+	log.Println("[TRADE]", string(b))
 	f, err := os.OpenFile(tradeLogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err == nil {
 		defer f.Close()
