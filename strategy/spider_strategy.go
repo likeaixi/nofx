@@ -393,15 +393,11 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 			decisions = append(decisions, dec)
 			continue
 		}
-		c1, c3, c5 := fetchC3C5(coin.Symbol)
-		c1 = strings.ToUpper(c1)
-		c3 = strings.ToUpper(c3)
-		c5 = strings.ToUpper(c5)
-		if !((c3 == "UP" && c5 == "UP") || (c3 == "DOWN" && c5 == "DOWN")) {
-			//sleepUntil(start, pollInterval)
-			log.Printf("[ENTRY] C3和C5方向不一致，wait")
+		act, c1, c3, c5 := fetchCombo()
+		if act == "NEUTRAL" {
+			log.Printf("[ENTRY] 信号方向为NEUTRAL，wait")
 			dec.Action = "wait"
-			dec.Reasoning = "C3和C5方向不一致"
+			dec.Reasoning = "AI信号方向为NEUTRAL"
 			decisions = append(decisions, dec)
 			continue
 		}
@@ -443,7 +439,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 
 		var dcs []map[string]any
 		for _, lv := range candidates {
-			if m := decideOnLevel(lv, closed, c3, c5, priceBandUSD); m != nil {
+			if m := decideOnLevel(lv, closed, act, priceBandUSD); m != nil {
 				dcs = append(dcs, m)
 			}
 		}
@@ -468,15 +464,16 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		}
 		best := dcs[bestIdx]
 		logTradeEvent("OPEN_SIGNAL", map[string]any{
-			"symbol":    coin.Symbol,
-			"direction": best["side"],
-			"ref_level": best["level"],
-			"reason":    best["reason"],
-			"price":     price,
-			"c1":        c1,
-			"c3":        c3,
-			"c5":        c5,
-			"ssp":       ssp,
+			"symbol":       coin.Symbol,
+			"direction":    best["side"],
+			"ref_level":    best["level"],
+			"reason":       best["reason"],
+			"price":        price,
+			"c1":           c1,
+			"c3":           c3,
+			"c5":           c5,
+			"combo_action": act,
+			"ssp":          ssp,
 		})
 
 		var action string
@@ -650,7 +647,7 @@ func checkExitConditions(pos decision.PositionInfo, klines []decision.Kline) dec
 
 	closed := klines
 
-	c1, c3, c5 := fetchC3C5(pos.Symbol)
+	action, c1, c3, c5 := fetchCombo()
 	c1 = strings.ToUpper(c1)
 	c3 = strings.ToUpper(c3)
 	c5 = strings.ToUpper(c5)
@@ -666,7 +663,7 @@ func checkExitConditions(pos decision.PositionInfo, klines []decision.Kline) dec
 
 	dec.Level = pos.EntryLevel
 	// 1) entry_level 的反向信号
-	if d := decideOnLevel(entryLevel, closed, c3, c5, priceBandUSD); d != nil {
+	if d := decideOnLevel(entryLevel, closed, action, priceBandUSD); d != nil {
 		if side == "LONG" && d["side"].(string) == "SHORT" {
 			//closePosition(b, "reverse_signal_on_entry_level")
 			//return
@@ -836,7 +833,7 @@ func dedupSort(xs []decimal.Decimal) []decimal.Decimal {
 
 // ================ 决策（反转点位） ================
 
-func decideOnLevel(level decimal.Decimal, closed []decision.Kline, c3, c5 string, band decimal.Decimal) map[string]any {
+func decideOnLevel(level decimal.Decimal, closed []decision.Kline, comboAction string, band decimal.Decimal) map[string]any {
 	if len(closed) < 4 {
 		return nil
 	}
@@ -851,14 +848,13 @@ func decideOnLevel(level decimal.Decimal, closed []decision.Kline, c3, c5 string
 			break
 		}
 	}
-	log.Println("最近三根K线是否触碰", touched)
 	if !touched {
 		return nil
 	}
 
 	fromBelow := prev.Close.LessThan(level.Sub(band))
 	fromAbove := prev.Close.GreaterThan(level.Add(band))
-	log.Println("fromBelow:", fromBelow, "fromAbove:", fromAbove)
+
 	standAbove := true
 	for _, k := range last3 {
 		if k.Close.LessThanOrEqual(level) {
@@ -875,26 +871,26 @@ func decideOnLevel(level decimal.Decimal, closed []decision.Kline, c3, c5 string
 		}
 	}
 
-	log.Println("standAbove:", standAbove, "standBelow:", standBelow)
 	lastClose := last3[len(last3)-1].Close
 
-	c3Up, c5Up := c3 == "UP", c5 == "UP"
-	c3Dn, c5Dn := c3 == "DOWN", c5 == "DOWN"
+	// 用组合动作作为方向约束
+	wantLong := comboAction == "LONG"
+	wantShort := comboAction == "SHORT"
 
 	if fromBelow {
-		if standAbove && c3Up && c5Up {
+		if standAbove && wantLong {
 			return map[string]any{"side": "LONG", "level": level, "reason": "break_up"}
 		}
-		if !standAbove && lastClose.LessThan(level) && c3Dn && c5Dn {
+		if !standAbove && lastClose.LessThan(level) && wantShort {
 			return map[string]any{"side": "SHORT", "level": level, "reason": "fail_break_up"}
 		}
 		return nil
 	}
 	if fromAbove {
-		if standBelow && c3Dn && c5Dn {
+		if standBelow && wantShort {
 			return map[string]any{"side": "SHORT", "level": level, "reason": "reject_down"}
 		}
-		if !standBelow && lastClose.GreaterThan(level) && c3Up && c5Up {
+		if !standBelow && lastClose.GreaterThan(level) && wantLong {
 			return map[string]any{"side": "LONG", "level": level, "reason": "fail_break_down"}
 		}
 		return nil
@@ -952,22 +948,39 @@ type c35APIResp struct {
 	Msg  string `json:"msg"`
 }
 
-// 统一成 UP/DOWN/NEUTRAL
-func toUDN(s string) string {
+// 统一为 U/D/N 字母
+func toLetter(s string) string {
 	t := strings.TrimSpace(strings.ToUpper(s))
 	switch t {
 	case "UP", "LONG", "BUY", "BULL":
-		return "UP"
+		return "U"
 	case "DOWN", "SHORT", "SELL", "BEAR":
-		return "DOWN"
+		return "D"
+	default:
+		return "N"
+	}
+}
+
+// 根据 C1 C3 C5 的 U/D/N 组合，返回 LONG/SHORT/NEUTRAL
+// 规则：
+// UDD→SHORT, DUU→LONG, NDD→SHORT, NUU→LONG,
+// UND→SHORT, DND→SHORT, UNU→LONG, DNU→LONG
+func actionFromCombo(c1, c3, c5 string) string {
+	key := toLetter(c1) + toLetter(c3) + toLetter(c5)
+	switch key {
+	case "UDD", "NDD", "UND", "DND":
+		return "SHORT"
+	case "DUU", "NUU", "UNU", "DNU":
+		return "LONG"
 	default:
 		return "NEUTRAL"
 	}
 }
 
-func fetchC3C5(symbol string) (string, string, string) {
+// 从 hyperaitrade 接口获取组合，并给出动作
+func fetchCombo() (action, c1, c3, c5 string) {
 	if strings.TrimSpace(c35URL) == "" {
-		return "NEUTRAL", "NEUTRAL", "NEUTRAL"
+		return "NEUTRAL", "N", "N", "N"
 	}
 
 	req, _ := http.NewRequest(http.MethodGet, c35URL, nil)
@@ -977,67 +990,62 @@ func fetchC3C5(symbol string) (string, string, string) {
 
 	resp, err := cli.Do(req)
 	if err != nil {
-		log.Println("[C35] fetch error:", err)
-		return "NEUTRAL", "NEUTRAL", "NEUTRAL"
+		fmt.Println("[C35] fetch error:", err)
+		return "NEUTRAL", "N", "N", "N"
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode/100 != 2 {
 		b, _ := io.ReadAll(resp.Body)
-		log.Printf("[C35] non-2xx: %d %s", resp.StatusCode, string(b))
-		return "NEUTRAL", "NEUTRAL", "NEUTRAL"
+		fmt.Printf("[C35] non-2xx: %d %s", resp.StatusCode, string(b))
+		return "NEUTRAL", "N", "N", "N"
 	}
 
 	var payload c35APIResp
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		log.Println("[C35] json error:", err)
-		return "NEUTRAL", "NEUTRAL", "NEUTRAL"
+		fmt.Println("[C35] json error:", err)
+		return "NEUTRAL", "N", "N", "N"
 	}
 	if payload.Code != 0 {
-		log.Println("[C35] code!=0:", payload.Code, payload.Msg)
-		return "NEUTRAL", "NEUTRAL", "NEUTRAL"
+		fmt.Println("[C35] code!=0:", payload.Code, payload.Msg)
+		return "NEUTRAL", "N", "N", "N"
 	}
 
-	// 仅当 matched=true 时采用该信号；否则视为 NEUTRAL
+	// 仅 matched==true 才使用
 	if !payload.Data.RuleDecision.Matched {
-		return "NEUTRAL", "NEUTRAL", "NEUTRAL"
+		return "NEUTRAL", "N", "N", "N"
 	}
 
-	// 优先使用 rule_decision.combo 的 c3/c5（可能是 up/down/neutral）
-	c1 := toUDN(payload.Data.RuleDecision.Combo.C1)
-	c3 := toUDN(payload.Data.RuleDecision.Combo.C3)
-	c5 := toUDN(payload.Data.RuleDecision.Combo.C5)
+	// 优先 rule_decision.combo（lowercase up/down/neutral）
+	c1 = payload.Data.RuleDecision.Combo.C1
+	c3 = payload.Data.RuleDecision.Combo.C3
+	c5 = payload.Data.RuleDecision.Combo.C5
 
-	// 如果 combo 缺失，回退到 agents.C3/C5（可能是 LONG/SHORT/NEUTRAL）
-	if c1 == "NEUTRAL" && payload.Data.Agents.C1 != "" {
-		c1 = toUDN(payload.Data.Agents.C1)
+	// 若为空，回退 agents（可能是 LONG/SHORT/NEUTRAL）
+	if strings.TrimSpace(c1) == "" {
+		c1 = payload.Data.Agents.C1
 	}
-	if c3 == "NEUTRAL" && payload.Data.Agents.C3 != "" {
-		c3 = toUDN(payload.Data.Agents.C3)
+	if strings.TrimSpace(c3) == "" {
+		c3 = payload.Data.Agents.C3
 	}
-	if c5 == "NEUTRAL" && payload.Data.Agents.C5 != "" {
-		c5 = toUDN(payload.Data.Agents.C5)
-	}
-
-	// （可选）如果 symbol 与本地 symbol 不一致，这里仍然返回解析结果；
-	// 如需严格匹配，可在此处过滤：
-	if s := strings.ToUpper(payload.Data.Symbol); s != "" && s != strings.ToUpper(symbol) {
-		return "NEUTRAL", "NEUTRAL", "NEUTRAL"
+	if strings.TrimSpace(c5) == "" {
+		c5 = payload.Data.Agents.C5
 	}
 
-	// 记录一次抓取（便于诊断）
+	action = actionFromCombo(c1, c3, c5)
+
 	logTradeEvent("C35_FETCH", map[string]any{
 		"symbol":          payload.Data.Symbol,
 		"interval":        payload.Data.Interval,
-		"action":          payload.Data.RuleDecision.Action,
 		"matched":         payload.Data.RuleDecision.Matched,
-		"c1":              c1,
-		"c3":              c3,
-		"c5":              c5,
+		"combo_c1":        toLetter(c1),
+		"combo_c3":        toLetter(c3),
+		"combo_c5":        toLetter(c5),
+		"action":          action,
 		"rule_accuracy":   payload.Data.RuleDecision.RuleAccuracy,
 		"hourly_accuracy": payload.Data.RuleDecision.HourlyAccuracy,
 	})
 
-	return c1, c3, c5
+	return action, toLetter(c1), toLetter(c3), toLetter(c5)
 }
 
 // ================ 日志 ================
