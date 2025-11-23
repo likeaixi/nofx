@@ -518,6 +518,11 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		fullDecision.CoTTrace += d.Reasoning + " "
 	}
 
+	// 3) 验证决策
+	if err := decision.ValidateDecisions(decisions, ctx.Account.TotalEquity, ctx.BTCETHLeverage, ctx.AltcoinLeverage); err != nil {
+		return fullDecision, fmt.Errorf("决策验证失败: %w", err)
+	}
+
 	// 4. 解析AI响应
 	//decision, err := parseFullDecisionResponse(aiResponse, ctx.Account.TotalEquity, ctx.BTCETHLeverage, ctx.AltcoinLeverage)
 
