@@ -345,6 +345,8 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		AIRequestDurationMs: 0,
 	}
 
+	fullDecision.SystemPrompt = "Spider strategy"
+
 	// 计算所有币种的决策
 	decisions := make([]decision.Decision, 0, len(ctx.CandidateCoins))
 	for _, coin := range ctx.CandidateCoins {
@@ -510,6 +512,14 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 
 		log.Printf("[ENTRY] symbol: %s，action: %s", p.Symbol, dec.Reasoning)
 		decisions = append(decisions, dec)
+
+		fullDecision.SystemPrompt += "\n Symbol: " + dec.Symbol
+		fullDecision.SystemPrompt += "\n AI signal: " + act
+		fullDecision.SystemPrompt += "\n Price: " + price.String()
+		fullDecision.SystemPrompt += "\n SSP: " + fmt.Sprintf("%v", ssp)
+		fullDecision.SystemPrompt += "\n C1: " + fmt.Sprintf("%v", c1)
+		fullDecision.SystemPrompt += "\n C3: " + fmt.Sprintf("%v", c3)
+		fullDecision.SystemPrompt += "\n C5: " + fmt.Sprintf("%v", c5)
 	}
 
 	fullDecision.Decisions = decisions
@@ -530,8 +540,8 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 	if fullDecision != nil {
 		aiCallEnd := time.Now().UnixMicro()
 		fullDecision.Timestamp = time.Now()
-		fullDecision.SystemPrompt = "Spider strategy" // 保存系统prompt
-		fullDecision.UserPrompt = "Spider strategy"   // 保存输入prompt
+		//fullDecision.SystemPrompt = "Spider strategy" // 保存系统prompt
+		fullDecision.UserPrompt = "Spider strategy" // 保存输入prompt
 		fullDecision.AIRequestDurationMs = (aiCallEnd - aiCallStart) / 1000
 	}
 
