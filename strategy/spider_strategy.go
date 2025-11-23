@@ -442,6 +442,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 				dcs = append(dcs, m)
 			}
 		}
+		fmt.Println("满足条件的点位", dcs)
 		if len(dcs) == 0 {
 			//sleepUntil(start, pollInterval)
 			log.Printf("[ENTRY] 没有满足条件的反转点位，wait")
@@ -840,13 +841,14 @@ func decideOnLevel(level decimal.Decimal, closed []decision.Kline, c3, c5 string
 			break
 		}
 	}
+	log.Println("最近三根K线是否触碰", touched)
 	if !touched {
 		return nil
 	}
 
 	fromBelow := prev.Close.LessThan(level.Sub(band))
 	fromAbove := prev.Close.GreaterThan(level.Add(band))
-
+	log.Println("fromBelow:", fromBelow, "fromAbove:", fromAbove)
 	standAbove := true
 	for _, k := range last3 {
 		if k.Close.LessThanOrEqual(level) {
@@ -863,6 +865,7 @@ func decideOnLevel(level decimal.Decimal, closed []decision.Kline, c3, c5 string
 		}
 	}
 
+	log.Println("standAbove:", standAbove, "standBelow:", standBelow)
 	lastClose := last3[len(last3)-1].Close
 
 	c3Up, c5Up := c3 == "UP", c5 == "UP"
