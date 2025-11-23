@@ -366,13 +366,13 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 
 		dec.Symbol = coin.Symbol
 
-		fullDecision.SystemPrompt += "\n Symbol: " + dec.Symbol
-		fullDecision.SystemPrompt += "\n AI signal: " + act
-		fullDecision.SystemPrompt += "\n Price: " + pri.String()
-		fullDecision.SystemPrompt += "\n SSP: " + fmt.Sprintf("%v", ssp)
-		fullDecision.SystemPrompt += "\n C1: " + fmt.Sprintf("%v", c1)
-		fullDecision.SystemPrompt += "\n C3: " + fmt.Sprintf("%v", c3)
-		fullDecision.SystemPrompt += "\n C5: " + fmt.Sprintf("%v", c5)
+		fullDecision.SystemPrompt += "\nSymbol: " + dec.Symbol
+		fullDecision.SystemPrompt += "\nAI signal: " + act
+		fullDecision.SystemPrompt += "\nPrice: " + pri.String()
+		fullDecision.SystemPrompt += "\nSSP: " + fmt.Sprintf("%v", ssp)
+		fullDecision.SystemPrompt += "\nC1: " + fmt.Sprintf("%v", c1)
+		fullDecision.SystemPrompt += "\nC3: " + fmt.Sprintf("%v", c3)
+		fullDecision.SystemPrompt += "\nC5: " + fmt.Sprintf("%v", c5)
 
 		// 1) 有持仓先做退出逻辑
 		if p.Symbol != "" {
