@@ -375,6 +375,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		if !ok1 || !ok2 {
 			log.Printf("[ENTRY] 没有市场数据或者K线，wait")
 			dec.Action = "wait"
+			dec.Reasoning = "没有K线数据"
 			decisions = append(decisions, dec)
 			continue
 		}
@@ -388,6 +389,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 			//sleepUntil(start, pollInterval)
 
 			dec.Action = "wait"
+			dec.Reasoning = "获取K线失败"
 			decisions = append(decisions, dec)
 			continue
 		}
@@ -399,6 +401,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 			//sleepUntil(start, pollInterval)
 			log.Printf("[ENTRY] C3和C5方向不一致，wait")
 			dec.Action = "wait"
+			dec.Reasoning = "C3和C5方向不一致"
 			decisions = append(decisions, dec)
 			continue
 		}
@@ -408,6 +411,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 			log.Printf("[ENTRY] 蜘蛛丝为空，wait")
 			//sleepUntil(start, pollInterval)
 			dec.Action = "wait"
+			dec.Reasoning = "蜘蛛丝为空"
 			decisions = append(decisions, dec)
 			continue
 		}
@@ -432,6 +436,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 			log.Printf("[ENTRY] 没有满足条件的蜘蛛丝价格，wait")
 			//sleepUntil(start, pollInterval)
 			dec.Action = "wait"
+			dec.Reasoning = "没有满足条件的蜘蛛丝价格"
 			decisions = append(decisions, dec)
 			continue
 		}
@@ -442,11 +447,12 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 				dcs = append(dcs, m)
 			}
 		}
-		fmt.Println("满足条件的点位", dcs)
+		log.Println("满足条件的点位", dcs)
 		if len(dcs) == 0 {
 			//sleepUntil(start, pollInterval)
 			log.Printf("[ENTRY] 没有满足条件的反转点位，wait")
 			dec.Action = "wait"
+			dec.Reasoning = "没有满足条件的反转点位"
 			decisions = append(decisions, dec)
 			continue
 		}
@@ -510,6 +516,10 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 	}
 
 	fullDecision.Decisions = decisions
+
+	for _, d := range decisions {
+		fullDecision.CoTTrace += d.Reasoning + " "
+	}
 
 	// 4. 解析AI响应
 	//decision, err := parseFullDecisionResponse(aiResponse, ctx.Account.TotalEquity, ctx.BTCETHLeverage, ctx.AltcoinLeverage)
