@@ -535,9 +535,6 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		return fullDecision, fmt.Errorf("决策验证失败: %w", err)
 	}
 
-	// 4. 解析AI响应
-	//decision, err := parseFullDecisionResponse(aiResponse, ctx.Account.TotalEquity, ctx.BTCETHLeverage, ctx.AltcoinLeverage)
-
 	// 无论是否有错误，都要保存 SystemPrompt 和 UserPrompt（用于调试和决策未执行后的问题定位）
 	if fullDecision != nil {
 		aiCallEnd := time.Now().UnixMicro()

@@ -55,33 +55,33 @@ export default function HeroSection({ language }: HeroSectionProps) {
                   boxShadow: '0 0 20px rgba(240, 185, 11, 0.2)',
                 }}
               >
-                <Sparkles
-                  className="w-4 h-4"
-                  style={{ color: 'var(--brand-yellow)' }}
-                />
-                <span
-                  className="text-sm font-semibold"
-                  style={{ color: 'var(--brand-yellow)' }}
-                >
-                  {isLoading ? (
-                    t('githubStarsInDays', language)
-                  ) : language === 'zh' ? (
-                    <>
-                      {daysOld} 天内{' '}
-                      <span className="inline-block tabular-nums">
-                        {(animatedStars / 1000).toFixed(1)}
-                      </span>
-                      K+ GitHub Stars
-                    </>
-                  ) : (
-                    <>
-                      <span className="inline-block tabular-nums">
-                        {(animatedStars / 1000).toFixed(1)}
-                      </span>
-                      K+ GitHub Stars in {daysOld} days
-                    </>
-                  )}
-                </span>
+                {/*<Sparkles*/}
+                {/*  className="w-4 h-4"*/}
+                {/*  style={{ color: 'var(--brand-yellow)' }}*/}
+                {/*/>*/}
+                {/*<span*/}
+                {/*  className="text-sm font-semibold"*/}
+                {/*  style={{ color: 'var(--brand-yellow)' }}*/}
+                {/*>*/}
+                {/*  {isLoading ? (*/}
+                {/*    t('githubStarsInDays', language)*/}
+                {/*  ) : language === 'zh' ? (*/}
+                {/*    <>*/}
+                {/*      {daysOld} 天内{' '}*/}
+                {/*      <span className="inline-block tabular-nums">*/}
+                {/*        {(animatedStars / 1000).toFixed(1)}*/}
+                {/*      </span>*/}
+                {/*      K+ GitHub Stars*/}
+                {/*    </>*/}
+                {/*  ) : (*/}
+                {/*    <>*/}
+                {/*      <span className="inline-block tabular-nums">*/}
+                {/*        {(animatedStars / 1000).toFixed(1)}*/}
+                {/*      </span>*/}
+                {/*      K+ GitHub Stars in {daysOld} days*/}
+                {/*    </>*/}
+                {/*  )}*/}
+                {/*</span>*/}
               </motion.div>
             </motion.div>
 
@@ -104,54 +104,54 @@ export default function HeroSection({ language }: HeroSectionProps) {
               {t('heroDescription', language)}
             </motion.p>
 
-            <div className="flex items-center gap-3 flex-wrap">
-              <motion.a
-                href="https://github.com/tinkle-community/nofx"
-                target="_blank"
-                rel="noopener noreferrer"
-                whileHover={{ scale: 1.05 }}
-                transition={{ type: 'spring', stiffness: 400 }}
-              >
-                <img
-                  src="https://img.shields.io/github/stars/tinkle-community/nofx?style=for-the-badge&logo=github&logoColor=white&color=F0B90B&labelColor=0A0A0A"
-                  alt="GitHub Stars"
-                  className="h-7"
-                />
-              </motion.a>
-              <motion.a
-                href="https://github.com/tinkle-community/nofx/network/members"
-                target="_blank"
-                rel="noopener noreferrer"
-                whileHover={{ scale: 1.05 }}
-                transition={{ type: 'spring', stiffness: 400 }}
-              >
-                <img
-                  src="https://img.shields.io/github/forks/tinkle-community/nofx?style=for-the-badge&logo=github&logoColor=white&color=F0B90B&labelColor=0A0A0A"
-                  alt="GitHub Forks"
-                  className="h-7"
-                />
-              </motion.a>
-              <motion.a
-                href="https://github.com/tinkle-community/nofx/graphs/contributors"
-                target="_blank"
-                rel="noopener noreferrer"
-                whileHover={{ scale: 1.05 }}
-                transition={{ type: 'spring', stiffness: 400 }}
-              >
-                <img
-                  src="https://img.shields.io/github/contributors/tinkle-community/nofx?style=for-the-badge&logo=github&logoColor=white&color=F0B90B&labelColor=0A0A0A"
-                  alt="GitHub Contributors"
-                  className="h-7"
-                />
-              </motion.a>
-            </div>
+            {/*<div className="flex items-center gap-3 flex-wrap">*/}
+            {/*  <motion.a*/}
+            {/*    href="https://github.com/tinkle-community/nofx"*/}
+            {/*    target="_blank"*/}
+            {/*    rel="noopener noreferrer"*/}
+            {/*    whileHover={{ scale: 1.05 }}*/}
+            {/*    transition={{ type: 'spring', stiffness: 400 }}*/}
+            {/*  >*/}
+            {/*    <img*/}
+            {/*      src="https://img.shields.io/github/stars/tinkle-community/nofx?style=for-the-badge&logo=github&logoColor=white&color=F0B90B&labelColor=0A0A0A"*/}
+            {/*      alt="GitHub Stars"*/}
+            {/*      className="h-7"*/}
+            {/*    />*/}
+            {/*  </motion.a>*/}
+            {/*  <motion.a*/}
+            {/*    href="https://github.com/tinkle-community/nofx/network/members"*/}
+            {/*    target="_blank"*/}
+            {/*    rel="noopener noreferrer"*/}
+            {/*    whileHover={{ scale: 1.05 }}*/}
+            {/*    transition={{ type: 'spring', stiffness: 400 }}*/}
+            {/*  >*/}
+            {/*    <img*/}
+            {/*      src="https://img.shields.io/github/forks/tinkle-community/nofx?style=for-the-badge&logo=github&logoColor=white&color=F0B90B&labelColor=0A0A0A"*/}
+            {/*      alt="GitHub Forks"*/}
+            {/*      className="h-7"*/}
+            {/*    />*/}
+            {/*  </motion.a>*/}
+            {/*  <motion.a*/}
+            {/*    href="https://github.com/tinkle-community/nofx/graphs/contributors"*/}
+            {/*    target="_blank"*/}
+            {/*    rel="noopener noreferrer"*/}
+            {/*    whileHover={{ scale: 1.05 }}*/}
+            {/*    transition={{ type: 'spring', stiffness: 400 }}*/}
+            {/*  >*/}
+            {/*    <img*/}
+            {/*      src="https://img.shields.io/github/contributors/tinkle-community/nofx?style=for-the-badge&logo=github&logoColor=white&color=F0B90B&labelColor=0A0A0A"*/}
+            {/*      alt="GitHub Contributors"*/}
+            {/*      className="h-7"*/}
+            {/*    />*/}
+            {/*  </motion.a>*/}
+            {/*</div>*/}
 
             <motion.p
               className="text-xs pt-4"
               style={{ color: 'var(--text-tertiary)' }}
               variants={fadeInUp}
             >
-              {t('poweredBy', language)}
+              {/*{t('poweredBy', language)}*/}
             </motion.p>
           </motion.div>
 
@@ -186,7 +186,7 @@ export default function HeroSection({ language }: HeroSectionProps) {
             {/* Background Layer */}
             <motion.img
               src="/images/hand-bg.png"
-              alt="NOFX Platform Background"
+              alt="OctoTrader Platform Background"
               className="w-full opacity-90"
               style={{ opacity, scale }}
               whileHover={{ scale: 1.02 }}

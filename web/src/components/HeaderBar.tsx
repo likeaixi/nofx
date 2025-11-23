@@ -20,7 +20,7 @@ interface HeaderBarProps {
 
 export default function HeaderBar({
   isLoggedIn = false,
-  isHomePage = false,
+  // isHomePage = false,
   currentPage,
   language = 'zh' as Language,
   onLanguageChange,
@@ -68,18 +68,18 @@ export default function HeaderBar({
           to="/"
           className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
         >
-          <img src="/icons/nofx.svg" alt="NOFX Logo" className="w-8 h-8" />
+          <img src="/icons/logo.svg" alt="OctoTrader Logo" className="w-8 h-8" />
           <span
             className="text-xl font-bold"
             style={{ color: 'var(--brand-yellow)' }}
           >
-            NOFX
+            OctoTrader
           </span>
           <span
             className="text-sm hidden sm:block"
             style={{ color: 'var(--text-secondary)' }}
           >
-            Agentic Trading OS
+            Trading OS
           </span>
         </Link>
 
@@ -207,48 +207,48 @@ export default function HeaderBar({
                   {t('dashboardNav', language)}
                 </button>
 
-                <button
-                  onClick={() => {
-                    if (onPageChange) {
-                      onPageChange('faq')
-                    } else {
-                      navigate('/faq')
-                    }
-                  }}
-                  className="text-sm font-bold transition-all duration-300 relative focus:outline-2 focus:outline-yellow-500"
-                  style={{
-                    color:
-                      currentPage === 'faq'
-                        ? 'var(--brand-yellow)'
-                        : 'var(--brand-light-gray)',
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    position: 'relative',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (currentPage !== 'faq') {
-                      e.currentTarget.style.color = 'var(--brand-yellow)'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (currentPage !== 'faq') {
-                      e.currentTarget.style.color = 'var(--brand-light-gray)'
-                    }
-                  }}
-                >
-                  {/* Background for selected state */}
-                  {currentPage === 'faq' && (
-                    <span
-                      className="absolute inset-0 rounded-lg"
-                      style={{
-                        background: 'rgba(240, 185, 11, 0.15)',
-                        zIndex: -1,
-                      }}
-                    />
-                  )}
+                {/*<button*/}
+                {/*  onClick={() => {*/}
+                {/*    if (onPageChange) {*/}
+                {/*      onPageChange('faq')*/}
+                {/*    } else {*/}
+                {/*      navigate('/faq')*/}
+                {/*    }*/}
+                {/*  }}*/}
+                {/*  className="text-sm font-bold transition-all duration-300 relative focus:outline-2 focus:outline-yellow-500"*/}
+                {/*  style={{*/}
+                {/*    color:*/}
+                {/*      currentPage === 'faq'*/}
+                {/*        ? 'var(--brand-yellow)'*/}
+                {/*        : 'var(--brand-light-gray)',*/}
+                {/*    padding: '8px 16px',*/}
+                {/*    borderRadius: '8px',*/}
+                {/*    position: 'relative',*/}
+                {/*  }}*/}
+                {/*  onMouseEnter={(e) => {*/}
+                {/*    if (currentPage !== 'faq') {*/}
+                {/*      e.currentTarget.style.color = 'var(--brand-yellow)'*/}
+                {/*    }*/}
+                {/*  }}*/}
+                {/*  onMouseLeave={(e) => {*/}
+                {/*    if (currentPage !== 'faq') {*/}
+                {/*      e.currentTarget.style.color = 'var(--brand-light-gray)'*/}
+                {/*    }*/}
+                {/*  }}*/}
+                {/*>*/}
+                {/*  /!* Background for selected state *!/*/}
+                {/*  {currentPage === 'faq' && (*/}
+                {/*    <span*/}
+                {/*      className="absolute inset-0 rounded-lg"*/}
+                {/*      style={{*/}
+                {/*        background: 'rgba(240, 185, 11, 0.15)',*/}
+                {/*        zIndex: -1,*/}
+                {/*      }}*/}
+                {/*    />*/}
+                {/*  )}*/}
 
-                  {t('faqNav', language)}
-                </button>
+                {/*  {t('faqNav', language)}*/}
+                {/*</button>*/}
               </>
             ) : (
               // Landing page navigation when not logged in
@@ -290,42 +290,42 @@ export default function HeaderBar({
                   {t('realtimeNav', language)}
                 </a>
 
-                <a
-                  href="/faq"
-                  className="text-sm font-bold transition-all duration-300 relative focus:outline-2 focus:outline-yellow-500"
-                  style={{
-                    color:
-                      currentPage === 'faq'
-                        ? 'var(--brand-yellow)'
-                        : 'var(--brand-light-gray)',
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    position: 'relative',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (currentPage !== 'faq') {
-                      e.currentTarget.style.color = 'var(--brand-yellow)'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (currentPage !== 'faq') {
-                      e.currentTarget.style.color = 'var(--brand-light-gray)'
-                    }
-                  }}
-                >
-                  {/* Background for selected state */}
-                  {currentPage === 'faq' && (
-                    <span
-                      className="absolute inset-0 rounded-lg"
-                      style={{
-                        background: 'rgba(240, 185, 11, 0.15)',
-                        zIndex: -1,
-                      }}
-                    />
-                  )}
+                {/*<a*/}
+                {/*  href="/faq"*/}
+                {/*  className="text-sm font-bold transition-all duration-300 relative focus:outline-2 focus:outline-yellow-500"*/}
+                {/*  style={{*/}
+                {/*    color:*/}
+                {/*      currentPage === 'faq'*/}
+                {/*        ? 'var(--brand-yellow)'*/}
+                {/*        : 'var(--brand-light-gray)',*/}
+                {/*    padding: '8px 16px',*/}
+                {/*    borderRadius: '8px',*/}
+                {/*    position: 'relative',*/}
+                {/*  }}*/}
+                {/*  onMouseEnter={(e) => {*/}
+                {/*    if (currentPage !== 'faq') {*/}
+                {/*      e.currentTarget.style.color = 'var(--brand-yellow)'*/}
+                {/*    }*/}
+                {/*  }}*/}
+                {/*  onMouseLeave={(e) => {*/}
+                {/*    if (currentPage !== 'faq') {*/}
+                {/*      e.currentTarget.style.color = 'var(--brand-light-gray)'*/}
+                {/*    }*/}
+                {/*  }}*/}
+                {/*>*/}
+                {/*  /!* Background for selected state *!/*/}
+                {/*  {currentPage === 'faq' && (*/}
+                {/*    <span*/}
+                {/*      className="absolute inset-0 rounded-lg"*/}
+                {/*      style={{*/}
+                {/*        background: 'rgba(240, 185, 11, 0.15)',*/}
+                {/*        zIndex: -1,*/}
+                {/*      }}*/}
+                {/*    />*/}
+                {/*  )}*/}
 
-                  {t('faqNav', language)}
-                </a>
+                {/*  {t('faqNav', language)}*/}
+                {/*</a>*/}
               </>
             )}
           </div>
@@ -333,42 +333,42 @@ export default function HeaderBar({
           {/* Right Side - Original Navigation Items and Login */}
           <div className="flex items-center gap-6">
             {/* Only show original navigation items on home page */}
-            {isHomePage &&
-              [
-                { key: 'features', label: t('features', language) },
-                { key: 'howItWorks', label: t('howItWorks', language) },
-                { key: 'GitHub', label: 'GitHub' },
-                { key: 'community', label: t('community', language) },
-              ].map((item) => (
-                <a
-                  key={item.key}
-                  href={
-                    item.key === 'GitHub'
-                      ? 'https://github.com/tinkle-community/nofx'
-                      : item.key === 'community'
-                        ? 'https://t.me/nofx_dev_community'
-                        : `#${item.key === 'features' ? 'features' : 'how-it-works'}`
-                  }
-                  target={
-                    item.key === 'GitHub' || item.key === 'community'
-                      ? '_blank'
-                      : undefined
-                  }
-                  rel={
-                    item.key === 'GitHub' || item.key === 'community'
-                      ? 'noopener noreferrer'
-                      : undefined
-                  }
-                  className="text-sm transition-colors relative group"
-                  style={{ color: 'var(--brand-light-gray)' }}
-                >
-                  {item.label}
-                  <span
-                    className="absolute -bottom-1 left-0 w-0 h-0.5 group-hover:w-full transition-all duration-300"
-                    style={{ background: 'var(--brand-yellow)' }}
-                  />
-                </a>
-              ))}
+            {/*{isHomePage &&*/}
+            {/*  [*/}
+            {/*    { key: 'features', label: t('features', language) },*/}
+            {/*    { key: 'howItWorks', label: t('howItWorks', language) },*/}
+            {/*    { key: 'GitHub', label: 'GitHub' },*/}
+            {/*    { key: 'community', label: t('community', language) },*/}
+            {/*  ].map((item) => (*/}
+            {/*    <a*/}
+            {/*      key={item.key}*/}
+            {/*      href={*/}
+            {/*        item.key === 'GitHub'*/}
+            {/*          ? 'https://github.com/tinkle-community/nofx'*/}
+            {/*          : item.key === 'community'*/}
+            {/*            ? 'https://t.me/nofx_dev_community'*/}
+            {/*            : `#${item.key === 'features' ? 'features' : 'how-it-works'}`*/}
+            {/*      }*/}
+            {/*      target={*/}
+            {/*        item.key === 'GitHub' || item.key === 'community'*/}
+            {/*          ? '_blank'*/}
+            {/*          : undefined*/}
+            {/*      }*/}
+            {/*      rel={*/}
+            {/*        item.key === 'GitHub' || item.key === 'community'*/}
+            {/*          ? 'noopener noreferrer'*/}
+            {/*          : undefined*/}
+            {/*      }*/}
+            {/*      className="text-sm transition-colors relative group"*/}
+            {/*      style={{ color: 'var(--brand-light-gray)' }}*/}
+            {/*    >*/}
+            {/*      {item.label}*/}
+            {/*      <span*/}
+            {/*        className="absolute -bottom-1 left-0 w-0 h-0.5 group-hover:w-full transition-all duration-300"*/}
+            {/*        style={{ background: 'var(--brand-yellow)' }}*/}
+            {/*      />*/}
+            {/*    </a>*/}
+            {/*  ))}*/}
 
             {/* User Info and Actions */}
             {isLoggedIn && user ? (
@@ -724,77 +724,77 @@ export default function HeaderBar({
 
                 {t('dashboardNav', language)}
               </button>
-              <button
-                onClick={() => {
-                  if (onPageChange) {
-                    onPageChange('faq')
-                  } else {
-                    navigate('/faq')
-                  }
-                  setMobileMenuOpen(false)
-                }}
-                className="block text-sm font-bold transition-all duration-300 relative focus:outline-2 focus:outline-yellow-500 hover:text-yellow-500"
-                style={{
-                  color:
-                    currentPage === 'faq'
-                      ? 'var(--brand-yellow)'
-                      : 'var(--brand-light-gray)',
-                  padding: '12px 16px',
-                  borderRadius: '8px',
-                  position: 'relative',
-                  width: '100%',
-                  textAlign: 'left',
-                }}
-              >
-                {/* Background for selected state */}
-                {currentPage === 'faq' && (
-                  <span
-                    className="absolute inset-0 rounded-lg"
-                    style={{
-                      background: 'rgba(240, 185, 11, 0.15)',
-                      zIndex: -1,
-                    }}
-                  />
-                )}
+              {/*<button*/}
+              {/*  onClick={() => {*/}
+              {/*    if (onPageChange) {*/}
+              {/*      onPageChange('faq')*/}
+              {/*    } else {*/}
+              {/*      navigate('/faq')*/}
+              {/*    }*/}
+              {/*    setMobileMenuOpen(false)*/}
+              {/*  }}*/}
+              {/*  className="block text-sm font-bold transition-all duration-300 relative focus:outline-2 focus:outline-yellow-500 hover:text-yellow-500"*/}
+              {/*  style={{*/}
+              {/*    color:*/}
+              {/*      currentPage === 'faq'*/}
+              {/*        ? 'var(--brand-yellow)'*/}
+              {/*        : 'var(--brand-light-gray)',*/}
+              {/*    padding: '12px 16px',*/}
+              {/*    borderRadius: '8px',*/}
+              {/*    position: 'relative',*/}
+              {/*    width: '100%',*/}
+              {/*    textAlign: 'left',*/}
+              {/*  }}*/}
+              {/*>*/}
+              {/*  /!* Background for selected state *!/*/}
+              {/*  {currentPage === 'faq' && (*/}
+              {/*    <span*/}
+              {/*      className="absolute inset-0 rounded-lg"*/}
+              {/*      style={{*/}
+              {/*        background: 'rgba(240, 185, 11, 0.15)',*/}
+              {/*        zIndex: -1,*/}
+              {/*      }}*/}
+              {/*    />*/}
+              {/*  )}*/}
 
-                {t('faqNav', language)}
-              </button>
+              {/*  {t('faqNav', language)}*/}
+              {/*</button>*/}
             </>
           )}
 
           {/* Original Navigation Items - Only on home page */}
-          {isHomePage &&
-            [
-              { key: 'features', label: t('features', language) },
-              { key: 'howItWorks', label: t('howItWorks', language) },
-              { key: 'GitHub', label: 'GitHub' },
-              { key: 'community', label: t('community', language) },
-            ].map((item) => (
-              <a
-                key={item.key}
-                href={
-                  item.key === 'GitHub'
-                    ? 'https://github.com/tinkle-community/nofx'
-                    : item.key === 'community'
-                      ? 'https://t.me/nofx_dev_community'
-                      : `#${item.key === 'features' ? 'features' : 'how-it-works'}`
-                }
-                target={
-                  item.key === 'GitHub' || item.key === 'community'
-                    ? '_blank'
-                    : undefined
-                }
-                rel={
-                  item.key === 'GitHub' || item.key === 'community'
-                    ? 'noopener noreferrer'
-                    : undefined
-                }
-                className="block text-sm py-2"
-                style={{ color: 'var(--brand-light-gray)' }}
-              >
-                {item.label}
-              </a>
-            ))}
+          {/*{isHomePage &&*/}
+          {/*  [*/}
+          {/*    { key: 'features', label: t('features', language) },*/}
+          {/*    { key: 'howItWorks', label: t('howItWorks', language) },*/}
+          {/*    { key: 'GitHub', label: 'GitHub' },*/}
+          {/*    { key: 'community', label: t('community', language) },*/}
+          {/*  ].map((item) => (*/}
+          {/*    <a*/}
+          {/*      key={item.key}*/}
+          {/*      href={*/}
+          {/*        item.key === 'GitHub'*/}
+          {/*          ? 'https://github.com/tinkle-community/nofx'*/}
+          {/*          : item.key === 'community'*/}
+          {/*            ? 'https://t.me/nofx_dev_community'*/}
+          {/*            : `#${item.key === 'features' ? 'features' : 'how-it-works'}`*/}
+          {/*      }*/}
+          {/*      target={*/}
+          {/*        item.key === 'GitHub' || item.key === 'community'*/}
+          {/*          ? '_blank'*/}
+          {/*          : undefined*/}
+          {/*      }*/}
+          {/*      rel={*/}
+          {/*        item.key === 'GitHub' || item.key === 'community'*/}
+          {/*          ? 'noopener noreferrer'*/}
+          {/*          : undefined*/}
+          {/*      }*/}
+          {/*      className="block text-sm py-2"*/}
+          {/*      style={{ color: 'var(--brand-light-gray)' }}*/}
+          {/*    >*/}
+          {/*      {item.label}*/}
+          {/*    </a>*/}
+          {/*  ))}*/}
 
           {/* Language Toggle */}
           <div className="py-2">

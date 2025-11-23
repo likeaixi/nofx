@@ -52,7 +52,7 @@ export default function CommunitySection() {
   const items: CardProps[] = [
     {
       quote:
-        '前不久非常火的 AI 量化交易系统 NOF1，在 GitHub 上有人将其复刻并开源，这就是 NOFX 项目。基于 DeepSeek、Qwen 等大语言模型，打造的通用架构 AI 交易操作系统，完成了从决策、到交易、再到复盘的闭环。GitHub: https://github.com/NoFxAiOS/nofx',
+        '前不久非常火的 AI 量化交易系统 NOF1，在 GitHub 上有人将其复刻并开源，这就是 OctoTrader 项目。基于 DeepSeek、Qwen 等大语言模型，打造的通用架构 AI 交易操作系统，完成了从决策、到交易、再到复盘的闭环。GitHub: https://github.com/NoFxAiOS/nofx',
       authorName: 'Michael Williams',
       handle: '@MichaelWil93725',
       avatarUrl:
@@ -73,7 +73,7 @@ export default function CommunitySection() {
     },
     {
       quote:
-        'Open-source NOFX revives the legendary Alpha Arena, an AI-powered crypto futures battleground. Built on DeepSeek/Qwen AI, it trades live on Binance, Hyperliquid, and Aster DEX, featuring multi-AI battles and self-learning bots',
+        'Open-source OctoTrader revives the legendary Alpha Arena, an AI-powered crypto futures battleground. Built on DeepSeek/Qwen AI, it trades live on Binance, Hyperliquid, and Aster DEX, featuring multi-AI battles and self-learning bots',
       authorName: 'Kai',
       handle: '@hqmank',
       avatarUrl:

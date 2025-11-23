@@ -15,10 +15,10 @@ export default function FooterSection({ language }: FooterSectionProps) {
       <div className="max-w-[1200px] mx-auto px-6 py-10">
         {/* Brand */}
         <div className="flex items-center gap-3 mb-8">
-          <img src="/icons/nofx.svg" alt="NOFX Logo" className="w-8 h-8" />
+          <img src="/icons/logo.svg" alt="OctoTrader Logo" className="w-8 h-8" />
           <div>
             <div className="text-lg font-bold" style={{ color: '#EAECEF' }}>
-              NOFX
+              OctoTrader
             </div>
             <div className="text-xs" style={{ color: '#848E9C' }}>
               {t('futureStandardAI', language)}
@@ -36,30 +36,30 @@ export default function FooterSection({ language }: FooterSectionProps) {
               {t('links', language)}
             </h3>
             <ul className="space-y-2 text-sm" style={{ color: '#848E9C' }}>
+              {/*<li>*/}
+              {/*  <a*/}
+              {/*    className="hover:text-[#F0B90B]"*/}
+              {/*    href="https://github.com/tinkle-community/nofx"*/}
+              {/*    target="_blank"*/}
+              {/*    rel="noopener noreferrer"*/}
+              {/*  >*/}
+              {/*    GitHub*/}
+              {/*  </a>*/}
+              {/*</li>*/}
+              {/*<li>*/}
+              {/*  <a*/}
+              {/*    className="hover:text-[#F0B90B]"*/}
+              {/*    href="https://t.me/nofx_dev_community"*/}
+              {/*    target="_blank"*/}
+              {/*    rel="noopener noreferrer"*/}
+              {/*  >*/}
+              {/*    Telegram*/}
+              {/*  </a>*/}
+              {/*</li>*/}
               <li>
                 <a
                   className="hover:text-[#F0B90B]"
-                  href="https://github.com/tinkle-community/nofx"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  GitHub
-                </a>
-              </li>
-              <li>
-                <a
-                  className="hover:text-[#F0B90B]"
-                  href="https://t.me/nofx_dev_community"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Telegram
-                </a>
-              </li>
-              <li>
-                <a
-                  className="hover:text-[#F0B90B]"
-                  href="https://x.com/nofx_ai"
+                  href="https://x.com/OctoTraderAI"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -77,36 +77,36 @@ export default function FooterSection({ language }: FooterSectionProps) {
               {t('resources', language)}
             </h3>
             <ul className="space-y-2 text-sm" style={{ color: '#848E9C' }}>
-              <li>
-                <a
-                  className="hover:text-[#F0B90B]"
-                  href="https://github.com/tinkle-community/nofx/blob/main/README.md"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {t('documentation', language)}
-                </a>
-              </li>
-              <li>
-                <a
-                  className="hover:text-[#F0B90B]"
-                  href="https://github.com/tinkle-community/nofx/issues"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Issues
-                </a>
-              </li>
-              <li>
-                <a
-                  className="hover:text-[#F0B90B]"
-                  href="https://github.com/tinkle-community/nofx/pulls"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Pull Requests
-                </a>
-              </li>
+              {/*<li>*/}
+              {/*  <a*/}
+              {/*    className="hover:text-[#F0B90B]"*/}
+              {/*    href="https://github.com/tinkle-community/nofx/blob/main/README.md"*/}
+              {/*    target="_blank"*/}
+              {/*    rel="noopener noreferrer"*/}
+              {/*  >*/}
+              {/*    {t('documentation', language)}*/}
+              {/*  </a>*/}
+              {/*</li>*/}
+              {/*<li>*/}
+              {/*  <a*/}
+              {/*    className="hover:text-[#F0B90B]"*/}
+              {/*    href="https://github.com/tinkle-community/nofx/issues"*/}
+              {/*    target="_blank"*/}
+              {/*    rel="noopener noreferrer"*/}
+              {/*  >*/}
+              {/*    Issues*/}
+              {/*  </a>*/}
+              {/*</li>*/}
+              {/*<li>*/}
+              {/*  <a*/}
+              {/*    className="hover:text-[#F0B90B]"*/}
+              {/*    href="https://github.com/tinkle-community/nofx/pulls"*/}
+              {/*    target="_blank"*/}
+              {/*    rel="noopener noreferrer"*/}
+              {/*  >*/}
+              {/*    Pull Requests*/}
+              {/*  </a>*/}
+              {/*</li>*/}
             </ul>
           </div>
 
@@ -121,7 +121,7 @@ export default function FooterSection({ language }: FooterSectionProps) {
               <li>
                 <a
                   className="hover:text-[#F0B90B]"
-                  href="https://www.asterdex.com/en/referral/fdfc0e"
+                  href="https://www.asterdex.com"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -131,7 +131,7 @@ export default function FooterSection({ language }: FooterSectionProps) {
               <li>
                 <a
                   className="hover:text-[#F0B90B]"
-                  href="https://www.maxweb.red/join?ref=NOFXAI"
+                  href="https://www.maxweb.red/join"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -148,19 +148,19 @@ export default function FooterSection({ language }: FooterSectionProps) {
                   Hyperliquid
                 </a>
               </li>
-              <li>
-                <a
-                  className="hover:text-[#F0B90B]"
-                  href="https://amber.ac/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Amber.ac{' '}
-                  <span className="opacity-70">
-                    {t('strategicInvestment', language)}
-                  </span>
-                </a>
-              </li>
+              {/*<li>*/}
+              {/*  <a*/}
+              {/*    className="hover:text-[#F0B90B]"*/}
+              {/*    href="https://amber.ac/"*/}
+              {/*    target="_blank"*/}
+              {/*    rel="noopener noreferrer"*/}
+              {/*  >*/}
+              {/*    Amber.ac{' '}*/}
+              {/*    <span className="opacity-70">*/}
+              {/*      {t('strategicInvestment', language)}*/}
+              {/*    </span>*/}
+              {/*  </a>*/}
+              {/*</li>*/}
             </ul>
           </div>
         </div>
@@ -174,7 +174,7 @@ export default function FooterSection({ language }: FooterSectionProps) {
           }}
         >
           <p>{t('footerTitle', language)}</p>
-          <p className="mt-1">{t('footerWarning', language)}</p>
+          {/*<p className="mt-1">{t('footerWarning', language)}</p>*/}
         </div>
       </div>
     </footer>
