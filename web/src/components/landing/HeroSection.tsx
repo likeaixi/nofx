@@ -43,18 +43,18 @@ export default function HeroSection({ language }: HeroSectionProps) {
             animate="animate"
             variants={staggerContainer}
           >
-            <motion.div variants={fadeInUp}>
-              <motion.div
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6"
-                style={{
-                  background: 'rgba(240, 185, 11, 0.1)',
-                  border: '1px solid rgba(240, 185, 11, 0.2)',
-                }}
-                whileHover={{
-                  scale: 1.05,
-                  boxShadow: '0 0 20px rgba(240, 185, 11, 0.2)',
-                }}
-              >
+            {/*<motion.div variants={fadeInUp}>*/}
+            {/*  <motion.div*/}
+            {/*    className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6"*/}
+            {/*    style={{*/}
+            {/*      background: 'rgba(240, 185, 11, 0.1)',*/}
+            {/*      border: '1px solid rgba(240, 185, 11, 0.2)',*/}
+            {/*    }}*/}
+            {/*    whileHover={{*/}
+            {/*      scale: 1.05,*/}
+            {/*      boxShadow: '0 0 20px rgba(240, 185, 11, 0.2)',*/}
+            {/*    }}*/}
+            {/*  >*/}
                 {/*<Sparkles*/}
                 {/*  className="w-4 h-4"*/}
                 {/*  style={{ color: 'var(--brand-yellow)' }}*/}
@@ -82,8 +82,8 @@ export default function HeroSection({ language }: HeroSectionProps) {
                 {/*    </>*/}
                 {/*  )}*/}
                 {/*</span>*/}
-              </motion.div>
-            </motion.div>
+            {/*  </motion.div>*/}
+            {/*</motion.div>*/}
 
             <h1
               className="text-5xl lg:text-7xl font-bold leading-tight"
