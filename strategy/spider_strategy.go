@@ -674,6 +674,7 @@ func checkExitConditions(pos decision.PositionInfo, klines []decision.Kline) dec
 
 	dec.Symbol = pos.Symbol
 	dec.Action = "hold"
+	dec.Reasoning = "没有退出信号"
 
 	dec.Level = pos.EntryLevel
 	// 1) entry_level 的反向信号
