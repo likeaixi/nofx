@@ -372,7 +372,7 @@ func (at *AutoTrader) runCycle() error {
 	//log.Printf("🤖 正在请求AI分析并决策... [模板: %s]", at.systemPromptTemplate)
 	//decision, err := decision.GetFullDecisionWithCustomPrompt(ctx, at.mcpClient, at.customPrompt, at.overrideBasePrompt, at.systemPromptTemplate)
 
-	// 5.1 换成蜘蛛丝策略
+	// 5 换成蜘蛛丝策略
 	log.Printf("🕷️ 正在请求Spider Strategy分析并决策")
 	decision, err := at.strategy.GetFullDecision(ctx)
 

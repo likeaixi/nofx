@@ -185,6 +185,7 @@ func (t *FuturesTrader) GetKlines(coins []decision.CandidateCoin) (map[string][]
 	log.Printf("🔄 缓存过期，正在调用币安API获取K线数据...")
 
 	var result map[string][]decision.Kline
+	result = make(map[string][]decision.Kline, len(coins))
 	for _, coin := range coins {
 		closed, err := t.KlinesClosed(coin.Symbol, 10, "1m")
 		if err != nil {

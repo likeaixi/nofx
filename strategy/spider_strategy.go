@@ -399,6 +399,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		c5 = strings.ToUpper(c5)
 		if !((c3 == "UP" && c5 == "UP") || (c3 == "DOWN" && c5 == "DOWN")) {
 			//sleepUntil(start, pollInterval)
+			logger.Info("[ENTRY] C3和C5方向不一致，wait")
 			dec.Action = "wait"
 			decisions = append(decisions, dec)
 			continue
