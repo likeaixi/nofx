@@ -501,7 +501,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		}
 
 		dec.Action = action
-		dec.Level, _ = d(best["level"].(string)).Float64()
+		dec.Level, _ = (best["level"]).(decimal.Decimal).Float64()
 		dec.Reasoning = best["reason"].(string)
 
 		accountEquityUSDT := decimal.NewFromFloat(ctx.Account.TotalEquity)
