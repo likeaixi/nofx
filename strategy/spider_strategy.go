@@ -403,25 +403,25 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 			continue
 		}
 
-		shortsRaw, longsRaw := fetchSpiderRaw()
-		if len(shortsRaw) == 0 || len(longsRaw) == 0 {
-			log.Printf("[ENTRY] 蜘蛛丝只有一边，wait")
+		ssp := fetchSpiderRaw()
+		if len(ssp) == 0 {
+			log.Printf("[ENTRY] 蜘蛛丝为空，wait")
 			//sleepUntil(start, pollInterval)
 			dec.Action = "wait"
 			decisions = append(decisions, dec)
 			continue
 		}
 
-		shorts, longs := filterPairsForEntry(shortsRaw, longsRaw, pairMinGapUSD)
-		if len(shorts) == 0 && len(longs) == 0 {
-			log.Printf("[ENTRY] 没有可用的蜘蛛丝，wait")
-			//sleepUntil(start, pollInterval)
-			dec.Action = "wait"
-			decisions = append(decisions, dec)
-			continue
-		}
+		//shorts, longs := filterPairsForEntry(shortsRaw, longsRaw, pairMinGapUSD)
+		//if len(shorts) == 0 && len(longs) == 0 {
+		//	log.Printf("[ENTRY] 没有可用的蜘蛛丝，wait")
+		//	//sleepUntil(start, pollInterval)
+		//	dec.Action = "wait"
+		//	decisions = append(decisions, dec)
+		//	continue
+		//}
 
-		allEntry := collectAllLevels(shorts, longs)
+		allEntry := ssp
 		var candidates []decimal.Decimal
 		for _, lv := range allEntry {
 			if absDec(lv.Sub(price)).LessThanOrEqual(entryNearRangeUSD) {
@@ -461,16 +461,15 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		}
 		best := dcs[bestIdx]
 		logTradeEvent("OPEN_SIGNAL", map[string]any{
-			"symbol":       coin.Symbol,
-			"direction":    best["side"],
-			"ref_level":    best["level"],
-			"reason":       best["reason"],
-			"price":        price,
-			"c1":           c1,
-			"c3":           c3,
-			"c5":           c5,
-			"shorts_entry": shorts,
-			"longs_entry":  longs,
+			"symbol":    coin.Symbol,
+			"direction": best["side"],
+			"ref_level": best["level"],
+			"reason":    best["reason"],
+			"price":     price,
+			"c1":        c1,
+			"c3":        c3,
+			"c5":        c5,
+			"ssp":       ssp,
 		})
 
 		var action string
@@ -644,8 +643,8 @@ func checkExitConditions(pos decision.PositionInfo, klines []decision.Kline) dec
 	c1 = strings.ToUpper(c1)
 	c3 = strings.ToUpper(c3)
 	c5 = strings.ToUpper(c5)
-	shortsRaw, longsRaw := fetchSpiderRaw()
-	allRaw := collectAllLevels(shortsRaw, longsRaw)
+	ssp := fetchSpiderRaw()
+	allRaw := ssp
 
 	side := pos.Side
 	entryLevel := decimal.NewFromFloat(pos.EntryLevel)
@@ -714,33 +713,35 @@ func checkExitConditions(pos decision.PositionInfo, klines []decision.Kline) dec
 
 // ================ 蜘蛛丝获取与过滤 ================
 
-type spiderResp struct{ SHORT, LONG []json.Number }
+type spiderResp struct {
+	P   string
+	SSP []json.Number
+	T   json.Number
+}
 
-func fetchSpiderRaw() ([]decimal.Decimal, []decimal.Decimal) {
+func fetchSpiderRaw() []decimal.Decimal {
 	req, _ := http.NewRequest(http.MethodGet, spiderURL, nil)
 	cli := &http.Client{Timeout: 2 * time.Second}
 	resp, err := cli.Do(req)
 	if err != nil {
 		log.Println("[SPIDER] fetch error:", err)
-		return nil, nil
+		return nil
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode/100 != 2 {
 		b, _ := io.ReadAll(resp.Body)
 		log.Printf("[SPIDER] non-2xx: %d %s", resp.StatusCode, string(b))
-		return nil, nil
+		return nil
 	}
 	var data spiderResp
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
 		log.Println("[SPIDER] json error:", err)
-		return nil, nil
+		return nil
 	}
-	shorts := toDecimals(data.SHORT)
-	longs := toDecimals(data.LONG)
-	shorts = dedupSort(shorts)
-	longs = dedupSort(longs)
-	log.Println("[SPIDER] RAW SHORT=", shorts, "LONG=", longs)
-	return shorts, longs
+	p := d(data.P)
+	ssp := toDecimals(data.SSP)
+	log.Println("[SPIDER] RAW ssp=", ssp, "price=", p)
+	return ssp
 }
 
 func toDecimals(ns []json.Number) []decimal.Decimal {
