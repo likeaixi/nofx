@@ -361,7 +361,18 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 			}
 		}
 
+		ssp, pri := fetchSpiderRaw()
+		act, c1, c3, c5 := fetchCombo()
+
 		dec.Symbol = coin.Symbol
+
+		fullDecision.SystemPrompt += "\n Symbol: " + dec.Symbol
+		fullDecision.SystemPrompt += "\n AI signal: " + act
+		fullDecision.SystemPrompt += "\n Price: " + pri.String()
+		fullDecision.SystemPrompt += "\n SSP: " + fmt.Sprintf("%v", ssp)
+		fullDecision.SystemPrompt += "\n C1: " + fmt.Sprintf("%v", c1)
+		fullDecision.SystemPrompt += "\n C3: " + fmt.Sprintf("%v", c3)
+		fullDecision.SystemPrompt += "\n C5: " + fmt.Sprintf("%v", c5)
 
 		// 1) 有持仓先做退出逻辑
 		if p.Symbol != "" {
@@ -395,7 +406,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 			decisions = append(decisions, dec)
 			continue
 		}
-		act, c1, c3, c5 := fetchCombo()
+
 		if act == "NEUTRAL" {
 			log.Printf("[ENTRY] 信号方向为NEUTRAL，wait")
 			dec.Action = "wait"
@@ -404,7 +415,6 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 			continue
 		}
 
-		ssp := fetchSpiderRaw()
 		if len(ssp) == 0 {
 			log.Printf("[ENTRY] 蜘蛛丝为空，wait")
 			//sleepUntil(start, pollInterval)
@@ -512,14 +522,6 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 
 		log.Printf("[ENTRY] symbol: %s，action: %s", p.Symbol, dec.Reasoning)
 		decisions = append(decisions, dec)
-
-		fullDecision.SystemPrompt += "\n Symbol: " + dec.Symbol
-		fullDecision.SystemPrompt += "\n AI signal: " + act
-		fullDecision.SystemPrompt += "\n Price: " + price.String()
-		fullDecision.SystemPrompt += "\n SSP: " + fmt.Sprintf("%v", ssp)
-		fullDecision.SystemPrompt += "\n C1: " + fmt.Sprintf("%v", c1)
-		fullDecision.SystemPrompt += "\n C3: " + fmt.Sprintf("%v", c3)
-		fullDecision.SystemPrompt += "\n C5: " + fmt.Sprintf("%v", c5)
 	}
 
 	fullDecision.Decisions = decisions
@@ -666,7 +668,7 @@ func checkExitConditions(pos decision.PositionInfo, klines []decision.Kline) dec
 	c1 = strings.ToUpper(c1)
 	c3 = strings.ToUpper(c3)
 	c5 = strings.ToUpper(c5)
-	ssp := fetchSpiderRaw()
+	ssp, _ := fetchSpiderRaw()
 	allRaw := ssp
 
 	side := pos.Side
@@ -742,29 +744,29 @@ type spiderResp struct {
 	T   json.Number
 }
 
-func fetchSpiderRaw() []decimal.Decimal {
+func fetchSpiderRaw() ([]decimal.Decimal, decimal.Decimal) {
 	req, _ := http.NewRequest(http.MethodGet, spiderURL, nil)
 	cli := &http.Client{Timeout: 2 * time.Second}
 	resp, err := cli.Do(req)
 	if err != nil {
 		log.Println("[SPIDER] fetch error:", err)
-		return nil
+		return nil, decimal.NewFromInt(0)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode/100 != 2 {
 		b, _ := io.ReadAll(resp.Body)
 		log.Printf("[SPIDER] non-2xx: %d %s", resp.StatusCode, string(b))
-		return nil
+		return nil, decimal.NewFromInt(0)
 	}
 	var data spiderResp
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
 		log.Println("[SPIDER] json error:", err)
-		return nil
+		return nil, decimal.NewFromInt(0)
 	}
 	p := d(data.P)
 	ssp := toDecimals(data.SSP)
 	log.Println("[SPIDER] RAW ssp=", ssp, "price=", p)
-	return ssp
+	return ssp, p
 }
 
 func toDecimals(ns []json.Number) []decimal.Decimal {
