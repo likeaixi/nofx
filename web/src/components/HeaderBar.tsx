@@ -20,7 +20,7 @@ interface HeaderBarProps {
 
 export default function HeaderBar({
   isLoggedIn = false,
-  // isHomePage = false,
+  isHomePage = false,
   currentPage,
   language = 'zh' as Language,
   onLanguageChange,
@@ -591,8 +591,8 @@ export default function HeaderBar({
             <button
               onClick={() => {
                 console.log(
-                  '移动端 实时 button clicked, onPageChange:',
-                  onPageChange
+                  '移动端 实时 button clicked, onPageChange, isHomepage',
+                  onPageChange, isHomePage
                 )
                 onPageChange?.('competition')
                 setMobileMenuOpen(false)
