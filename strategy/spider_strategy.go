@@ -478,12 +478,13 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 
 		var action string
 		var sl, tp decimal.Decimal
+		decimalLeverage := decimal.NewFromInt(int64(leverage))
 		log.Println("Best side", best["side"])
 		if best["side"] == "LONG" {
 			action = "open_long"
 
-			sl = price.Mul(d("1").Sub(STOP_LOSS_PCT))
-			tp = price.Mul(d("1").Add(TAKE_PROFIT_PCT))
+			sl = price.Mul(d("1").Sub(STOP_LOSS_PCT.Div(decimalLeverage)))
+			tp = price.Mul(d("1").Add(TAKE_PROFIT_PCT.Div(decimalLeverage)))
 
 			dec.StopLoss, _ = sl.Float64()
 			dec.TakeProfit, _ = tp.Float64()
@@ -492,8 +493,8 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		if best["side"] == "SHORT" {
 			action = "open_short"
 
-			sl = price.Mul(d("1").Add(STOP_LOSS_PCT))
-			tp = price.Mul(d("1").Sub(TAKE_PROFIT_PCT))
+			sl = price.Mul(d("1").Add(STOP_LOSS_PCT.Div(decimalLeverage)))
+			tp = price.Mul(d("1").Sub(TAKE_PROFIT_PCT.Div(decimalLeverage)))
 
 			dec.StopLoss, _ = sl.Float64()
 			dec.TakeProfit, _ = tp.Float64()
