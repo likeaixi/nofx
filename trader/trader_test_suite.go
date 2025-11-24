@@ -274,7 +274,7 @@ func (s *TraderTestSuite) TestFormatQuantity() {
 
 	for _, tt := range tests {
 		s.T.Run(tt.name, func(t *testing.T) {
-			result, err := s.Trader.FormatQuantity(tt.symbol, tt.quantity)
+			result, _, err := s.Trader.FormatQuantity(tt.symbol, tt.quantity, 0)
 			if tt.wantError {
 				assert.Error(t, err)
 			} else {
