@@ -36,8 +36,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
         onLanguageChange={setLanguage}
         user={user}
         onLogout={logout}
-        onPageChange={() => {
+        onPageChange={(page) => {
           // React Router handles navigation now
+          console.log('Main layout onPageChange called with:', page)
+          if (page === 'competition') {
+            window.location.href = '/competition'
+          } else if (page === 'traders') {
+            window.location.href = '/traders'
+          } else if (page === 'trader') {
+            window.location.href = '/dashboard'
+          }
         }}
       />
 
