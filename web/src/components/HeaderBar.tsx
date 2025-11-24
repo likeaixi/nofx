@@ -79,7 +79,7 @@ export default function HeaderBar({
             className="text-sm hidden sm:block"
             style={{ color: 'var(--text-secondary)' }}
           >
-            Trading OS
+            Agentic Trading OS
           </span>
         </Link>
 

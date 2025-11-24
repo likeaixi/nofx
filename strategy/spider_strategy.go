@@ -527,7 +527,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 	fullDecision.Decisions = decisions
 
 	for _, d := range decisions {
-		fullDecision.CoTTrace += d.Reasoning + " "
+		fullDecision.CoTTrace += d.Reasoning
 	}
 
 	// 3) 验证决策
@@ -668,7 +668,8 @@ func checkExitConditions(pos decision.PositionInfo, klines []decision.Kline) dec
 	ssp, _ := fetchSpiderRaw()
 	allRaw := ssp
 
-	side := pos.Side
+	fmt.Println("Position side", pos.Side)
+	side := strings.ToUpper(pos.Side)
 	entryLevel := decimal.NewFromFloat(pos.EntryLevel)
 	entryPrice := decimal.NewFromFloat(pos.EntryPrice)
 
