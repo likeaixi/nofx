@@ -891,23 +891,6 @@ func (t *FuturesTrader) GetSymbolPrecision(symbol string) (int, int, error) {
 	return 3, 3, nil // 默认精度为3
 }
 
-// GetSymbolPricePrecision 获取交易对的价格精度
-func (t *FuturesTrader) GetSymbolPricePrecision(symbol string) (int, error) {
-	exchangeInfo, err := t.client.NewExchangeInfoService().Do(context.Background())
-	if err != nil {
-		return 0, fmt.Errorf("获取交易规则失败: %w", err)
-	}
-
-	for _, s := range exchangeInfo.Symbols {
-		if s.Symbol == symbol {
-			return s.PricePrecision, nil
-		}
-	}
-
-	log.Printf("  ⚠ %s 未找到精度信息，使用默认精度3", symbol)
-	return 3, nil // 默认精度为3
-}
-
 // calculatePrecision 从stepSize计算精度
 func calculatePrecision(stepSize string) int {
 	// 去除尾部的0

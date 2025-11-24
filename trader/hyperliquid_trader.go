@@ -810,13 +810,14 @@ func (t *HyperliquidTrader) SetTakeProfit(symbol string, positionSide string, qu
 }
 
 // FormatQuantity 格式化数量到正确的精度
-func (t *HyperliquidTrader) FormatQuantity(symbol string, quantity float64) (string, error) {
+func (t *HyperliquidTrader) FormatQuantity(symbol string, quantity float64, price float64) (string, string, error) {
 	coin := convertSymbolToHyperliquid(symbol)
 	szDecimals := t.getSzDecimals(coin)
 
 	// 使用szDecimals格式化数量
-	formatStr := fmt.Sprintf("%%.%df", szDecimals)
-	return fmt.Sprintf(formatStr, quantity), nil
+	formatStr1 := fmt.Sprintf("%%.%df", szDecimals)
+	formatStr2 := fmt.Sprintf("%%.%df", 5)
+	return fmt.Sprintf(formatStr1, quantity), fmt.Sprintf(formatStr2, t.roundPriceToSigfigs(price)), nil
 }
 
 // getSzDecimals 获取币种的数量精度

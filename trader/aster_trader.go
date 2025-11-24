@@ -1230,10 +1230,10 @@ func (t *AsterTrader) CancelStopOrders(symbol string) error {
 }
 
 // FormatQuantity 格式化数量（实现Trader接口）
-func (t *AsterTrader) FormatQuantity(symbol string, quantity float64) (string, error) {
+func (t *AsterTrader) FormatQuantity(symbol string, quantity float64, price float64) (string, string, error) {
 	formatted, err := t.formatQuantity(symbol, quantity)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return fmt.Sprintf("%v", formatted), nil
+	return fmt.Sprintf("%v", formatted), "", nil
 }
