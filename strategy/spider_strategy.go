@@ -475,21 +475,10 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 			}
 		}
 		best := dcs[bestIdx]
-		logTradeEvent("OPEN_SIGNAL", map[string]any{
-			"symbol":       coin.Symbol,
-			"direction":    best["side"],
-			"ref_level":    best["level"],
-			"reason":       best["reason"],
-			"price":        price,
-			"c1":           c1,
-			"c3":           c3,
-			"c5":           c5,
-			"combo_action": act,
-			"ssp":          ssp,
-		})
 
 		var action string
 		var sl, tp decimal.Decimal
+		log.Println("Best side", best["side"])
 		if best["side"] == "LONG" {
 			action = "open_long"
 
@@ -522,12 +511,27 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 
 		log.Printf("[ENTRY] symbol: %s，action: %s", p.Symbol, dec.Reasoning)
 		decisions = append(decisions, dec)
+
+		logTradeEvent("OPEN_SIGNAL", map[string]any{
+			"symbol":       coin.Symbol,
+			"side":         best["side"],
+			"ref_level":    best["level"],
+			"reason":       best["reason"],
+			"price":        price,
+			"c1":           c1,
+			"c3":           c3,
+			"c5":           c5,
+			"combo_action": act,
+			"ssp":          ssp,
+			"tp":           dec.TakeProfit,
+			"sl":           dec.StopLoss,
+		})
 	}
 
 	fullDecision.Decisions = decisions
 
 	for _, d := range decisions {
-		fullDecision.CoTTrace += d.Reasoning
+		fullDecision.CoTTrace += d.Reasoning + "\n"
 	}
 
 	// 3) 验证决策
