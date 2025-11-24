@@ -509,11 +509,11 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		dec.PositionSizeUSD, _ = accountEquityUSDT.Mul(positionPercent).Mul(l).Float64()
 		dec.Leverage = leverage
 
-		log.Printf("[ENTRY] symbol: %s，action: %s", p.Symbol, dec.Reasoning)
+		log.Printf("[ENTRY] symbol: %s，action: %s", dec.Symbol, dec.Reasoning)
 		decisions = append(decisions, dec)
 
 		logTradeEvent("OPEN_SIGNAL", map[string]any{
-			"symbol":       coin.Symbol,
+			"symbol":       dec.Symbol,
 			"side":         best["side"],
 			"ref_level":    best["level"],
 			"reason":       best["reason"],

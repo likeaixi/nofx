@@ -371,7 +371,7 @@ func (t *FuturesTrader) OpenLong(symbol string, quantity float64, leverage int) 
 	// 注意：仓位模式应该由调用方（AutoTrader）在开仓前通过 SetMarginMode 设置
 
 	// 格式化数量到正确精度
-	quantityStr, err := t.FormatQuantity(symbol, quantity)
+	quantityStr, _, err := t.FormatQuantity(symbol, quantity, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -426,7 +426,7 @@ func (t *FuturesTrader) OpenShort(symbol string, quantity float64, leverage int)
 	// 注意：仓位模式应该由调用方（AutoTrader）在开仓前通过 SetMarginMode 设置
 
 	// 格式化数量到正确精度
-	quantityStr, err := t.FormatQuantity(symbol, quantity)
+	quantityStr, _, err := t.FormatQuantity(symbol, quantity, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -488,7 +488,7 @@ func (t *FuturesTrader) CloseLong(symbol string, quantity float64) (map[string]i
 	}
 
 	// 格式化数量
-	quantityStr, err := t.FormatQuantity(symbol, quantity)
+	quantityStr, _, err := t.FormatQuantity(symbol, quantity, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -543,7 +543,7 @@ func (t *FuturesTrader) CloseShort(symbol string, quantity float64) (map[string]
 	}
 
 	// 格式化数量
-	quantityStr, err := t.FormatQuantity(symbol, quantity)
+	quantityStr, _, err := t.FormatQuantity(symbol, quantity, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -778,7 +778,7 @@ func (t *FuturesTrader) SetStopLoss(symbol string, positionSide string, quantity
 	}
 
 	// 格式化数量
-	quantityStr, err := t.FormatQuantity(symbol, quantity)
+	quantityStr, slStr, err := t.FormatQuantity(symbol, quantity, stopPrice)
 	if err != nil {
 		return err
 	}
@@ -788,7 +788,7 @@ func (t *FuturesTrader) SetStopLoss(symbol string, positionSide string, quantity
 		Side(side).
 		PositionSide(posSide).
 		Type(futures.OrderTypeStopMarket).
-		StopPrice(fmt.Sprintf("%.8f", stopPrice)).
+		StopPrice(slStr).
 		Quantity(quantityStr).
 		WorkingType(futures.WorkingTypeContractPrice).
 		ClosePosition(true).
@@ -816,7 +816,7 @@ func (t *FuturesTrader) SetTakeProfit(symbol string, positionSide string, quanti
 	}
 
 	// 格式化数量
-	quantityStr, err := t.FormatQuantity(symbol, quantity)
+	quantityStr, tpStr, err := t.FormatQuantity(symbol, quantity, takeProfitPrice)
 	if err != nil {
 		return err
 	}
@@ -826,7 +826,7 @@ func (t *FuturesTrader) SetTakeProfit(symbol string, positionSide string, quanti
 		Side(side).
 		PositionSide(posSide).
 		Type(futures.OrderTypeTakeProfitMarket).
-		StopPrice(fmt.Sprintf("%.8f", takeProfitPrice)).
+		StopPrice(tpStr).
 		Quantity(quantityStr).
 		WorkingType(futures.WorkingTypeContractPrice).
 		ClosePosition(true).
@@ -866,11 +866,11 @@ func (t *FuturesTrader) CheckMinNotional(symbol string, quantity float64) error 
 	return nil
 }
 
-// GetSymbolPrecision 获取交易对的数量精度
-func (t *FuturesTrader) GetSymbolPrecision(symbol string) (int, error) {
+// GetSymbolPrecision 获取交易对的数量和价格精度
+func (t *FuturesTrader) GetSymbolPrecision(symbol string) (int, int, error) {
 	exchangeInfo, err := t.client.NewExchangeInfoService().Do(context.Background())
 	if err != nil {
-		return 0, fmt.Errorf("获取交易规则失败: %w", err)
+		return 0, 0, fmt.Errorf("获取交易规则失败: %w", err)
 	}
 
 	for _, s := range exchangeInfo.Symbols {
@@ -881,9 +881,26 @@ func (t *FuturesTrader) GetSymbolPrecision(symbol string) (int, error) {
 					stepSize := filter["stepSize"].(string)
 					precision := calculatePrecision(stepSize)
 					log.Printf("  %s 数量精度: %d (stepSize: %s)", symbol, precision, stepSize)
-					return precision, nil
+					return precision, s.PricePrecision, nil
 				}
 			}
+		}
+	}
+
+	log.Printf("  ⚠ %s 未找到精度信息，使用默认精度3", symbol)
+	return 3, 3, nil // 默认精度为3
+}
+
+// GetSymbolPricePrecision 获取交易对的价格精度
+func (t *FuturesTrader) GetSymbolPricePrecision(symbol string) (int, error) {
+	exchangeInfo, err := t.client.NewExchangeInfoService().Do(context.Background())
+	if err != nil {
+		return 0, fmt.Errorf("获取交易规则失败: %w", err)
+	}
+
+	for _, s := range exchangeInfo.Symbols {
+		if s.Symbol == symbol {
+			return s.PricePrecision, nil
 		}
 	}
 
@@ -935,15 +952,16 @@ func trimTrailingZeros(s string) string {
 }
 
 // FormatQuantity 格式化数量到正确的精度
-func (t *FuturesTrader) FormatQuantity(symbol string, quantity float64) (string, error) {
-	precision, err := t.GetSymbolPrecision(symbol)
+func (t *FuturesTrader) FormatQuantity(symbol string, quantity float64, price float64) (string, string, error) {
+	precision, pricePrecisiion, err := t.GetSymbolPrecision(symbol)
 	if err != nil {
 		// 如果获取失败，使用默认格式
-		return fmt.Sprintf("%.3f", quantity), nil
+		return fmt.Sprintf("%.3f", quantity), fmt.Sprintf("%.3f", price), nil
 	}
 
-	format := fmt.Sprintf("%%.%df", precision)
-	return fmt.Sprintf(format, quantity), nil
+	format1 := fmt.Sprintf("%%.%df", precision)
+	format2 := fmt.Sprintf("%%.%df", pricePrecisiion)
+	return fmt.Sprintf(format1, quantity), fmt.Sprintf(format2, price), nil
 }
 
 // 辅助函数
