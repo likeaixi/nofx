@@ -41,7 +41,7 @@ var (
 	pairMinGapUSD = d("500")
 
 	// 开仓参数
-	leverage             = 50
+	//leverage             = 50
 	accountEquityUSDT    = d("1000") // 备注
 	positionNotionalUSDT = d("200")  // 每次开仓名义 200U
 
@@ -51,7 +51,7 @@ var (
 	positionPercent = d("0.2")
 
 	// 可选硬止损（0 关闭）
-	slPctHard = d("0.05") // 5%
+	slPctHard = d("0.1") // 10%
 
 	// 仅考虑当前价 ± 这个范围内的蜘蛛丝来找入场
 	entryNearRangeUSD = d("2000")
@@ -376,7 +376,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 
 		// 1) 有持仓先做退出逻辑
 		if p.Symbol != "" {
-			dec = checkExitConditions(p, ctx.Klines[coin.Symbol])
+			dec = checkExitConditions(p, ctx.Klines[coin.Symbol], ctx.BTCETHLeverage)
 			decisions = append(decisions, dec)
 			log.Printf("[ENTRY] 有持仓，先判断是否退出，symbol: %s，action: %s", p.Symbol, dec.Reasoning)
 			continue
@@ -478,7 +478,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 
 		var action string
 		var sl, tp decimal.Decimal
-		decimalLeverage := decimal.NewFromInt(int64(leverage))
+		decimalLeverage := decimal.NewFromInt(int64(ctx.BTCETHLeverage))
 		log.Println("Best side", best["side"])
 		if best["side"] == "LONG" {
 			action = "open_long"
@@ -505,10 +505,9 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		dec.Reasoning = best["reason"].(string)
 
 		accountEquityUSDT := decimal.NewFromFloat(ctx.Account.TotalEquity)
-		l := decimal.NewFromInt(int64(leverage))
 
-		dec.PositionSizeUSD, _ = accountEquityUSDT.Mul(positionPercent).Mul(l).Float64()
-		dec.Leverage = leverage
+		dec.PositionSizeUSD, _ = accountEquityUSDT.Mul(positionPercent).Mul(decimalLeverage).Float64()
+		dec.Leverage = ctx.BTCETHLeverage
 
 		log.Printf("[ENTRY] symbol: %s，action: %s", dec.Symbol, dec.Reasoning)
 		decisions = append(decisions, dec)
@@ -659,7 +658,7 @@ func calculateMaxCandidates(ctx *decision.Context) int {
 	return min(len(ctx.CandidateCoins), maxCandidates)
 }
 
-func checkExitConditions(pos decision.PositionInfo, klines []decision.Kline) decision.Decision {
+func checkExitConditions(pos decision.PositionInfo, klines []decision.Kline, leverage int) decision.Decision {
 	var dec = decision.Decision{}
 
 	var price = decimal.NewFromFloat(pos.MarkPrice)
@@ -718,8 +717,9 @@ func checkExitConditions(pos decision.PositionInfo, klines []decision.Kline) dec
 	}
 	// 3) 硬止损兜底
 	if slPctHard.GreaterThan(decimal.Zero) {
+		decimalLeverage := decimal.NewFromInt(int64(leverage))
 		if side == "LONG" {
-			sl := entryPrice.Mul(d("1").Sub(slPctHard))
+			sl := entryPrice.Mul(d("1").Sub(slPctHard.Div(decimalLeverage)))
 			if price.LessThanOrEqual(sl) {
 				//closePosition(b, "hard_stop_loss")
 				//return
@@ -727,7 +727,7 @@ func checkExitConditions(pos decision.PositionInfo, klines []decision.Kline) dec
 				dec.Reasoning = "hard_stop_loss"
 			}
 		} else {
-			sl := entryPrice.Mul(d("1").Add(slPctHard))
+			sl := entryPrice.Mul(d("1").Add(slPctHard.Div(decimalLeverage)))
 			if price.GreaterThanOrEqual(sl) {
 				//closePosition(b, "hard_stop_loss")
 				//return
