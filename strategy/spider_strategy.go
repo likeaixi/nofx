@@ -45,7 +45,7 @@ var (
 	accountEquityUSDT    = d("1000") // 备注
 	positionNotionalUSDT = d("200")  // 每次开仓名义 200U
 
-	STOP_LOSS_PCT   = d("0.05")
+	STOP_LOSS_PCT   = d("0.1")
 	TAKE_PROFIT_PCT = d("0.25")
 
 	positionPercent = d("0.2")
