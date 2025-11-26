@@ -227,7 +227,7 @@ export function ComparisonChart({ traders }: ComparisonChartProps) {
                     className="text-xs ml-2 font-normal"
                     style={{ color: '#848E9C' }}
                   >
-                    ({equity?.toFixed(2)} USDT)
+                    ({equity?.toFixed(2)} USD)
                   </span>
                 </div>
               </div>

@@ -393,18 +393,18 @@ export default function TraderDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <StatCard
           title={t('totalEquity', language)}
-          value={`${account?.total_equity?.toFixed(2) || '0.00'} USDT`}
+          value={`${account?.total_equity?.toFixed(2) || '0.00'} USD`}
           change={account?.total_pnl_pct || 0}
           positive={(account?.total_pnl ?? 0) > 0}
         />
         <StatCard
           title={t('availableBalance', language)}
-          value={`${account?.available_balance?.toFixed(2) || '0.00'} USDT`}
+          value={`${account?.available_balance?.toFixed(2) || '0.00'} USD`}
           subtitle={`${account?.available_balance && account?.total_equity ? ((account.available_balance / account.total_equity) * 100).toFixed(1) : '0.0'}% ${t('free', language)}`}
         />
         <StatCard
           title={t('totalPnL', language)}
-          value={`${account?.total_pnl !== undefined && account.total_pnl >= 0 ? '+' : ''}${account?.total_pnl?.toFixed(2) || '0.00'} USDT`}
+          value={`${account?.total_pnl !== undefined && account.total_pnl >= 0 ? '+' : ''}${account?.total_pnl?.toFixed(2) || '0.00'} USD`}
           change={account?.total_pnl_pct || 0}
           positive={(account?.total_pnl ?? 0) >= 0}
         />
@@ -536,7 +536,7 @@ export default function TraderDashboard() {
                           className="py-3 font-mono font-bold"
                           style={{ color: '#EAECEF' }}
                         >
-                          {(pos.quantity * pos.mark_price).toFixed(2)} USDT
+                          {(pos.quantity * pos.mark_price).toFixed(2)} USD
                         </td>
                         <td
                           className="py-3 font-mono"
@@ -896,10 +896,10 @@ function DecisionCard({
           style={{ background: '#0B0E11', color: '#848E9C' }}
         >
           <span>
-            净值: {decision.account_state.total_balance.toFixed(2)} USDT
+            净值: {decision.account_state.total_balance.toFixed(2)} USD
           </span>
           <span>
-            可用: {decision.account_state.available_balance.toFixed(2)} USDT
+            可用: {decision.account_state.available_balance.toFixed(2)} USD
           </span>
           <span>
             保证金率: {decision.account_state.margin_used_pct.toFixed(1)}%

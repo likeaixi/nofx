@@ -176,14 +176,14 @@ export function EquityChart({ traderId }: EquityChartProps) {
             Cycle #{data.cycle}
           </div>
           <div className="font-bold mono" style={{ color: '#EAECEF' }}>
-            {data.raw_equity.toFixed(2)} USDT
+            {data.raw_equity.toFixed(2)} USD
           </div>
           <div
             className="text-sm mono font-bold"
             style={{ color: data.raw_pnl >= 0 ? '#0ECB81' : '#F6465D' }}
           >
             {data.raw_pnl >= 0 ? '+' : ''}
-            {data.raw_pnl.toFixed(2)} USDT ({data.raw_pnl_pct >= 0 ? '+' : ''}
+            {data.raw_pnl.toFixed(2)} USD ({data.raw_pnl_pct >= 0 ? '+' : ''}
             {data.raw_pnl_pct}%)
           </div>
         </div>
@@ -213,7 +213,7 @@ export function EquityChart({ traderId }: EquityChartProps) {
                 className="text-base sm:text-lg ml-1"
                 style={{ color: '#848E9C' }}
               >
-                USDT
+                USD
               </span>
             </span>
             <div className="flex items-center gap-2 flex-wrap">
@@ -244,7 +244,7 @@ export function EquityChart({ traderId }: EquityChartProps) {
                 style={{ color: '#848E9C' }}
               >
                 ({isProfit ? '+' : ''}
-                {currentValue.raw_pnl.toFixed(2)} USDT)
+                {currentValue.raw_pnl.toFixed(2)} USD)
               </span>
             </div>
           </div>
@@ -268,7 +268,7 @@ export function EquityChart({ traderId }: EquityChartProps) {
                 : { background: 'transparent', color: '#848E9C' }
             }
           >
-            <DollarSign className="w-4 h-4" /> USDT
+            <DollarSign className="w-4 h-4" /> USD
           </button>
           <button
             onClick={() => setDisplayMode('percent')}
@@ -395,7 +395,7 @@ export function EquityChart({ traderId }: EquityChartProps) {
             className="text-xs sm:text-sm font-bold mono"
             style={{ color: '#EAECEF' }}
           >
-            {initialBalance.toFixed(2)} USDT
+            {initialBalance.toFixed(2)} USD
           </div>
         </div>
         <div
@@ -412,7 +412,7 @@ export function EquityChart({ traderId }: EquityChartProps) {
             className="text-xs sm:text-sm font-bold mono"
             style={{ color: '#EAECEF' }}
           >
-            {currentValue.raw_equity.toFixed(2)} USDT
+            {currentValue.raw_equity.toFixed(2)} USD
           </div>
         </div>
         <div

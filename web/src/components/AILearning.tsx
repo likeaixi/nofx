@@ -292,7 +292,7 @@ export default function AILearning({ traderId }: AILearningProps) {
               className="text-xs flex items-center gap-1"
               style={{ color: '#6EE7B7' }}
             >
-              <TrendingUp className="w-3 h-3" /> USDT Average
+              <TrendingUp className="w-3 h-3" /> USD Average
             </div>
           </div>
         </div>
@@ -332,7 +332,7 @@ export default function AILearning({ traderId }: AILearningProps) {
               className="text-xs flex items-center gap-1"
               style={{ color: '#FCA5A5' }}
             >
-              <TrendingDown className="w-3 h-3" /> USDT Average
+              <TrendingDown className="w-3 h-3" /> USD Average
             </div>
           </div>
         </div>
@@ -621,7 +621,7 @@ export default function AILearning({ traderId }: AILearningProps) {
                     ? '+'
                     : ''}
                   {symbolStats[performance.best_symbol].total_pn_l.toFixed(2)}{' '}
-                  USDT {t('pnl', language)}
+                  USD {t('pnl', language)}
                 </div>
               )}
             </div>
@@ -664,7 +664,7 @@ export default function AILearning({ traderId }: AILearningProps) {
                     ? '+'
                     : ''}
                   {symbolStats[performance.worst_symbol].total_pn_l.toFixed(2)}{' '}
-                  USDT {t('pnl', language)}
+                  USD {t('pnl', language)}
                 </div>
               )}
             </div>
@@ -735,13 +735,13 @@ export default function AILearning({ traderId }: AILearningProps) {
                       className="text-right px-4 py-3 text-xs font-semibold"
                       style={{ color: '#94A3B8' }}
                     >
-                      Total P&L (USDT)
+                      Total P&L (USD)
                     </th>
                     <th
                       className="text-right px-4 py-3 text-xs font-semibold"
                       style={{ color: '#94A3B8' }}
                     >
-                      Avg P&L (USDT)
+                      Avg P&L (USD)
                     </th>
                   </tr>
                 </thead>
@@ -1004,7 +1004,7 @@ export default function AILearning({ traderId }: AILearningProps) {
                             }}
                           >
                             {isProfitable ? '+' : ''}
-                            {trade.pn_l.toFixed(2)} USDT
+                            {trade.pn_l.toFixed(2)} USD
                           </span>
                         </div>
                       </div>
