@@ -145,7 +145,7 @@ func (t *FuturesTrader) GetBalance() (map[string]interface{}, error) {
 
 	// 缓存过期或不存在，调用API
 	log.Printf("🔄 缓存过期，正在调用币安API获取账户余额...")
-	account, err := t.client.NewGetAccountService().Do(context.Background())
+	account, err := t.client.NewGetAccountV3Service().Do(context.Background())
 	if err != nil {
 		log.Printf("❌ 币安API调用失败: %v", err)
 		return nil, fmt.Errorf("获取账户信息失败: %w", err)
