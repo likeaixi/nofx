@@ -62,7 +62,7 @@ func (c *APIClient) GetKlines(symbol, interval string, limit int) ([]Kline, erro
 	if err != nil {
 		return nil, err
 	}
-
+	fmt.Printf("symbol %s", symbol)
 	q := req.URL.Query()
 	q.Add("symbol", symbol)
 	q.Add("interval", interval)
