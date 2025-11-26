@@ -57,7 +57,7 @@ func (m *WSMonitor) Initialize(coins []string) error {
 		// 筛选永续合约交易对 --仅测试时使用
 		//exchangeInfo.Symbols = exchangeInfo.Symbols[0:2]
 		for _, symbol := range exchangeInfo.Symbols {
-			if symbol.Status == "TRADING" && symbol.ContractType == "PERPETUAL" && strings.ToUpper(symbol.Symbol[len(symbol.Symbol)-4:]) == "USDT" {
+			if symbol.Status == "TRADING" && symbol.ContractType == "PERPETUAL" && strings.ToUpper(symbol.Symbol[len(symbol.Symbol)-4:]) == "USDC" {
 				m.symbols = append(m.symbols, symbol.Symbol)
 				m.filterSymbols.Store(symbol.Symbol, true)
 			}

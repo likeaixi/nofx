@@ -527,10 +527,10 @@ func formatFloatSlice(values []float64) string {
 // Normalize 标准化symbol,确保是USDT交易对
 func Normalize(symbol string) string {
 	symbol = strings.ToUpper(symbol)
-	if strings.HasSuffix(symbol, "USDT") {
+	if strings.HasSuffix(symbol, "USDC") {
 		return symbol
 	}
-	return symbol + "USDT"
+	return symbol + "USDC"
 }
 
 // parseFloat 解析float值
