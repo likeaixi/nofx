@@ -156,6 +156,7 @@ func (t *FuturesTrader) GetBalance() (map[string]interface{}, error) {
 	for _, a := range assets {
 		if a.Asset == "USDC" {
 			asset = a
+			break
 		}
 	}
 
