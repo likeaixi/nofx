@@ -485,8 +485,8 @@ func (s *Server) handleCreateTrader(c *gin.Context) {
 		symbols := strings.Split(req.TradingSymbols, ",")
 		for _, symbol := range symbols {
 			symbol = strings.TrimSpace(symbol)
-			if symbol != "" && !strings.HasSuffix(strings.ToUpper(symbol), "USDT") {
-				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("无效的币种格式: %s，必须以USDT结尾", symbol)})
+			if symbol != "" && !strings.HasSuffix(strings.ToUpper(symbol), "USDC") {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("无效的币种格式: %s，必须以USDC结尾", symbol)})
 				return
 			}
 		}
