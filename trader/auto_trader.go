@@ -1507,8 +1507,8 @@ func normalizeSymbol(symbol string) string {
 	symbol = strings.ToUpper(strings.TrimSpace(symbol))
 
 	// 确保以USDT结尾
-	if !strings.HasSuffix(symbol, "USDT") {
-		symbol = symbol + "USDT"
+	if !strings.HasSuffix(symbol, "USDC") {
+		symbol = symbol + "USDC"
 	}
 
 	return symbol

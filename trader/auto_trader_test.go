@@ -1082,8 +1082,14 @@ func (m *MockTrader) CancelStopOrders(symbol string) error {
 	return nil
 }
 
-func (m *MockTrader) FormatQuantity(symbol string, quantity float64) (string, error) {
-	return fmt.Sprintf("%.4f", quantity), nil
+func (m *MockTrader) FormatQuantity(symbol string, quantity float64, price float64) (string, string, error) {
+	return fmt.Sprintf("%.4f", quantity), fmt.Sprintf("%.4f", price), nil
+}
+
+func (m *MockTrader) GetKlines(coins []decision.CandidateCoin) (map[string][]decision.Kline, error) {
+	// TODO: 暂未实现
+	var result map[string][]decision.Kline
+	return result, nil
 }
 
 // ============================================================
