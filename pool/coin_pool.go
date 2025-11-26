@@ -325,8 +325,8 @@ func normalizeSymbol(symbol string) string {
 	symbol = toUpper(symbol)
 
 	// 确保以USDT结尾
-	if !endsWith(symbol, "USDT") {
-		symbol = symbol + "USDT"
+	if !endsWith(symbol, "USDC") {
+		symbol = symbol + "USDC"
 	}
 
 	return symbol
