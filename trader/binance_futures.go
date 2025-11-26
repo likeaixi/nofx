@@ -166,9 +166,9 @@ func (t *FuturesTrader) GetBalance() (map[string]interface{}, error) {
 	result["totalUnrealizedProfit"], _ = strconv.ParseFloat(asset.UnrealizedProfit, 64)
 
 	log.Printf("✓ 币安API返回: 总余额=%s, 可用=%s, 未实现盈亏=%s",
-		account.TotalWalletBalance,
-		account.AvailableBalance,
-		account.TotalUnrealizedProfit)
+		asset.WalletBalance,
+		asset.AvailableBalance,
+		asset.UnrealizedProfit)
 
 	// 更新缓存
 	t.balanceCacheMutex.Lock()
