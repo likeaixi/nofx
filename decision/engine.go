@@ -741,7 +741,7 @@ func validateDecision(d *Decision, accountEquity float64, btcEthLeverage, altcoi
 		// 根据币种使用配置的杠杆上限
 		maxLeverage := altcoinLeverage          // 山寨币使用配置的杠杆
 		maxPositionValue := accountEquity * 1.5 // 山寨币最多1.5倍账户净值
-		if d.Symbol == "BTCUSDT" || d.Symbol == "ETHUSDT" {
+		if d.Symbol == "BTCUSDC" || d.Symbol == "ETHUSDC" {
 			maxLeverage = btcEthLeverage          // BTC和ETH使用配置的杠杆
 			maxPositionValue = accountEquity * 10 // BTC/ETH最多10倍账户净值
 		}
@@ -764,23 +764,23 @@ func validateDecision(d *Decision, accountEquity float64, btcEthLeverage, altcoi
 		const minPositionSizeGeneral = 12.0 // 10 + 20% 安全边际
 		const minPositionSizeBTCETH = 60.0  // BTC/ETH 因价格高和精度限制需要更大金额（更灵活）
 
-		if d.Symbol == "BTCUSDT" || d.Symbol == "ETHUSDT" {
+		if d.Symbol == "BTCUSDC" || d.Symbol == "ETHUSDC" {
 			if d.PositionSizeUSD < minPositionSizeBTCETH {
-				return fmt.Errorf("%s 开仓金额过小(%.2f USDT)，必须≥%.2f USDT（因价格高且精度限制，避免数量四舍五入为0）", d.Symbol, d.PositionSizeUSD, minPositionSizeBTCETH)
+				return fmt.Errorf("%s 开仓金额过小(%.2f USD)，必须≥%.2f USD（因价格高且精度限制，避免数量四舍五入为0）", d.Symbol, d.PositionSizeUSD, minPositionSizeBTCETH)
 			}
 		} else {
 			if d.PositionSizeUSD < minPositionSizeGeneral {
-				return fmt.Errorf("开仓金额过小(%.2f USDT)，必须≥%.2f USDT（Binance 最小名义价值要求）", d.PositionSizeUSD, minPositionSizeGeneral)
+				return fmt.Errorf("开仓金额过小(%.2f USD)，必须≥%.2f USD（Binance 最小名义价值要求）", d.PositionSizeUSD, minPositionSizeGeneral)
 			}
 		}
 
 		// 验证仓位价值上限（加1%容差以避免浮点数精度问题）
 		tolerance := maxPositionValue * 0.01 // 1%容差
 		if d.PositionSizeUSD > maxPositionValue+tolerance {
-			if d.Symbol == "BTCUSDT" || d.Symbol == "ETHUSDT" {
-				return fmt.Errorf("BTC/ETH单币种仓位价值不能超过%.0f USDT（10倍账户净值），实际: %.0f", maxPositionValue, d.PositionSizeUSD)
+			if d.Symbol == "BTCUSDC" || d.Symbol == "ETHUSDC" {
+				return fmt.Errorf("BTC/ETH单币种仓位价值不能超过%.0f USD（10倍账户净值），实际: %.0f", maxPositionValue, d.PositionSizeUSD)
 			} else {
-				return fmt.Errorf("山寨币单币种仓位价值不能超过%.0f USDT（1.5倍账户净值），实际: %.0f", maxPositionValue, d.PositionSizeUSD)
+				return fmt.Errorf("山寨币单币种仓位价值不能超过%.0f USD（1.5倍账户净值），实际: %.0f", maxPositionValue, d.PositionSizeUSD)
 			}
 		}
 		if d.StopLoss <= 0 || d.TakeProfit <= 0 {
