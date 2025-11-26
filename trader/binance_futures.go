@@ -145,16 +145,24 @@ func (t *FuturesTrader) GetBalance() (map[string]interface{}, error) {
 
 	// 缓存过期或不存在，调用API
 	log.Printf("🔄 缓存过期，正在调用币安API获取账户余额...")
-	account, err := t.client.NewGetAccountV3Service().Do(context.Background())
+	account, err := t.client.NewGetAccountService().Do(context.Background())
 	if err != nil {
 		log.Printf("❌ 币安API调用失败: %v", err)
 		return nil, fmt.Errorf("获取账户信息失败: %w", err)
 	}
 
+	asset := &futures.AccountAsset{}
+	assets := account.Assets
+	for _, a := range assets {
+		if a.Asset == "USDC" {
+			asset = a
+		}
+	}
+
 	result := make(map[string]interface{})
-	result["totalWalletBalance"], _ = strconv.ParseFloat(account.TotalWalletBalance, 64)
-	result["availableBalance"], _ = strconv.ParseFloat(account.AvailableBalance, 64)
-	result["totalUnrealizedProfit"], _ = strconv.ParseFloat(account.TotalUnrealizedProfit, 64)
+	result["totalWalletBalance"], _ = strconv.ParseFloat(asset.WalletBalance, 64)
+	result["availableBalance"], _ = strconv.ParseFloat(asset.AvailableBalance, 64)
+	result["totalUnrealizedProfit"], _ = strconv.ParseFloat(asset.UnrealizedProfit, 64)
 
 	log.Printf("✓ 币安API返回: 总余额=%s, 可用=%s, 未实现盈亏=%s",
 		account.TotalWalletBalance,
