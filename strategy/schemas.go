@@ -2,9 +2,8 @@ package strategy
 
 import (
 	"fmt"
-	"github.com/shopspring/decimal"
-	"log"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -20,41 +19,35 @@ type SSPResponse struct {
 }
 
 // SSPResult 对应 Python 的 SSPResult Pydantic 模型
-//
-// 比 SSPResponse 多出来：
-// - Price: Decimal 价格
-// - SSP: 去重 + 升序后的 levels
-// - Timestamp: UTC 时间
-// - 以及 SpiderProfile 的各项分析字段
+// 注意：原来 Optional[Decimal] 的字段，这里统一用 0 表示无
 type SSPResult struct {
-	Price     decimal.Decimal `json:"price"`
-	SSP       []int64         `json:"ssp"`
-	Timestamp time.Time       `json:"timestamp"`
+	Price     float64   `json:"price"`
+	SSP       []int64   `json:"ssp"`
+	Timestamp time.Time `json:"timestamp"`
 
-	KeySupport          *decimal.Decimal `json:"key_support,omitempty"`
-	KeyResistance       *decimal.Decimal `json:"key_resistance,omitempty"`
-	SupportPower        decimal.Decimal  `json:"support_power"`
-	ResistPower         decimal.Decimal  `json:"resist_power"`
-	Bias                decimal.Decimal  `json:"bias"`
-	SupportStrengthNear decimal.Decimal  `json:"support_strength_near"`
-	ResistStrengthNear  decimal.Decimal  `json:"resist_strength_near"`
-	SupBandLow          *decimal.Decimal `json:"sup_band_low,omitempty"`
-	SupBandHigh         *decimal.Decimal `json:"sup_band_high,omitempty"`
-	ResBandLow          *decimal.Decimal `json:"res_band_low,omitempty"`
-	ResBandHigh         *decimal.Decimal `json:"res_band_high,omitempty"`
-	BiasNear            decimal.Decimal  `json:"bias_near"`
-
-	LevelsDetail []LevelDetail `json:"levels_detail"`
+	KeySupport          float64       `json:"key_support"`    // 0 = None
+	KeyResistance       float64       `json:"key_resistance"` // 0 = None
+	SupportPower        float64       `json:"support_power"`
+	ResistPower         float64       `json:"resist_power"`
+	Bias                float64       `json:"bias"`
+	SupportStrengthNear float64       `json:"support_strength_near"`
+	ResistStrengthNear  float64       `json:"resist_strength_near"`
+	SupBandLow          float64       `json:"sup_band_low"`  // 0 = None
+	SupBandHigh         float64       `json:"sup_band_high"` // 0 = None
+	ResBandLow          float64       `json:"res_band_low"`  // 0 = None
+	ResBandHigh         float64       `json:"res_band_high"` // 0 = None
+	BiasNear            float64       `json:"bias_near"`
+	LevelsDetail        []LevelDetail `json:"levels_detail"`
 }
 
 // NewSSPResult 等价于 Python SSPResult.from_response(cls, resp)
 func NewSSPResult(resp SSPResponse) SSPResult {
-	zeroDec := decimal.NewFromInt(0)
-
-	// Convert price = Decimal(resp.P or "0")
-	price, err := decimal.NewFromString(resp.P)
-	if err != nil {
-		price = zeroDec
+	// Convert price = Decimal(resp.P or "0") → float64
+	price := 0.0
+	if resp.P != "" {
+		if v, err := strconv.ParseFloat(resp.P, 64); err == nil {
+			price = v
+		}
 	}
 
 	// Raw levels (with duplicates)
@@ -72,13 +65,10 @@ func NewSSPResult(resp SSPResponse) SSPResult {
 	sort.Slice(uniqueLevels, func(i, j int) bool { return uniqueLevels[i] < uniqueLevels[j] })
 
 	// Convert T (milliseconds) to aware UTC datetime
-	// ts_ms = int(resp.T or 0); ts = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc)
-	var ts time.Time
-	// 在 Python 里 0 也会得到 1970-01-01，而不是 now()，这里保持一样语义
-	ts = time.UnixMilli(resp.T).UTC()
+	// Python: ts = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc)
+	ts := time.UnixMilli(resp.T).UTC()
 
 	// Spider profile
-	// profile = compute_spider_profile(price=price, raw_levels=raw_levels)
 	profile := ComputeSpiderProfile(price, rawLevels)
 
 	result := SSPResult{
@@ -101,18 +91,19 @@ func NewSSPResult(resp SSPResponse) SSPResult {
 		LevelsDetail:        profile.LevelsDetail,
 	}
 
-	log.Printf(result.String())
-
 	return result
 }
 
 // ---------- 辅助格式化 ----------
 
-func decPtr(p *decimal.Decimal) string {
-	if p == nil {
+func show2(x float64) string { return fmt.Sprintf("%.2f", x) }
+func show3(x float64) string { return fmt.Sprintf("%.3f", x) }
+
+func opt2(x float64) string { // 0 代表 None → 打印 “—”
+	if x == 0 {
 		return "—"
 	}
-	return p.String()
+	return show2(x)
 }
 
 func intsPreview(xs []int64, n int) string {
@@ -136,29 +127,22 @@ func summarizeLevels(levels []LevelDetail, side string, top int) (count int, pre
 	if count == 0 {
 		return 0, "[]"
 	}
-	// 强度降序，其次次数降序，其次价格升序
+	// 强度降序 -> 次数降序 -> 价格升序
 	sort.Slice(arr, func(i, j int) bool {
-		if !arr[i].NormStrength.Equal(arr[j].NormStrength) {
-			return arr[i].NormStrength.GreaterThan(arr[j].NormStrength)
+		if arr[i].NormStrength != arr[j].NormStrength {
+			return arr[i].NormStrength > arr[j].NormStrength
 		}
 		if arr[i].Count != arr[j].Count {
 			return arr[i].Count > arr[j].Count
 		}
-		return arr[i].Price.LessThan(arr[j].Price)
+		return arr[i].Price < arr[j].Price
 	})
 	if len(arr) > top {
 		arr = arr[:top]
 	}
-	// 简洁预览：price(str=0.812,x5)
-	var parts []string
+	parts := make([]string, 0, len(arr))
 	for _, ld := range arr {
-		parts = append(parts,
-			fmt.Sprintf("%s(str=%s,x%d)",
-				ld.Price.String(),              // 或 StringFixed(0/2)
-				ld.NormStrength.StringFixed(3), // 强度保留3位
-				ld.Count,
-			),
-		)
+		parts = append(parts, fmt.Sprintf("%.2f(str=%.3f,x%d)", ld.Price, ld.NormStrength, ld.Count))
 	}
 	return count, "[" + strings.Join(parts, ", ") + "]"
 }
@@ -168,38 +152,37 @@ func summarizeLevels(levels []LevelDetail, side string, top int) (count int, pre
 func (r SSPResult) String() string {
 	const (
 		maxSSPPreview = 12
+		labelW        = 11
 		topLevels     = 5
 	)
 	var b strings.Builder
 
-	// 标题行
+	// 标题
 	fmt.Fprintf(&b, "SSPResult @ %s\n", r.Timestamp.UTC().Format(time.RFC3339))
 
-	// 顶部核心指标
-	fmt.Fprintf(&b, "  Price: %s | Bias: %s (near %s)\n",
-		r.Price.String(), r.Bias.String(), r.BiasNear.String(),
+	// 核心指标
+	fmt.Fprintf(&b, "  %-*s %s  |  Bias=%s  (near %s)\n",
+		labelW, "Price:", show2(r.Price), show3(r.Bias), show3(r.BiasNear),
 	)
 
-	// 支撑/压力概览
-	fmt.Fprintf(&b, "  Support: key=%s  power=%s  near=%s  band=[%s, %s]\n",
-		decPtr(r.KeySupport), r.SupportPower.String(), r.SupportStrengthNear.String(),
-		decPtr(r.SupBandLow), decPtr(r.SupBandHigh),
+	// 支撑/压力摘要（0 → “—”）
+	fmt.Fprintf(&b, "  %-*s key=%s  power=%s  near=%s  band=[%s, %s]\n",
+		labelW, "Support:",
+		opt2(r.KeySupport), show3(r.SupportPower), show3(r.SupportStrengthNear),
+		opt2(r.SupBandLow), opt2(r.SupBandHigh),
 	)
-	fmt.Fprintf(&b, "  Resist : key=%s  power=%s  near=%s  band=[%s, %s]\n",
-		decPtr(r.KeyResistance), r.ResistPower.String(), r.ResistStrengthNear.String(),
-		decPtr(r.ResBandLow), decPtr(r.ResBandHigh),
+	fmt.Fprintf(&b, "  %-*s key=%s  power=%s  near=%s  band=[%s, %s]\n",
+		labelW, "Resist:",
+		opt2(r.KeyResistance), show3(r.ResistPower), show3(r.ResistStrengthNear),
+		opt2(r.ResBandLow), opt2(r.ResBandHigh),
 	)
 
-	// SSP 列表预览
-	fmt.Fprintf(&b, "  SSP levels (%d): %s\n", len(r.SSP), intsPreview(r.SSP, maxSSPPreview))
+	// 蜘蛛丝预览 + Level 统计
+	fmt.Fprintf(&b, "  %-*s %s (total=%d)\n", labelW, "SSP:", intsPreview(r.SSP, maxSSPPreview), len(r.SSP))
 
-	// LevelsDetail 分侧汇总与 Top-N
 	sCnt, sTop := summarizeLevels(r.LevelsDetail, "support", topLevels)
 	rCnt, rTop := summarizeLevels(r.LevelsDetail, "resistance", topLevels)
-
-	fmt.Fprintf(&b, "  LevelsDetail: total=%d (support=%d, resistance=%d)\n",
-		len(r.LevelsDetail), sCnt, rCnt,
-	)
+	fmt.Fprintf(&b, "  %-*s total=%d (support=%d, resistance=%d)\n", labelW, "Levels:", len(r.LevelsDetail), sCnt, rCnt)
 	fmt.Fprintf(&b, "    • top support   : %s\n", sTop)
 	fmt.Fprintf(&b, "    • top resistance: %s\n", rTop)
 

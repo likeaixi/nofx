@@ -379,12 +379,12 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 
 		fullDecision.SystemPrompt += systemPrompt
 		currentSpiderSnapshot := &decision.SpiderSnapshot{
-			S0:      sspResult.SupportStrengthNear.InexactFloat64(),
-			R0:      sspResult.ResistStrengthNear.InexactFloat64(),
-			SupLow:  sspResult.SupBandLow.InexactFloat64(),
-			SupHigh: sspResult.SupBandHigh.InexactFloat64(),
-			ResLow:  sspResult.ResBandLow.InexactFloat64(),
-			ResHigh: sspResult.ResBandHigh.InexactFloat64(),
+			S0:      sspResult.SupportStrengthNear,
+			R0:      sspResult.ResistStrengthNear,
+			SupLow:  sspResult.SupBandLow,
+			SupHigh: sspResult.SupBandHigh,
+			ResLow:  sspResult.ResBandLow,
+			ResHigh: sspResult.ResBandHigh,
 		}
 
 		// 1) 有持仓先做退出或者止盈止损逻辑
@@ -502,7 +502,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 
 		openDecisionCtx := OpenDecisionContext{
 			PositionState: PositionStateFlat,
-			Bias:          sspResult.Bias.InexactFloat64(),
+			Bias:          sspResult.Bias,
 			SignalSide:    act,
 			SignalValid:   true,
 			SignalAgeMin:  signalAge,

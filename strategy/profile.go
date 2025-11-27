@@ -1,10 +1,10 @@
 package strategy
 
 import (
+	"fmt"
 	"math"
 	"sort"
-
-	"github.com/shopspring/decimal"
+	"strings"
 )
 
 // LevelDetail 对应 Python levels_detail 里的每一项 dict：
@@ -16,52 +16,60 @@ import (
 //	  "norm_strength": Decimal
 //	}
 type LevelDetail struct {
-	Price        decimal.Decimal `json:"price"`
-	Side         string          `json:"side"` // "support" or "resistance"
-	Count        int             `json:"count"`
-	NormStrength decimal.Decimal `json:"norm_strength"` // 归一化强度（相对该侧 max）
+	Price        float64 `json:"price"`
+	Side         string  `json:"side"` // "support" or "resistance"
+	Count        int     `json:"count"`
+	NormStrength float64 `json:"norm_strength"` // 归一化强度（相对该侧 max）
+}
+
+func (ld LevelDetail) String() string {
+	// 价格两位、强度三位
+	return fmt.Sprintf("%s@%.2f x%d (str=%.3f)",
+		strings.ToLower(ld.Side), ld.Price, ld.Count, ld.NormStrength,
+	)
 }
 
 // SpiderProfile 对应 compute_spider_profile 返回的 dict
+// 说明：原本可为 None 的字段（key_support 等），这里用 0 表示 "无"
 type SpiderProfile struct {
-	KeySupport          *decimal.Decimal `json:"key_support,omitempty"`
-	KeyResistance       *decimal.Decimal `json:"key_resistance,omitempty"`
-	SupportPower        decimal.Decimal  `json:"support_power"`
-	ResistPower         decimal.Decimal  `json:"resist_power"`
-	Bias                decimal.Decimal  `json:"bias"`
-	SupportStrengthNear decimal.Decimal  `json:"support_strength_near"`
-	ResistStrengthNear  decimal.Decimal  `json:"resist_strength_near"`
-	LevelsDetail        []LevelDetail    `json:"levels_detail"`
+	KeySupport          float64       `json:"key_support"`    // 0 表示无
+	KeyResistance       float64       `json:"key_resistance"` // 0 表示无
+	SupportPower        float64       `json:"support_power"`
+	ResistPower         float64       `json:"resist_power"`
+	Bias                float64       `json:"bias"`
+	SupportStrengthNear float64       `json:"support_strength_near"`
+	ResistStrengthNear  float64       `json:"resist_strength_near"`
+	LevelsDetail        []LevelDetail `json:"levels_detail"`
 
-	SupBandLow  *decimal.Decimal `json:"sup_band_low,omitempty"`
-	SupBandHigh *decimal.Decimal `json:"sup_band_high,omitempty"`
-	ResBandLow  *decimal.Decimal `json:"res_band_low,omitempty"`
-	ResBandHigh *decimal.Decimal `json:"res_band_high,omitempty"`
-	BiasNear    decimal.Decimal  `json:"bias_near"`
+	SupBandLow  float64 `json:"sup_band_low"`  // 0 表示无
+	SupBandHigh float64 `json:"sup_band_high"` // 0 表示无
+	ResBandLow  float64 `json:"res_band_low"`  // 0 表示无
+	ResBandHigh float64 `json:"res_band_high"` // 0 表示无
+	BiasNear    float64 `json:"bias_near"`
 }
 
 // ComputeSpiderProfile 等价于 Python 的 compute_spider_profile
-func ComputeSpiderProfile(price decimal.Decimal, rawLevels []int64) SpiderProfile {
-	zero := decimal.NewFromInt(0)
-
+// price: 当前价格 (float64)
+// rawLevels: 原始蜘蛛丝价位（允许重复）
+func ComputeSpiderProfile(price float64, rawLevels []int64) SpiderProfile {
 	var (
-		keySupport          *decimal.Decimal
-		keyResistance       *decimal.Decimal
-		supportPower        = zero
-		resistPower         = zero
-		bias                = zero
-		supportStrengthNear = zero
-		resistStrengthNear  = zero
+		keySupport          float64
+		keyResistance       float64
+		supportPower        float64
+		resistPower         float64
+		bias                float64
+		supportStrengthNear float64
+		resistStrengthNear  float64
 		levelsDetail        []LevelDetail
-		supBandLow          *decimal.Decimal
-		supBandHigh         *decimal.Decimal
-		resBandLow          *decimal.Decimal
-		resBandHigh         *decimal.Decimal
-		biasNear            = zero
+		supBandLow          float64
+		supBandHigh         float64
+		resBandLow          float64
+		resBandHigh         float64
+		biasNear            float64
 	)
 
 	// if price <= 0 or not raw_levels: return defaults
-	if price.Cmp(zero) <= 0 || len(rawLevels) == 0 {
+	if price <= 0 || len(rawLevels) == 0 {
 		return SpiderProfile{
 			KeySupport:          keySupport,
 			KeyResistance:       keyResistance,
@@ -92,7 +100,7 @@ func ComputeSpiderProfile(price decimal.Decimal, rawLevels []int64) SpiderProfil
 	}
 	sort.Slice(levelValues, func(i, j int) bool { return levelValues[i] < levelValues[j] })
 
-	// Parameters for cluster/distance (完全对齐 Python)
+	// Parameters for cluster/distance（完全对齐 Python）
 	const (
 		W               = 300.0  // cluster width in USD
 		lambdaBps       = 50.0   // distance decay in basis points
@@ -102,10 +110,7 @@ func ComputeSpiderProfile(price decimal.Decimal, rawLevels []int64) SpiderProfil
 
 	strengths := make(map[int64]float64)
 
-	priceF, err := price.Float64()
-	if err {
-		priceF = 0.0
-	}
+	priceF := price
 
 	// Precompute cluster_weight + distance-based strength
 	for _, L := range levelValues {
@@ -130,8 +135,7 @@ func ComputeSpiderProfile(price decimal.Decimal, rawLevels []int64) SpiderProfil
 	// Split support / resistance by price
 	var supportLevels, resistLevels []int64
 	for _, L := range levelValues {
-		LDec := decimal.NewFromInt(L)
-		if LDec.Cmp(price) <= 0 {
+		if float64(L) <= price {
 			supportLevels = append(supportLevels, L)
 		} else {
 			resistLevels = append(resistLevels, L)
@@ -176,35 +180,27 @@ func ComputeSpiderProfile(price decimal.Decimal, rawLevels []int64) SpiderProfil
 	krInt, hasKR := pickKey(resistLevels)
 
 	if hasKS {
-		v := decimal.NewFromInt(ksInt)
-		keySupport = &v
-		s := strengths[ksInt]
-		supportPower = decimal.NewFromFloat(s)
+		keySupport = float64(ksInt)
+		supportPower = strengths[ksInt]
 	}
 	if hasKR {
-		v := decimal.NewFromInt(krInt)
-		keyResistance = &v
-		s := strengths[krInt]
-		resistPower = decimal.NewFromFloat(s)
+		keyResistance = float64(krInt)
+		resistPower = strengths[krInt]
 	}
 
 	// bias = (sp - rp) / (sp + rp)
-	{
-		sp, err1 := supportPower.Float64()
-		rp, err2 := resistPower.Float64()
-		if !err1 && !err2 && sp+rp > 0 {
-			bias = decimal.NewFromFloat((sp - rp) / (sp + rp))
-		}
+	sp := supportPower
+	rp := resistPower
+	if sp+rp > 0 {
+		bias = (sp - rp) / (sp + rp)
 	}
 
 	// Build levels_detail with normalized strength per side
 	details := make([]LevelDetail, 0, len(levelValues))
 	for _, L := range levelValues {
 		sVal := strengths[L]
-		LDec := decimal.NewFromInt(L)
-
 		side := "support"
-		if LDec.Cmp(price) > 0 {
+		if float64(L) > price {
 			side = "resistance"
 		}
 
@@ -224,26 +220,24 @@ func ComputeSpiderProfile(price decimal.Decimal, rawLevels []int64) SpiderProfil
 		}
 
 		details = append(details, LevelDetail{
-			Price:        LDec,
+			Price:        float64(L),
 			Side:         side,
 			Count:        counts[L],
-			NormStrength: decimal.NewFromFloat(norm),
+			NormStrength: norm,
 		})
 	}
 	levelsDetail = details
 
 	// support_strength_near / resist_strength_near
 	if hasKS && maxSupport > 0 {
-		val := strengths[ksInt] / maxSupport
-		supportStrengthNear = decimal.NewFromFloat(val)
+		supportStrengthNear = strengths[ksInt] / maxSupport
 	}
 	if hasKR && maxResist > 0 {
-		val := strengths[krInt] / maxResist
-		resistStrengthNear = decimal.NewFromFloat(val)
+		resistStrengthNear = strengths[krInt] / maxResist
 	}
 
 	// -------- Extended: bias_near --------
-	// Near-window mass-based bias (NEAR_WINDOW = 2000.0)
+	// Near-window mass-based bias
 	massSup := 0.0
 	massRes := 0.0
 
@@ -261,14 +255,12 @@ func ComputeSpiderProfile(price decimal.Decimal, rawLevels []int64) SpiderProfil
 		}
 	}
 
-	// denom = mass_sup + mass_res + 1e-9
 	denom := massSup + massRes + 1e-9
 	if denom != 0 {
-		biasNear = decimal.NewFromFloat((massSup - massRes) / denom)
+		biasNear = (massSup - massRes) / denom
 	}
 
 	// -------- Extended: core bands sup_band / res_band --------
-	// Core bands: accumulate from nearest to price until covering BAND_COVER_FRAC of mass
 
 	// support band
 	totalSupMass := 0.0
@@ -301,10 +293,8 @@ func ComputeSpiderProfile(price decimal.Decimal, rawLevels []int64) SpiderProfil
 					maxL = L
 				}
 			}
-			low := decimal.NewFromInt(minL)
-			high := decimal.NewFromInt(maxL)
-			supBandLow = &low
-			supBandHigh = &high
+			supBandLow = float64(minL)
+			supBandHigh = float64(maxL)
 		}
 	}
 
@@ -339,10 +329,8 @@ func ComputeSpiderProfile(price decimal.Decimal, rawLevels []int64) SpiderProfil
 					maxL = L
 				}
 			}
-			low := decimal.NewFromInt(minL)
-			high := decimal.NewFromInt(maxL)
-			resBandLow = &low
-			resBandHigh = &high
+			resBandLow = float64(minL)
+			resBandHigh = float64(maxL)
 		}
 	}
 
