@@ -369,13 +369,13 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		dec.Symbol = coin.Symbol
 
 		fullDecision.SystemPrompt += "\nSymbol: " + dec.Symbol
-		fullDecision.SystemPrompt += "\nAI signal: " + act
+		fullDecision.SystemPrompt += "\nAI Signal: " + act
 		fullDecision.SystemPrompt += "\nPrice: " + pri.String()
 		fullDecision.SystemPrompt += "\nC1: " + fmt.Sprintf("%v", c1)
 		fullDecision.SystemPrompt += "\nC3: " + fmt.Sprintf("%v", c3)
 		fullDecision.SystemPrompt += "\nC5: " + fmt.Sprintf("%v", c5)
-		fullDecision.SystemPrompt += "\nSSP: " + fmt.Sprintf("%v", ssp)
-		fullDecision.SystemPrompt += "\nSSP result: " + fmt.Sprintf("%v", sspResult)
+		//fullDecision.SystemPrompt += "\nSSP: " + fmt.Sprintf("%v", ssp)
+		fullDecision.SystemPrompt += "\nSSP Result: " + sspResult.String()
 
 		currentSpiderSnapshot := &decision.SpiderSnapshot{
 			S0:      sspResult.SupportStrengthNear.InexactFloat64(),
