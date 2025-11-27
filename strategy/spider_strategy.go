@@ -1153,7 +1153,7 @@ func FormatSystemPrompt(symbol, act string, pri decimal.Decimal, c1, c3, c5 stri
 	var b strings.Builder
 
 	// 标题
-	b.WriteString("               Spider Strategy               \n")
+	b.WriteString("Spider Strategy\n")
 
 	// 基础信息（左列对齐）
 	fmt.Fprintf(&b, "%-*s %s\n", labelW, "Symbol:", symbol)
@@ -1161,8 +1161,8 @@ func FormatSystemPrompt(symbol, act string, pri decimal.Decimal, c1, c3, c5 stri
 	fmt.Fprintf(&b, "%-*s %s\n", labelW, "Price:", pri.String())
 
 	// 组合信号
-	combo := fmt.Sprintf("%s-%s-%s", strings.ToUpper(c1), strings.ToUpper(c3), strings.ToUpper(c5))
-	fmt.Fprintf(&b, "%-*s %s\n", labelW, "Combo (C1/C3/C5):", combo)
+	combo := fmt.Sprintf("%s%s%s", strings.ToUpper(c1), strings.ToUpper(c3), strings.ToUpper(c5))
+	fmt.Fprintf(&b, "%-*s %s\n", labelW, "C1/C3/C5:", combo)
 
 	// 蜘蛛丝预览
 	//fmt.Fprintf(&b, "%-*s %s (total=%d)\n", labelW, "SSP:", previewInts(ssp, sspPreviewN), len(ssp))
