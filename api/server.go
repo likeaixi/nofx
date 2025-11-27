@@ -737,8 +737,8 @@ func (s *Server) handleUpdateTrader(c *gin.Context) {
 	scanIntervalMinutes := req.ScanIntervalMinutes
 	if scanIntervalMinutes <= 0 {
 		scanIntervalMinutes = existingTrader.ScanIntervalMinutes // 保持原值
-	} else if scanIntervalMinutes < 3 {
-		scanIntervalMinutes = 3
+	} else if scanIntervalMinutes < 1 {
+		scanIntervalMinutes = 1
 	}
 
 	// 设置提示词模板，允许更新
