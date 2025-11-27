@@ -103,7 +103,7 @@ func ComputeSpiderProfile(price decimal.Decimal, rawLevels []int64) SpiderProfil
 	strengths := make(map[int64]float64)
 
 	priceF, err := price.Float64()
-	if err != nil {
+	if err {
 		priceF = 0.0
 	}
 
@@ -192,7 +192,7 @@ func ComputeSpiderProfile(price decimal.Decimal, rawLevels []int64) SpiderProfil
 	{
 		sp, err1 := supportPower.Float64()
 		rp, err2 := resistPower.Float64()
-		if err1 == nil && err2 == nil && sp+rp > 0 {
+		if !err1 && !err2 && sp+rp > 0 {
 			bias = decimal.NewFromFloat((sp - rp) / (sp + rp))
 		}
 	}
