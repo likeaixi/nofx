@@ -2,6 +2,7 @@ package strategy
 
 import (
 	"fmt"
+	"log"
 	"sort"
 	"strconv"
 	"strings"
@@ -90,6 +91,8 @@ func NewSSPResult(resp SSPResponse) SSPResult {
 		BiasNear:            profile.BiasNear,
 		LevelsDetail:        profile.LevelsDetail,
 	}
+
+	log.Printf("%s", result)
 
 	return result
 }
