@@ -274,7 +274,7 @@ type OpenDecisionContext struct {
 }
 
 // DecideOpenPosition 综合决策是否允许开新仓（只在 NEUTRAL 才会考虑开仓）
-func DecideOpenPosition(ctx OpenDecisionContext, price decimal.Decimal, leverage decimal.Decimal) decision.Decision {
+func DecideOpenPosition(ctx OpenDecisionContext, price decimal.Decimal, leverage decimal.Decimal, spider *decision.SpiderSnapshot) decision.Decision {
 	var dec = decision.Decision{}
 	dec.Action = "wait"
 	dec.Reasoning = "没有开仓信号"
@@ -358,11 +358,11 @@ func DecideOpenPosition(ctx OpenDecisionContext, price decimal.Decimal, leverage
 		dec.Action = "open_long"
 		dec.Reasoning = "LONG"
 
-		sl := price.Mul(d("1").Sub(STOP_LOSS_PCT.Div(leverage)))
-		tp := price.Mul(d("1").Add(TAKE_PROFIT_PCT.Div(leverage)))
+		sl := spider.SupLow
+		tp := spider.ResHigh
 
-		dec.StopLoss, _ = sl.Float64()
-		dec.TakeProfit, _ = tp.Float64()
+		dec.StopLoss = sl
+		dec.TakeProfit = tp
 	}
 
 	// 5.4 做空分支
@@ -387,11 +387,11 @@ func DecideOpenPosition(ctx OpenDecisionContext, price decimal.Decimal, leverage
 		//return DecisionOpenShort
 		dec.Action = "open_short"
 		dec.Reasoning = "SHORT"
-		sl := price.Mul(d("1").Add(STOP_LOSS_PCT.Div(leverage)))
-		tp := price.Mul(d("1").Sub(TAKE_PROFIT_PCT.Div(leverage)))
+		sl := spider.ResHigh
+		tp := spider.SupLow
 
-		dec.StopLoss, _ = sl.Float64()
-		dec.TakeProfit, _ = tp.Float64()
+		dec.StopLoss = sl
+		dec.TakeProfit = tp
 	}
 
 	// 5.5 兜底
