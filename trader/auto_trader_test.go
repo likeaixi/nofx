@@ -77,7 +77,7 @@ func (s *AutoTraderTestSuite) SetupTest() {
 		AIModel:              "deepseek",
 		Exchange:             "binance",
 		InitialBalance:       10000.0,
-		ScanInterval:         3 * time.Minute,
+		ScanInterval:         1 * time.Minute,
 		SystemPromptTemplate: "adaptive",
 		BTCETHLeverage:       10,
 		AltcoinLeverage:      5,
