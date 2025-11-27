@@ -3,6 +3,7 @@ package strategy
 import (
 	"fmt"
 	"github.com/shopspring/decimal"
+	"log"
 	"sort"
 	"strings"
 	"time"
@@ -99,6 +100,8 @@ func NewSSPResult(resp SSPResponse) SSPResult {
 		BiasNear:            profile.BiasNear,
 		LevelsDetail:        profile.LevelsDetail,
 	}
+
+	log.Printf(result.String())
 
 	return result
 }
