@@ -571,13 +571,36 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 		peakPnlPct := at.peakPnLCache[posKey]
 		at.peakPnLCacheMutex.RUnlock()
 
-		// TODO: 获取数据库的entry_level数据
+		// 获取蜘蛛丝快照
+		baseDir := fmt.Sprintf("decision_logs/%s", at.id)
+
+		var spider *decision.SpiderSnapshot
+		entryLevel := float64(0)
+		stopLoss := float64(0)
+		snapshot, err := strategy.LoadSnapshotForSymbol(baseDir, symbol)
+		if err != nil {
+			log.Println("加载蜘蛛丝快照失败", err)
+			log.Printf("symbol %s", symbol)
+			spider = nil
+		}
+
+		if snapshot != nil {
+			spider = snapshot.Spider
+			entryLevel = snapshot.EntryLevel
+			stopLoss = snapshot.StopLoss
+			log.Printf("加载蜘蛛丝快照 snapsho: %v, entryLevel: %v, stopLoss: %v", snapshot, entryLevel, stopLoss)
+		}
+
+		if entryLevel == 0 {
+			entryLevel = entryPrice
+		}
 
 		positionInfos = append(positionInfos, decision.PositionInfo{
 			Symbol:           symbol,
 			Side:             side,
 			EntryPrice:       entryPrice,
-			EntryLevel:       entryPrice,
+			EntryLevel:       entryLevel,
+			CurrentStopLoss:  stopLoss,
 			MarkPrice:        markPrice,
 			Quantity:         quantity,
 			Leverage:         leverage,
@@ -587,6 +610,7 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 			LiquidationPrice: liquidationPrice,
 			MarginUsed:       marginUsed,
 			UpdateTime:       updateTime,
+			Spider:           spider,
 		})
 	}
 
@@ -739,6 +763,14 @@ func (at *AutoTrader) executeOpenLongWithRecord(decision *decision.Decision, act
 		return err
 	}
 
+	// 保存蜘蛛丝快照
+	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
+	timeNow := time.Now().UnixMilli()
+	err = strategy.SaveSnapshotOnOpen(baseDir, decision.Symbol, "LONG", decision.Level, decision.StopLoss, timeNow, decision.Spider)
+	if err != nil {
+		log.Printf("保存蜘蛛丝快照失败: %v", err)
+	}
+
 	// 记录订单ID
 	if orderID, ok := order["orderId"].(int64); ok {
 		actionRecord.OrderID = orderID
@@ -754,9 +786,9 @@ func (at *AutoTrader) executeOpenLongWithRecord(decision *decision.Decision, act
 	if err := at.trader.SetStopLoss(decision.Symbol, "LONG", quantity, decision.StopLoss); err != nil {
 		log.Printf("  ⚠ 设置止损失败: %v", err)
 	}
-	if err := at.trader.SetTakeProfit(decision.Symbol, "LONG", quantity, decision.TakeProfit); err != nil {
-		log.Printf("  ⚠ 设置止盈失败: %v", err)
-	}
+	//if err := at.trader.SetTakeProfit(decision.Symbol, "LONG", quantity, decision.TakeProfit); err != nil {
+	//	log.Printf("  ⚠ 设置止盈失败: %v", err)
+	//}
 
 	return nil
 }
@@ -819,6 +851,14 @@ func (at *AutoTrader) executeOpenShortWithRecord(decision *decision.Decision, ac
 		return err
 	}
 
+	// 保存蜘蛛丝快照
+	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
+	timeNow := time.Now().UnixMilli()
+	err = strategy.SaveSnapshotOnOpen(baseDir, decision.Symbol, "SHORT", decision.Level, decision.StopLoss, timeNow, decision.Spider)
+	if err != nil {
+		log.Printf("保存蜘蛛丝快照失败: %v", err)
+	}
+
 	// 记录订单ID
 	if orderID, ok := order["orderId"].(int64); ok {
 		actionRecord.OrderID = orderID
@@ -834,9 +874,9 @@ func (at *AutoTrader) executeOpenShortWithRecord(decision *decision.Decision, ac
 	if err := at.trader.SetStopLoss(decision.Symbol, "SHORT", quantity, decision.StopLoss); err != nil {
 		log.Printf("  ⚠ 设置止损失败: %v", err)
 	}
-	if err := at.trader.SetTakeProfit(decision.Symbol, "SHORT", quantity, decision.TakeProfit); err != nil {
-		log.Printf("  ⚠ 设置止盈失败: %v", err)
-	}
+	//if err := at.trader.SetTakeProfit(decision.Symbol, "SHORT", quantity, decision.TakeProfit); err != nil {
+	//	log.Printf("  ⚠ 设置止盈失败: %v", err)
+	//}
 
 	return nil
 }
@@ -971,6 +1011,13 @@ func (at *AutoTrader) executeUpdateStopLossWithRecord(decision *decision.Decisio
 	err = at.trader.SetStopLoss(decision.Symbol, positionSide, quantity, decision.NewStopLoss)
 	if err != nil {
 		return fmt.Errorf("修改止损失败: %w", err)
+	}
+
+	// 更新蜘蛛丝快照
+	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
+	err = strategy.UpdateStopLossForSymbol(baseDir, decision.Symbol, decision.NewStopLoss)
+	if err != nil {
+		log.Printf("更新蜘蛛丝快照失败: %v", err)
 	}
 
 	log.Printf("  ✓ 止损已调整: %.2f (当前价格: %.2f)", decision.NewStopLoss, marketData.CurrentPrice)

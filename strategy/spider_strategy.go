@@ -361,22 +361,45 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 			}
 		}
 
-		ssp, pri := fetchSpiderRaw()
-		act, c1, c3, c5 := fetchCombo()
+		ssp, pri, raw := fetchSpiderRaw()
+		act, c1, c3, c5, signalAge := fetchCombo()
+
+		sspResult := NewSSPResult(raw)
 
 		dec.Symbol = coin.Symbol
 
 		fullDecision.SystemPrompt += "\nSymbol: " + dec.Symbol
 		fullDecision.SystemPrompt += "\nAI signal: " + act
 		fullDecision.SystemPrompt += "\nPrice: " + pri.String()
-		fullDecision.SystemPrompt += "\nSSP: " + fmt.Sprintf("%v", ssp)
 		fullDecision.SystemPrompt += "\nC1: " + fmt.Sprintf("%v", c1)
 		fullDecision.SystemPrompt += "\nC3: " + fmt.Sprintf("%v", c3)
 		fullDecision.SystemPrompt += "\nC5: " + fmt.Sprintf("%v", c5)
+		fullDecision.SystemPrompt += "\nSSP: " + fmt.Sprintf("%v", ssp)
+		fullDecision.SystemPrompt += "\nSSP result: " + fmt.Sprintf("%v", sspResult)
 
-		// 1) 有持仓先做退出逻辑
+		currentSpiderSnapshot := &decision.SpiderSnapshot{
+			S0:      sspResult.SupportStrengthNear.InexactFloat64(),
+			R0:      sspResult.ResistStrengthNear.InexactFloat64(),
+			SupLow:  sspResult.SupBandLow.InexactFloat64(),
+			SupHigh: sspResult.SupBandHigh.InexactFloat64(),
+			ResLow:  sspResult.ResBandLow.InexactFloat64(),
+			ResHigh: sspResult.ResBandHigh.InexactFloat64(),
+		}
+
+		// 1) 有持仓先做退出或者止盈止损逻辑
 		if p.Symbol != "" {
-			dec = checkExitConditions(p, ctx.Klines[coin.Symbol], ctx.BTCETHLeverage)
+			//dec = checkExitConditions(p, ctx.Klines[coin.Symbol], ctx.BTCETHLeverage)
+			//decisions = append(decisions, dec)
+			//log.Printf("[ENTRY] 有持仓，先判断是否退出，symbol: %s，action: %s", p.Symbol, dec.Reasoning)
+			//continue
+
+			// 持仓蜘蛛丝快照如果为空，就用当前的
+			if p.Spider == nil {
+				log.Printf("蜘蛛丝快照为nil，使用当前的快照")
+				p.Spider = currentSpiderSnapshot
+			}
+
+			dec := UpdateSLWithSpider(p.Symbol, p.Side, p.EntryLevel, p.CurrentStopLoss, p.MarkPrice, p.Spider.S0, p.Spider.R0, p.Spider.SupLow, p.Spider.SupHigh, p.Spider.ResLow, p.Spider.ResHigh, p.UnrealizedPnL, p.MarginUsed)
 			decisions = append(decisions, dec)
 			log.Printf("[ENTRY] 有持仓，先判断是否退出，symbol: %s，action: %s", p.Symbol, dec.Reasoning)
 			continue
@@ -384,28 +407,28 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 
 		// 2) 无持仓，找入场
 		marketData, ok1 := ctx.MarketDataMap[coin.Symbol]
-		klines, ok2 := ctx.Klines[coin.Symbol]
-		if !ok1 || !ok2 {
-			log.Printf("[ENTRY] 没有市场数据或者K线，wait")
+		//klines, ok2 := ctx.Klines[coin.Symbol]
+		if !ok1 {
+			log.Printf("[ENTRY] 没有市场数据，wait")
 			dec.Action = "wait"
-			dec.Reasoning = "没有K线数据"
+			dec.Reasoning = "没有市场数据"
 			decisions = append(decisions, dec)
 			continue
 		}
 
 		price := decimal.NewFromFloat(marketData.CurrentPrice)
-		closed := klines
+		//closed := klines
 		//start := time.Now()
 
-		if closed == nil || len(closed) < 4 {
-			log.Printf("[ENTRY] 获取K线失败:")
-			//sleepUntil(start, pollInterval)
-
-			dec.Action = "wait"
-			dec.Reasoning = "获取K线失败"
-			decisions = append(decisions, dec)
-			continue
-		}
+		//if closed == nil || len(closed) < 5 {
+		//	log.Printf("[ENTRY] 获取K线失败:")
+		//	//sleepUntil(start, pollInterval)
+		//
+		//	dec.Action = "wait"
+		//	dec.Reasoning = "获取K线失败"
+		//	decisions = append(decisions, dec)
+		//	continue
+		//}
 
 		if act == "NEUTRAL" {
 			log.Printf("[ENTRY] 信号方向为NEUTRAL，wait")
@@ -449,74 +472,58 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 			continue
 		}
 
-		var dcs []map[string]any
-		for _, lv := range candidates {
-			if m := decideOnLevel(lv, closed, act, priceBandUSD); m != nil {
-				dcs = append(dcs, m)
-			}
-		}
-		log.Println("满足条件的点位", dcs)
-		if len(dcs) == 0 {
-			//sleepUntil(start, pollInterval)
-			log.Printf("[ENTRY] 没有满足条件的反转点位，wait")
-			dec.Action = "wait"
-			dec.Reasoning = "没有满足条件的反转点位"
-			decisions = append(decisions, dec)
-			continue
+		//var dcs []map[string]any
+		//for _, lv := range candidates {
+		//	if m := decideOnLevel(lv, closed, act, priceBandUSD); m != nil {
+		//		dcs = append(dcs, m)
+		//	}
+		//}
+		//log.Println("满足条件的点位", dcs)
+		//if len(dcs) == 0 {
+		//	//sleepUntil(start, pollInterval)
+		//	log.Printf("[ENTRY] 没有满足条件的反转点位，wait")
+		//	dec.Action = "wait"
+		//	dec.Reasoning = "没有满足条件的反转点位"
+		//	decisions = append(decisions, dec)
+		//	continue
+		//}
+
+		//bestIdx := 0
+		//bestDist := absDec(price.Sub(dcs[0]["level"].(decimal.Decimal)))
+		//for i := 1; i < len(dcs); i++ {
+		//	d := absDec(price.Sub(dcs[i]["level"].(decimal.Decimal)))
+		//	if d.LessThan(bestDist) {
+		//		bestDist = d
+		//		bestIdx = i
+		//	}
+		//}
+		//best := dcs[bestIdx]
+
+		openDecisionCtx := OpenDecisionContext{
+			PositionState: p.Side,
+			Bias:          sspResult.Bias.InexactFloat64(),
+			SignalSide:    act,
+			SignalValid:   true,
+			SignalAgeMin:  signalAge,
 		}
 
-		bestIdx := 0
-		bestDist := absDec(price.Sub(dcs[0]["level"].(decimal.Decimal)))
-		for i := 1; i < len(dcs); i++ {
-			d := absDec(price.Sub(dcs[i]["level"].(decimal.Decimal)))
-			if d.LessThan(bestDist) {
-				bestDist = d
-				bestIdx = i
-			}
-		}
-		best := dcs[bestIdx]
-
-		var action string
-		var sl, tp decimal.Decimal
 		decimalLeverage := decimal.NewFromInt(int64(ctx.BTCETHLeverage))
-		log.Println("Best side", best["side"])
-		if best["side"] == "LONG" {
-			action = "open_long"
 
-			sl = price.Mul(d("1").Sub(STOP_LOSS_PCT.Div(decimalLeverage)))
-			tp = price.Mul(d("1").Add(TAKE_PROFIT_PCT.Div(decimalLeverage)))
-
-			dec.StopLoss, _ = sl.Float64()
-			dec.TakeProfit, _ = tp.Float64()
-		}
-
-		if best["side"] == "SHORT" {
-			action = "open_short"
-
-			sl = price.Mul(d("1").Add(STOP_LOSS_PCT.Div(decimalLeverage)))
-			tp = price.Mul(d("1").Sub(TAKE_PROFIT_PCT.Div(decimalLeverage)))
-
-			dec.StopLoss, _ = sl.Float64()
-			dec.TakeProfit, _ = tp.Float64()
-		}
-
-		dec.Action = action
-		dec.Level, _ = (best["level"]).(decimal.Decimal).Float64()
-		dec.Reasoning = best["reason"].(string)
+		dec = DecideOpenPosition(openDecisionCtx, price, decimalLeverage)
 
 		accountEquityUSDT := decimal.NewFromFloat(ctx.Account.TotalEquity)
 
 		dec.PositionSizeUSD, _ = accountEquityUSDT.Mul(positionPercent).Mul(decimalLeverage).Float64()
 		dec.Leverage = ctx.BTCETHLeverage
+		dec.Spider = currentSpiderSnapshot
 
 		log.Printf("[ENTRY] symbol: %s，action: %s", dec.Symbol, dec.Reasoning)
 		decisions = append(decisions, dec)
 
 		logTradeEvent("OPEN_SIGNAL", map[string]any{
 			"symbol":       dec.Symbol,
-			"side":         best["side"],
-			"ref_level":    best["level"],
-			"reason":       best["reason"],
+			"side":         dec.Action,
+			"reason":       dec.Reasoning,
 			"price":        price,
 			"c1":           c1,
 			"c3":           c3,
@@ -665,11 +672,11 @@ func checkExitConditions(pos decision.PositionInfo, klines []decision.Kline, lev
 
 	closed := klines
 
-	action, c1, c3, c5 := fetchCombo()
+	action, c1, c3, c5, _ := fetchCombo()
 	c1 = strings.ToUpper(c1)
 	c3 = strings.ToUpper(c3)
 	c5 = strings.ToUpper(c5)
-	ssp, _ := fetchSpiderRaw()
+	ssp, _, _ := fetchSpiderRaw()
 	allRaw := ssp
 
 	fmt.Println("Position side", pos.Side)
@@ -742,43 +749,44 @@ func checkExitConditions(pos decision.PositionInfo, klines []decision.Kline, lev
 
 // ================ 蜘蛛丝获取与过滤 ================
 
-type spiderResp struct {
-	P   string
-	SSP []json.Number
-	T   json.Number
-}
+//type SpiderResp struct {
+//	P   string
+//	SSP []json.Number
+//	T   json.Number
+//}
 
-func fetchSpiderRaw() ([]decimal.Decimal, decimal.Decimal) {
+func fetchSpiderRaw() ([]decimal.Decimal, decimal.Decimal, SSPResponse) {
+	var data SSPResponse
+
 	req, _ := http.NewRequest(http.MethodGet, spiderURL, nil)
 	cli := &http.Client{Timeout: 2 * time.Second}
 	resp, err := cli.Do(req)
 	if err != nil {
 		log.Println("[SPIDER] fetch error:", err)
-		return nil, decimal.NewFromInt(0)
+		return nil, decimal.NewFromInt(0), data
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode/100 != 2 {
 		b, _ := io.ReadAll(resp.Body)
 		log.Printf("[SPIDER] non-2xx: %d %s", resp.StatusCode, string(b))
-		return nil, decimal.NewFromInt(0)
+		return nil, decimal.NewFromInt(0), data
 	}
-	var data spiderResp
+
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
 		log.Println("[SPIDER] json error:", err)
-		return nil, decimal.NewFromInt(0)
+		return nil, decimal.NewFromInt(0), data
 	}
 	p := d(data.P)
 	ssp := toDecimals(data.SSP)
 	log.Println("[SPIDER] RAW ssp=", ssp, "price=", p)
-	return ssp, p
+	return ssp, p, data
 }
 
-func toDecimals(ns []json.Number) []decimal.Decimal {
+func toDecimals(ns []int64) []decimal.Decimal {
 	out := make([]decimal.Decimal, 0, len(ns))
 	for _, n := range ns {
-		if v, err := decimal.NewFromString(n.String()); err == nil {
-			out = append(out, v)
-		}
+		v := decimal.NewFromInt(n)
+		out = append(out, v)
 	}
 	return out
 }
@@ -999,9 +1007,9 @@ func actionFromCombo(c1, c3, c5 string) string {
 }
 
 // 从 hyperaitrade 接口获取组合，并给出动作
-func fetchCombo() (action, c1, c3, c5 string) {
+func fetchCombo() (action, c1, c3, c5 string, signalAge int) {
 	if strings.TrimSpace(c35URL) == "" {
-		return "NEUTRAL", "N", "N", "N"
+		return "NEUTRAL", "N", "N", "N", 0
 	}
 
 	req, _ := http.NewRequest(http.MethodGet, c35URL, nil)
@@ -1012,28 +1020,28 @@ func fetchCombo() (action, c1, c3, c5 string) {
 	resp, err := cli.Do(req)
 	if err != nil {
 		fmt.Println("[C35] fetch error:", err)
-		return "NEUTRAL", "N", "N", "N"
+		return "NEUTRAL", "N", "N", "N", 0
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode/100 != 2 {
 		b, _ := io.ReadAll(resp.Body)
 		fmt.Printf("[C35] non-2xx: %d %s", resp.StatusCode, string(b))
-		return "NEUTRAL", "N", "N", "N"
+		return "NEUTRAL", "N", "N", "N", 0
 	}
 
 	var payload c35APIResp
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
 		fmt.Println("[C35] json error:", err)
-		return "NEUTRAL", "N", "N", "N"
+		return "NEUTRAL", "N", "N", "N", 0
 	}
 	if payload.Code != 0 {
 		fmt.Println("[C35] code!=0:", payload.Code, payload.Msg)
-		return "NEUTRAL", "N", "N", "N"
+		return "NEUTRAL", "N", "N", "N", 0
 	}
 
 	// 仅 matched==true 才使用
 	if !payload.Data.RuleDecision.Matched {
-		return "NEUTRAL", "N", "N", "N"
+		return "NEUTRAL", "N", "N", "N", 0
 	}
 
 	// 优先 rule_decision.combo（lowercase up/down/neutral）
@@ -1054,6 +1062,21 @@ func fetchCombo() (action, c1, c3, c5 string) {
 
 	action = actionFromCombo(c1, c3, c5)
 
+	// 按 UTC 解析
+	t, err := time.ParseInLocation("2006-01-02 15:04:05", payload.Data.Timestamp, time.UTC)
+	if err != nil {
+		t = time.Now().UTC()
+	}
+
+	// 当前时间（同样用 UTC，保持时区一致）
+	now := time.Now().UTC()
+
+	// 差值：现在 - 目标时间
+	diff := now.Sub(t)
+	minutesInt := diff / time.Minute
+
+	signalAge = int(minutesInt)
+
 	logTradeEvent("C35_FETCH", map[string]any{
 		"symbol":          payload.Data.Symbol,
 		"interval":        payload.Data.Interval,
@@ -1066,7 +1089,7 @@ func fetchCombo() (action, c1, c3, c5 string) {
 		"hourly_accuracy": payload.Data.RuleDecision.HourlyAccuracy,
 	})
 
-	return action, toLetter(c1), toLetter(c3), toLetter(c5)
+	return action, toLetter(c1), toLetter(c3), toLetter(c5), signalAge
 }
 
 // ================ 日志 ================

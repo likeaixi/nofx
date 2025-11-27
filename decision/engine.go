@@ -29,12 +29,22 @@ var (
 	reDecisionTag  = regexp.MustCompile(`(?s)<decision>(.*?)</decision>`)
 )
 
+type SpiderSnapshot struct {
+	S0      float64 `json:"s0"`
+	R0      float64 `json:"r0"`
+	SupLow  float64 `json:"sup_low"`
+	SupHigh float64 `json:"sup_high"`
+	ResLow  float64 `json:"res_low"`
+	ResHigh float64 `json:"res_high"`
+}
+
 // PositionInfo 持仓信息
 type PositionInfo struct {
 	Symbol           string  `json:"symbol"`
 	Side             string  `json:"side"` // "long" or "short"
 	EntryPrice       float64 `json:"entry_price"`
 	EntryLevel       float64 `json:"entry_level"`
+	CurrentStopLoss  float64 `json:"current_stop_loss"`
 	MarkPrice        float64 `json:"mark_price"`
 	Quantity         float64 `json:"quantity"`
 	Leverage         int     `json:"leverage"`
@@ -44,6 +54,8 @@ type PositionInfo struct {
 	LiquidationPrice float64 `json:"liquidation_price"`
 	MarginUsed       float64 `json:"margin_used"`
 	UpdateTime       int64   `json:"update_time"` // 持仓更新时间戳（毫秒）
+
+	Spider *SpiderSnapshot `json:"spider"`
 }
 
 // AccountInfo 账户信息
@@ -113,7 +125,8 @@ type Decision struct {
 	RiskUSD    float64 `json:"risk_usd,omitempty"`   // 最大美元风险
 	Reasoning  string  `json:"reasoning"`
 
-	Level float64 `json:"level"`
+	Level  float64         `json:"level"`
+	Spider *SpiderSnapshot `json:"spider"`
 }
 
 // FullDecision AI的完整决策（包含思维链）

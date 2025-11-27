@@ -6,28 +6,32 @@
 
 package strategy
 
-import "math"
+import (
+	"fmt"
+	"github.com/shopspring/decimal"
+	"math"
+	"nofx/decision"
+)
 
 ///////////////////////
 // 基础类型 & 常量定义 //
 ///////////////////////
 
 // PositionState 当前是否持仓
-type PositionState string
+//type PositionState string
 
 const (
-	PositionStateFlat  PositionState = "FLAT"
-	PositionStateLong  PositionState = "LONG"
-	PositionStateShort PositionState = "SHORT"
+	PositionStateFlat  = "NEUTRAL"
+	PositionStateLong  = "LONG"
+	PositionStateShort = "SHORT"
 )
 
 // SignalSide C1/C3/C5 组合方向
-type SignalSide string
 
 const (
-	SignalSideLong  SignalSide = "LONG"
-	SignalSideShort SignalSide = "SHORT"
-	SignalSideFlat  SignalSide = "FLAT"
+	SignalSideLong  string = "LONG"
+	SignalSideShort string = "SHORT"
+	SignalSideFlat  string = "NEUTRAL"
 )
 
 // SpiderPos 价格相对某一蜘蛛丝带 [L,U] 的位置
@@ -252,28 +256,34 @@ func ShapeForbidShort(s SpiderState) bool {
 // OpenDecisionContext 决策树输入
 type OpenDecisionContext struct {
 	// 顶层：当前持仓状态
-	PositionState PositionState
+	PositionState string
 
 	// Bias 门控
 	Bias float64
 
 	// 信号层（C1/C3/C5 组合）
-	SignalSide    SignalSide
+	SignalSide    string
 	SignalValid   bool
 	SignalAgeMin  int // 当前信号年龄（分钟）
 	SigMaxAge     int // 可选，0 使用默认 SIG_MAX_AGE
 	SigOpenWindow int // 可选，0 使用默认 SIG_OPEN_WINDOW
 
 	// 蜘蛛丝形态（可为 nil 表示当前无有效蜘蛛丝）
-	SupportState *SpiderState // 用于多头
-	ResistState  *SpiderState // 用于空头
+	//SupportState *SpiderState // 用于多头
+	//ResistState  *SpiderState // 用于空头
 }
 
-// DecideOpenPosition 综合决策是否允许开新仓（只在 FLAT 才会考虑开仓）
-func DecideOpenPosition(ctx OpenDecisionContext) OpenDecision {
+// DecideOpenPosition 综合决策是否允许开新仓（只在 NEUTRAL 才会考虑开仓）
+func DecideOpenPosition(ctx OpenDecisionContext, price decimal.Decimal, leverage decimal.Decimal) decision.Decision {
+	var dec = decision.Decision{}
+	dec.Action = "wait"
+	dec.Reasoning = "没有开仓信号"
+
 	// 5.1 只在空仓时走这棵树
 	if ctx.PositionState != PositionStateFlat {
-		return DecisionNoNewPosition
+		//return DecisionNoNewPosition
+		dec.Reasoning = "已有仓位"
+		return dec
 	}
 
 	maxAge := ctx.SigMaxAge
@@ -287,77 +297,105 @@ func DecideOpenPosition(ctx OpenDecisionContext) OpenDecision {
 
 	// 5.2 信号有效性判断
 	if !ctx.SignalValid {
-		return DecisionNoTrade
+		//return DecisionNoTrade
+
+		dec.Reasoning = "信号无效"
+		return dec
 	}
 	if ctx.SignalSide == SignalSideFlat {
-		return DecisionNoTrade
+		//return DecisionNoTrade
+
+		dec.Reasoning = "AI信号为" + SignalSideFlat
+		return dec
 	}
 	if ctx.SignalAgeMin > maxAge {
-		return DecisionNoTrade
+		//return DecisionNoTrade
+		dec.Reasoning = "信号已过期"
+		return dec
 	}
 	if ctx.SignalAgeMin > openWindow {
 		// 超过开仓时间窗，只用于管理，不开新仓
-		return DecisionNoTrade
+		//return DecisionNoTrade
+		dec.Reasoning = "超过开仓时间窗"
+		return dec
 	}
 
-	// 准备形态布尔
-	var (
-		shapeOKLong, shapeForbidLong   bool
-		shapeOKShort, shapeForbidShort bool
-	)
+	//// 准备形态布尔
+	//var (
+	//	shapeOKLong, shapeForbidLong   bool
+	//	shapeOKShort, shapeForbidShort bool
+	//)
 
-	if ctx.SupportState != nil {
-		shapeOKLong = ShapeOKLong(*ctx.SupportState)
-		shapeForbidLong = ShapeForbidLong(*ctx.SupportState)
-	}
-	if ctx.ResistState != nil {
-		shapeOKShort = ShapeOKShort(*ctx.ResistState)
-		shapeForbidShort = ShapeForbidShort(*ctx.ResistState)
-	}
+	//if ctx.SupportState != nil {
+	//	shapeOKLong = ShapeOKLong(*ctx.SupportState)
+	//	shapeForbidLong = ShapeForbidLong(*ctx.SupportState)
+	//}
+	//if ctx.ResistState != nil {
+	//	shapeOKShort = ShapeOKShort(*ctx.ResistState)
+	//	shapeForbidShort = ShapeForbidShort(*ctx.ResistState)
+	//}
 
 	// 5.3 做多分支
 	if ctx.SignalSide == SignalSideLong {
 		// 极端禁止：支撑被真跌破，这轮不拿它做锚
-		if shapeForbidLong {
-			return DecisionNoTrade
-		}
+		//if shapeForbidLong {
+		//	return DecisionNoTrade
+		//}
 
 		// 1) Bias 门控
 		if ctx.Bias < BIAS_TH_LONG {
-			return DecisionNoTrade
+			//return DecisionNoTrade
+			dec.Reasoning = "Bias不满足条件"
+			return dec
 		}
 
-		// 2) 形态门控
-		if !shapeOKLong {
-			return DecisionNoTrade
-		}
+		//// 2) 形态门控
+		//if !shapeOKLong {
+		//	return DecisionNoTrade
+		//}
 
 		// 3) 通过两层门控，允许开多
-		return DecisionOpenLong
+		dec.Action = "open_long"
+		dec.Reasoning = "LONG"
+
+		sl := price.Mul(d("1").Sub(STOP_LOSS_PCT.Div(leverage)))
+		tp := price.Mul(d("1").Add(TAKE_PROFIT_PCT.Div(leverage)))
+
+		dec.StopLoss, _ = sl.Float64()
+		dec.TakeProfit, _ = tp.Float64()
 	}
 
 	// 5.4 做空分支
 	if ctx.SignalSide == SignalSideShort {
 		// 极端禁止
-		if shapeForbidShort {
-			return DecisionNoTrade
-		}
+		//if shapeForbidShort {
+		//	return DecisionNoTrade
+		//}
 
 		// 1) Bias 门控
 		if ctx.Bias > BIAS_TH_SHORT { // 注意：BIAS_TH_SHORT 是负数
-			return DecisionNoTrade
+			//return DecisionNoTrade
+			dec.Reasoning = "Bias不满足条件"
+			return dec
 		}
 
-		// 2) 形态门控
-		if !shapeOKShort {
-			return DecisionNoTrade
-		}
+		//// 2) 形态门控
+		//if !shapeOKShort {
+		//	return DecisionNoTrade
+		//}
 
-		return DecisionOpenShort
+		//return DecisionOpenShort
+		dec.Action = "open_short"
+		dec.Reasoning = "SHORT"
+		sl := price.Mul(d("1").Add(STOP_LOSS_PCT.Div(leverage)))
+		tp := price.Mul(d("1").Sub(TAKE_PROFIT_PCT.Div(leverage)))
+
+		dec.StopLoss, _ = sl.Float64()
+		dec.TakeProfit, _ = tp.Float64()
 	}
 
 	// 5.5 兜底
-	return DecisionNoTrade
+	return dec
 }
 
 ////////////////////////////////////
@@ -375,11 +413,19 @@ func DecideOpenPosition(ctx OpenDecisionContext) OpenDecision {
 //
 // Go 版本：unrealizedProfit & initialMargin <=0 时视为不用盈利部分。
 func UpdateSLWithSpider(
-	side SignalSide,
+	symbol string,
+	side string,
 	entry, slCurrent, priceNow float64,
 	S0, R0, supLow, supHigh, resLow, resHigh float64,
 	unrealizedProfit, initialMargin float64,
-) (slNew float64, shouldClose bool) {
+) decision.Decision {
+	var dec = decision.Decision{}
+	dec.Symbol = symbol
+	dec.Action = "hold"
+	dec.Reasoning = "没有退出信号"
+
+	var slNew float64
+	var shouldClose bool
 
 	bandWidth := R0 - S0
 	midBand := (S0 + R0) / 2.0
@@ -471,5 +517,24 @@ func UpdateSLWithSpider(
 	// 结构部分仍然不会把止损移动到对自己不利的位置。
 	_ = bandWidth
 
-	return slNew, shouldClose
+	if shouldClose {
+		if side == SignalSideLong {
+			dec.Action = "close_long"
+			dec.Reasoning = fmt.Sprintf("当前价格需要止损，当前价格/止损价格: %v/%v", priceNow, slNew)
+		}
+
+		if side == SignalSideShort {
+			dec.Action = "close_short"
+			dec.Reasoning = fmt.Sprintf("当前价格需要止损，当前价格/止损价格: %v/%v", priceNow, slNew)
+		}
+
+	} else {
+		if slNew != slCurrent {
+			dec.Action = "update_stop_loss"
+			dec.NewStopLoss = slNew
+			dec.Reasoning = fmt.Sprintf("移动止损价格到 %v", slNew)
+		}
+	}
+
+	return dec
 }
