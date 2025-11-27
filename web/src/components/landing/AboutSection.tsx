@@ -102,8 +102,8 @@ export default function AboutSection({ language }: AboutSectionProps) {
             >
               <Typewriter
                 lines={[
-                  '$ git clone https://github.com/tinkle-community/nofx.git',
-                  '$ cd nofx',
+                  '$ git clone https://github.com/OctoTrader/octotrader.git',
+                  '$ cd octotrader',
                   '$ chmod +x start.sh',
                   '$ ./start.sh start --build',
                   t('startupMessages1', language),

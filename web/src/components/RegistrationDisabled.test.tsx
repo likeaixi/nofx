@@ -33,7 +33,7 @@ describe('RegistrationDisabled Component', () => {
       expect(container).toBeTruthy()
     })
 
-    it('should display the NoFx logo', () => {
+    it('should display the OctoTrader logo', () => {
       renderComponent()
       const logo = screen.getByAltText('NoFx Logo')
       expect(logo).toBeTruthy()

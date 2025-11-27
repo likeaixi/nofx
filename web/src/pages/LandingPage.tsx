@@ -6,7 +6,7 @@ import HeroSection from '../components/landing/HeroSection'
 import AboutSection from '../components/landing/AboutSection'
 import FeaturesSection from '../components/landing/FeaturesSection'
 import HowItWorksSection from '../components/landing/HowItWorksSection'
-import CommunitySection from '../components/landing/CommunitySection'
+// import CommunitySection from '../components/landing/CommunitySection'
 import AnimatedSection from '../components/landing/AnimatedSection'
 import LoginModal from '../components/landing/LoginModal'
 import FooterSection from '../components/landing/FooterSection'
@@ -53,7 +53,7 @@ export function LandingPage() {
         <AboutSection language={language} />
         <FeaturesSection language={language} />
         <HowItWorksSection language={language} />
-        <CommunitySection />
+        {/*<CommunitySection />*/}
 
         {/* CTA */}
         <AnimatedSection backgroundColor="var(--panel-bg)">
@@ -96,24 +96,24 @@ export function LandingPage() {
                   <ArrowRight className="w-5 h-5" />
                 </motion.div>
               </motion.button>
-              <motion.a
-                href="https://github.com/tinkle-community/nofx/tree/dev"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-10 py-4 rounded-lg font-semibold text-lg"
-                style={{
-                  background: 'transparent',
-                  color: 'var(--brand-light-gray)',
-                  border: '2px solid var(--brand-yellow)',
-                }}
-                whileHover={{
-                  scale: 1.05,
-                  backgroundColor: 'rgba(240, 185, 11, 0.1)',
-                }}
-                whileTap={{ scale: 0.95 }}
-              >
-                {t('viewSourceCode', language)}
-              </motion.a>
+              {/*<motion.a*/}
+              {/*  href="https://github.com/tinkle-community/nofx/tree/dev"*/}
+              {/*  target="_blank"*/}
+              {/*  rel="noopener noreferrer"*/}
+              {/*  className="flex items-center gap-2 px-10 py-4 rounded-lg font-semibold text-lg"*/}
+              {/*  style={{*/}
+              {/*    background: 'transparent',*/}
+              {/*    color: 'var(--brand-light-gray)',*/}
+              {/*    border: '2px solid var(--brand-yellow)',*/}
+              {/*  }}*/}
+              {/*  whileHover={{*/}
+              {/*    scale: 1.05,*/}
+              {/*    backgroundColor: 'rgba(240, 185, 11, 0.1)',*/}
+              {/*  }}*/}
+              {/*  whileTap={{ scale: 0.95 }}*/}
+              {/*>*/}
+              {/*  {t('viewSourceCode', language)}*/}
+              {/*</motion.a>*/}
             </div>
           </div>
         </AnimatedSection>
