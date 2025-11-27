@@ -345,8 +345,6 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		AIRequestDurationMs: 0,
 	}
 
-	fullDecision.SystemPrompt = "Spider strategy"
-
 	// 计算所有币种的决策
 	decisions := make([]decision.Decision, 0, len(ctx.CandidateCoins))
 	for _, coin := range ctx.CandidateCoins {
@@ -368,15 +366,18 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 
 		dec.Symbol = coin.Symbol
 
-		fullDecision.SystemPrompt += "\nSymbol: " + dec.Symbol
-		fullDecision.SystemPrompt += "\nAI Signal: " + act
-		fullDecision.SystemPrompt += "\nPrice: " + pri.String()
-		fullDecision.SystemPrompt += "\nC1: " + fmt.Sprintf("%v", c1)
-		fullDecision.SystemPrompt += "\nC3: " + fmt.Sprintf("%v", c3)
-		fullDecision.SystemPrompt += "\nC5: " + fmt.Sprintf("%v", c5)
-		//fullDecision.SystemPrompt += "\nSSP: " + fmt.Sprintf("%v", ssp)
-		fullDecision.SystemPrompt += "\nSSP Result: " + sspResult.String()
+		//fullDecision.SystemPrompt += "\nSymbol: " + dec.Symbol
+		//fullDecision.SystemPrompt += "\nAI Signal: " + act
+		//fullDecision.SystemPrompt += "\nPrice: " + pri.String()
+		//fullDecision.SystemPrompt += "\nC1: " + fmt.Sprintf("%v", c1)
+		//fullDecision.SystemPrompt += "\nC3: " + fmt.Sprintf("%v", c3)
+		//fullDecision.SystemPrompt += "\nC5: " + fmt.Sprintf("%v", c5)
+		////fullDecision.SystemPrompt += "\nSSP: " + fmt.Sprintf("%v", ssp)
+		//fullDecision.SystemPrompt += "\nSSP Result: " + sspResult.String()
 
+		systemPrompt := FormatSystemPrompt(dec.Symbol, act, pri, c1, c3, c5, sspResult)
+
+		fullDecision.SystemPrompt += systemPrompt
 		currentSpiderSnapshot := &decision.SpiderSnapshot{
 			S0:      sspResult.SupportStrengthNear.InexactFloat64(),
 			R0:      sspResult.ResistStrengthNear.InexactFloat64(),
@@ -1132,4 +1133,48 @@ func sleepUntil(start time.Time, period time.Duration) {
 	if d := period - time.Since(start); d > 0 {
 		time.Sleep(d)
 	}
+}
+
+func previewInts(xs []int64, n int) string {
+	if len(xs) == 0 {
+		return "[]"
+	}
+	if len(xs) <= n {
+		return fmt.Sprint(xs)
+	}
+	return fmt.Sprintf("%v…(+%d)", xs[:n], len(xs)-n)
+}
+
+func FormatSystemPrompt(symbol, act string, pri decimal.Decimal, c1, c3, c5 string, sspResult SSPResult) string {
+	const (
+		labelW      = 14
+		sspPreviewN = 12
+	)
+	var b strings.Builder
+
+	// 标题
+	b.WriteString("               Spider Strategy               \n")
+
+	// 基础信息（左列对齐）
+	fmt.Fprintf(&b, "%-*s %s\n", labelW, "Symbol:", symbol)
+	fmt.Fprintf(&b, "%-*s %s\n", labelW, "AI Signal:", act)
+	fmt.Fprintf(&b, "%-*s %s\n", labelW, "Price:", pri.String())
+
+	// 组合信号
+	combo := fmt.Sprintf("%s-%s-%s", strings.ToUpper(c1), strings.ToUpper(c3), strings.ToUpper(c5))
+	fmt.Fprintf(&b, "%-*s %s\n", labelW, "Combo (C1/C3/C5):", combo)
+
+	// 蜘蛛丝预览
+	//fmt.Fprintf(&b, "%-*s %s (total=%d)\n", labelW, "SSP:", previewInts(ssp, sspPreviewN), len(ssp))
+
+	// SSPResult 概要（你之前给的 String() 已经很好看；直接嵌下去）
+	b.WriteString("\n")
+	for _, line := range strings.Split(sspResult.String(), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		fmt.Fprintf(&b, "%s\n", line)
+	}
+
+	return b.String()
 }
