@@ -274,8 +274,9 @@ type OpenDecisionContext struct {
 }
 
 // DecideOpenPosition 综合决策是否允许开新仓（只在 NEUTRAL 才会考虑开仓）
-func DecideOpenPosition(ctx OpenDecisionContext, price decimal.Decimal, leverage decimal.Decimal, spider *decision.SpiderSnapshot) decision.Decision {
+func DecideOpenPosition(ctx OpenDecisionContext, symbol string, price decimal.Decimal, leverage decimal.Decimal, spider *decision.SpiderSnapshot) decision.Decision {
 	var dec = decision.Decision{}
+	dec.Symbol = symbol
 	dec.Action = "wait"
 	dec.Reasoning = "没有开仓信号"
 

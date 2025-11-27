@@ -501,7 +501,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 		//best := dcs[bestIdx]
 
 		openDecisionCtx := OpenDecisionContext{
-			PositionState: p.Side,
+			PositionState: PositionStateFlat,
 			Bias:          sspResult.Bias.InexactFloat64(),
 			SignalSide:    act,
 			SignalValid:   true,
@@ -510,7 +510,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 
 		decimalLeverage := decimal.NewFromInt(int64(ctx.BTCETHLeverage))
 
-		dec = DecideOpenPosition(openDecisionCtx, price, decimalLeverage, currentSpiderSnapshot)
+		dec = DecideOpenPosition(openDecisionCtx, coin.Symbol, price, decimalLeverage, currentSpiderSnapshot)
 
 		accountEquityUSDT := decimal.NewFromFloat(ctx.Account.TotalEquity)
 
