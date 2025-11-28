@@ -869,37 +869,37 @@ func validateDecision(d *Decision, accountEquity float64, btcEthLeverage, altcoi
 			}
 		}
 
-		// 验证风险回报比（必须≥1:3）
-		// 计算入场价（假设当前市价）
-		var entryPrice float64
-		if d.Action == "open_long" {
-			// 做多：入场价在止损和止盈之间
-			entryPrice = d.StopLoss + (d.TakeProfit-d.StopLoss)*0.2 // 假设在20%位置入场
-		} else {
-			// 做空：入场价在止损和止盈之间
-			entryPrice = d.StopLoss - (d.StopLoss-d.TakeProfit)*0.2 // 假设在20%位置入场
-		}
-
-		var riskPercent, rewardPercent, riskRewardRatio float64
-		if d.Action == "open_long" {
-			riskPercent = (entryPrice - d.StopLoss) / entryPrice * 100
-			rewardPercent = (d.TakeProfit - entryPrice) / entryPrice * 100
-			if riskPercent > 0 {
-				riskRewardRatio = rewardPercent / riskPercent
-			}
-		} else {
-			riskPercent = (d.StopLoss - entryPrice) / entryPrice * 100
-			rewardPercent = (entryPrice - d.TakeProfit) / entryPrice * 100
-			if riskPercent > 0 {
-				riskRewardRatio = rewardPercent / riskPercent
-			}
-		}
-
-		// 硬约束：风险回报比必须≥3.0
-		if riskRewardRatio < 3.0 {
-			return fmt.Errorf("风险回报比过低(%.2f:1)，必须≥3.0:1 [风险:%.2f%% 收益:%.2f%%] [止损:%.2f 止盈:%.2f]",
-				riskRewardRatio, riskPercent, rewardPercent, d.StopLoss, d.TakeProfit)
-		}
+		//// 验证风险回报比（必须≥1:3）
+		//// 计算入场价（假设当前市价）
+		//var entryPrice float64
+		//if d.Action == "open_long" {
+		//	// 做多：入场价在止损和止盈之间
+		//	entryPrice = d.StopLoss + (d.TakeProfit-d.StopLoss)*0.2 // 假设在20%位置入场
+		//} else {
+		//	// 做空：入场价在止损和止盈之间
+		//	entryPrice = d.StopLoss - (d.StopLoss-d.TakeProfit)*0.2 // 假设在20%位置入场
+		//}
+		//
+		//var riskPercent, rewardPercent, riskRewardRatio float64
+		//if d.Action == "open_long" {
+		//	riskPercent = (entryPrice - d.StopLoss) / entryPrice * 100
+		//	rewardPercent = (d.TakeProfit - entryPrice) / entryPrice * 100
+		//	if riskPercent > 0 {
+		//		riskRewardRatio = rewardPercent / riskPercent
+		//	}
+		//} else {
+		//	riskPercent = (d.StopLoss - entryPrice) / entryPrice * 100
+		//	rewardPercent = (entryPrice - d.TakeProfit) / entryPrice * 100
+		//	if riskPercent > 0 {
+		//		riskRewardRatio = rewardPercent / riskPercent
+		//	}
+		//}
+		//
+		//// 硬约束：风险回报比必须≥3.0
+		//if riskRewardRatio < 3.0 {
+		//	return fmt.Errorf("风险回报比过低(%.2f:1)，必须≥3.0:1 [风险:%.2f%% 收益:%.2f%%] [止损:%.2f 止盈:%.2f]",
+		//		riskRewardRatio, riskPercent, rewardPercent, d.StopLoss, d.TakeProfit)
+		//}
 	}
 
 	// 动态调整止损验证
