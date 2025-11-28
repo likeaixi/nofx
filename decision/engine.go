@@ -441,6 +441,7 @@ func buildUserPrompt(ctx *Context) string {
 	input.P = ssp.P
 	input.SSP = ssp.SSP
 	input.P = ssp.P
+	input.T = ssp.T
 
 	input.C1.Dir = c1
 	input.C3.Dir = c3
