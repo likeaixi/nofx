@@ -112,9 +112,9 @@ type Config struct {
 
 // 所有输入统一在这个 struct 里
 type Input struct {
-	P   float64   `json:"P"`
-	SSP []float64 `json:"SSP"`
-	T   int64     `json:"T"`
+	P   json.Number   `json:"P"`
+	SSP []json.Number `json:"SSP"`
+	T   json.Number   `json:"T"`
 
 	C1 Direction `json:"C1"`
 	C3 Direction `json:"C3"`
@@ -408,9 +408,8 @@ func buildUserPrompt(ctx *Context) string {
 
 	// BTC 市场
 	if btcData, hasBTC := ctx.MarketDataMap["BTCUSDT"]; hasBTC {
-		sb.WriteString(fmt.Sprintf("BTC: %.2f (1h: %+.2f%%, 4h: %+.2f%%) | MACD: %.4f | RSI: %.2f\n\n",
-			btcData.CurrentPrice, btcData.PriceChange1h, btcData.PriceChange4h,
-			btcData.CurrentMACD, btcData.CurrentRSI7))
+		sb.WriteString(fmt.Sprintf("BTC: %.2f (1h: %+.2f%%, 4h: %+.2f%%) \n\n",
+			btcData.CurrentPrice, btcData.PriceChange1h, btcData.PriceChange4h))
 	}
 
 	// 账户
@@ -423,9 +422,9 @@ func buildUserPrompt(ctx *Context) string {
 		ctx.Account.PositionCount))
 
 	input := Input{
-		P:   0,
+		P:   "",
 		SSP: nil,
-		T:   0,
+		T:   "",
 		C1:  Direction{},
 		C3:  Direction{},
 		C5:  Direction{},
@@ -436,7 +435,7 @@ func buildUserPrompt(ctx *Context) string {
 	_, c1, c3, c5 := spider.FetchCombo()
 	ssp, err := spider.FetchSpiderRaw()
 	if err != nil {
-
+		sb.WriteString(fmt.Sprintf("获取蜘蛛丝数据失败 %v", err))
 	}
 
 	input.P = ssp.P
@@ -512,11 +511,11 @@ func buildUserPrompt(ctx *Context) string {
 		//}
 
 		// 使用FormatMarketData输出完整市场数据
-		sb.WriteString(fmt.Sprintf("### %d. %s%s\n\n", displayedCount, coin.Symbol))
+		sb.WriteString(fmt.Sprintf("### %d. %s\n\n", displayedCount, coin.Symbol))
 		//sb.WriteString(market.Format(marketData))
 		b, err := json.MarshalIndent(input, "", "  ")
 		if err != nil {
-			panic(err)
+			sb.WriteString(fmt.Sprintf("解析输入数据失败 %v", err))
 		}
 		sb.WriteString(string(b))
 		sb.WriteString("\n")

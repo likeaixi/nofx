@@ -24,13 +24,13 @@ var (
 // ================ 蜘蛛丝获取与过滤 ================
 
 type SSPResponse struct {
-	P   float64   `json:"P"`
-	SSP []float64 `json:"SSP"`
-	T   int64     `json:"T"`
+	P   json.Number   `json:"P"`
+	SSP []json.Number `json:"SSP"`
+	T   json.Number   `json:"T"`
 }
 
 func FetchSpiderRaw() (SSPResponse, error) {
-	var data SSPResponse
+	data := SSPResponse{}
 
 	req, _ := http.NewRequest(http.MethodGet, spiderURL, nil)
 	cli := &http.Client{Timeout: 2 * time.Second}
