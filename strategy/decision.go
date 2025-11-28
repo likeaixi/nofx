@@ -275,7 +275,7 @@ type OpenDecisionContext struct {
 }
 
 // DecideOpenPosition 综合决策是否允许开新仓（只在 NEUTRAL 才会考虑开仓）
-func DecideOpenPosition(ctx OpenDecisionContext, symbol string, price decimal.Decimal, leverage decimal.Decimal, spider *decision.SpiderSnapshot) decision.Decision {
+func DecideOpenPosition(ctx OpenDecisionContext, symbol string, price float64, leverage decimal.Decimal, spider *decision.SpiderSnapshot) decision.Decision {
 	var dec = decision.Decision{}
 	dec.Symbol = symbol
 	dec.Action = "wait"
@@ -359,7 +359,7 @@ func DecideOpenPosition(ctx OpenDecisionContext, symbol string, price decimal.De
 		// 3) 通过两层门控，允许开多
 		dec.Action = "open_long"
 		dec.Reasoning = "LONG"
-		dec.Level, _ = price.Float64()
+		dec.Level = price
 
 		sl := spider.SupLow
 		tp := spider.ResHigh
@@ -390,7 +390,7 @@ func DecideOpenPosition(ctx OpenDecisionContext, symbol string, price decimal.De
 		//return DecisionOpenShort
 		dec.Action = "open_short"
 		dec.Reasoning = "SHORT"
-		dec.Level, _ = price.Float64()
+		dec.Level = price
 
 		sl := spider.ResHigh
 		tp := spider.SupLow

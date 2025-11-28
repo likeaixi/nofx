@@ -510,7 +510,7 @@ func (s *SpiderStrategy) GetFullDecision(ctx *decision.Context) (*decision.FullD
 
 		decimalLeverage := decimal.NewFromInt(int64(ctx.BTCETHLeverage))
 
-		dec = DecideOpenPosition(openDecisionCtx, coin.Symbol, price, decimalLeverage, currentSpiderSnapshot)
+		dec = DecideOpenPosition(openDecisionCtx, coin.Symbol, marketData.CurrentPrice, decimalLeverage, currentSpiderSnapshot)
 
 		accountEquityUSDT := decimal.NewFromFloat(ctx.Account.TotalEquity)
 
