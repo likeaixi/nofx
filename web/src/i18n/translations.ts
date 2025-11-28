@@ -1403,7 +1403,7 @@ export const translations = {
     fourSimpleSteps: '四个简单步骤，开启 AI 自动交易之旅',
     step1Title: '拉取 GitHub 仓库',
     step1Desc:
-      'git clone https://github.com/tinkle-community/nofx 并切换到 dev 分支测试新功能。',
+      'git clone https://github.com/OctoTrader/octotrader 并切换到 dev 分支测试新功能。',
     step2Title: '配置环境',
     step2Desc:
       '前端设置交易所 API（如 Binance、Hyperliquid）、AI 模型和自定义提示词。',
