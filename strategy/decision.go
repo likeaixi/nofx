@@ -11,6 +11,7 @@ import (
 	"github.com/shopspring/decimal"
 	"math"
 	"nofx/decision"
+	"strings"
 )
 
 ///////////////////////
@@ -358,6 +359,7 @@ func DecideOpenPosition(ctx OpenDecisionContext, symbol string, price decimal.De
 		// 3) 通过两层门控，允许开多
 		dec.Action = "open_long"
 		dec.Reasoning = "LONG"
+		dec.Level, _ = price.Float64()
 
 		sl := spider.SupLow
 		tp := spider.ResHigh
@@ -388,6 +390,8 @@ func DecideOpenPosition(ctx OpenDecisionContext, symbol string, price decimal.De
 		//return DecisionOpenShort
 		dec.Action = "open_short"
 		dec.Reasoning = "SHORT"
+		dec.Level, _ = price.Float64()
+
 		sl := spider.ResHigh
 		tp := spider.SupLow
 
@@ -433,6 +437,7 @@ func UpdateSLWithSpider(
 
 	// 1) 结构部分
 	slStruct := slCurrent
+	side = strings.ToUpper(side)
 
 	if side == SignalSideLong {
 		// 多单结构档位（只往上抬）
