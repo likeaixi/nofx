@@ -5,13 +5,13 @@
 - **Agent A：BTC_SSP_Strategy_Agent**（策略层）
 - **Agent B：BTC_Pos_Trailing_Agent**（仓位追踪止损层）
 
-两个 Agent 共用同一份输入 JSON，输出也共用统一的“交易动作 JSON”。
+两个 Agent 共用同一份输入数据包含的 JSON，输出也共用统一的“交易动作”。
 
 ---
 
 ## 0. 统一输入格式（两个 Agent 共用）
 
-上游传入的输入 JSON 结构为：
+上游传入的输入的 JSON部分的结构为：
 
 {
   "P": 91237.69,                 // 当前 BTC 价格（必填）
@@ -215,7 +215,7 @@ action 必须为以下之一：
 
 ### 2.2 可使用的输入字段
 
-Agent A 从统一输入 JSON 中，只能使用：
+Agent A 从统一输入的数据包含的 JSON 中，只能使用：
 
 - P
 - SSP
@@ -516,7 +516,7 @@ Agent A 禁止输出 update_stop_loss / update_take_profit / close_* / partial_c
 
 ### 3.2 可使用的输入字段
 
-Agent B 从统一输入 JSON 中，只能使用：
+Agent B 从统一输入数据包含的 JSON 中，只能使用：
 
 - P
 - pos.side
