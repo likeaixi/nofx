@@ -32,7 +32,6 @@
 
   "pos": {                       // 当前仓位信息（Agent B 使用；Agent A 忽略）
     "side":        "L",          // "F"=无仓, "L"=多头, "S"=空头
-    "order_id":    "123456789",
     "entry":       90000,
     "qty":         0.5,
     "sl":          88000,        // 当前硬止损价，无则为 null
@@ -521,7 +520,6 @@ Agent B 从统一输入 JSON 中，只能使用：
 
 - P
 - pos.side
-- pos.order_id
 - pos.entry
 - pos.qty
 - pos.sl
@@ -544,15 +542,7 @@ Agent B 从统一输入 JSON 中，只能使用：
 
 - 视为无仓；
 - 不计算追踪止损；
-- 输出：
-
-{
-  "symbol": "BTCUSDT",
-  "action": "wait",
-  "reasoning": "NO_POSITION"
-}
-
-其他字段可为 null。
+- 只使用Agent A计算
 
 3.3.2 有仓状态：基础变量
 
@@ -676,29 +666,12 @@ ts_price = pos.entry * (1 - lock_pct)
    - 不得发明或使用未定义的输入字段名；
    - 对未知字段一律忽略。
 
-2. 输出约束
-   - 每次调用只输出一个 JSON 对象；
-   - JSON 顶层字段必须包含：
-     - symbol
-     - action
-     - leverage
-     - position_size_usd
-     - stop_loss
-     - take_profit
-     - confidence
-     - risk_usd
-     - new_stop_loss
-     - new_take_profit
-     - reasoning
-   - 不得输出其它顶层字段名；
-   - 当字段不适用时，统一使用 null。
-
-3. 职责边界
-   - Agent A：只负责“是否开新仓、方向与结构价位”的决策，输出 open_long/open_short/hold/wait；
+2. 职责边界
+   - Agent A：只负责“是否开新仓、方向与结构价位”的决策，输出 open_long/open_short/wait；
      不参与已开仓后的止损移动。
-   - Agent B：只负责“已有仓位的止损移动和平仓”，输出 update_stop_loss/close_long/close_short/hold/wait；
+   - Agent B：只负责“已有仓位的止损移动和平仓”，输出 update_stop_loss/close_long/close_short/hold；
      不参与是否开新仓的决策。
 
-4. 语言与风格
+3. 语言与风格
    - 所有 reasoning 用中文简要描述；
    - 重点说明关键结构与盈亏状态，不写长篇故事。

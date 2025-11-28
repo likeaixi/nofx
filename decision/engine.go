@@ -8,6 +8,7 @@ import (
 	"nofx/market"
 	"nofx/mcp"
 	"nofx/pool"
+	"nofx/spider"
 	"regexp"
 	"strings"
 	"time"
@@ -85,6 +86,42 @@ type Context struct {
 	Performance     interface{}             `json:"-"` // 历史表现分析（logger.PerformanceAnalysis）
 	BTCETHLeverage  int                     `json:"-"` // BTC/ETH杠杆倍数（从配置读取）
 	AltcoinLeverage int                     `json:"-"` // 山寨币杠杆倍数（从配置读取）
+}
+
+// 输入信号的结构
+
+// ---------- 公共输入结构：A 和 B 共用 ----------
+
+type Direction struct {
+	Dir string `json:"dir"` // "U" / "D" / "N"
+}
+
+type Position struct {
+	Side      string   `json:"side"` // "F" / "L" / "S"
+	Entry     float64  `json:"entry"`
+	Qty       float64  `json:"qty"`
+	SL        *float64 `json:"sl"`          // 允许为 null => *float64
+	PnlPct    float64  `json:"pnl_pct"`     // 0.15 = 15%
+	PnlPctMax float64  `json:"pnl_pct_max"` // 开仓以来最大浮盈百分比
+}
+
+type Config struct {
+	MaxLoss  float64 `json:"max_loss"`  // 默认 0.05
+	TrailGap float64 `json:"trail_gap"` // 默认 0.10
+}
+
+// 所有输入统一在这个 struct 里
+type Input struct {
+	P   float64   `json:"P"`
+	SSP []float64 `json:"SSP"`
+	T   int64     `json:"T"`
+
+	C1 Direction `json:"C1"`
+	C3 Direction `json:"C3"`
+	C5 Direction `json:"C5"`
+
+	Pos Position `json:"pos"`
+	Cfg Config   `json:"cfg"`
 }
 
 // Decision AI的交易决策
@@ -385,6 +422,31 @@ func buildUserPrompt(ctx *Context) string {
 		ctx.Account.MarginUsedPct,
 		ctx.Account.PositionCount))
 
+	input := Input{
+		P:   0,
+		SSP: nil,
+		T:   0,
+		C1:  Direction{},
+		C3:  Direction{},
+		C5:  Direction{},
+		Pos: Position{},
+		Cfg: Config{},
+	}
+
+	_, c1, c3, c5 := spider.FetchCombo()
+	ssp, err := spider.FetchSpiderRaw()
+	if err != nil {
+
+	}
+
+	input.P = ssp.P
+	input.SSP = ssp.SSP
+	input.P = ssp.P
+
+	input.C1.Dir = c1
+	input.C3.Dir = c3
+	input.C5.Dir = c5
+
 	// 持仓（完整市场数据）
 	if len(ctx.Positions) > 0 {
 		sb.WriteString("## 当前持仓\n")
@@ -412,10 +474,21 @@ func buildUserPrompt(ctx *Context) string {
 				pos.Leverage, pos.MarginUsed, pos.LiquidationPrice, holdingDuration))
 
 			// 使用FormatMarketData输出完整市场数据
-			if marketData, ok := ctx.MarketDataMap[pos.Symbol]; ok {
-				sb.WriteString(market.Format(marketData))
-				sb.WriteString("\n")
+			//if marketData, ok := ctx.MarketDataMap[pos.Symbol]; ok {
+			//	sb.WriteString(market.Format(marketData))
+			//	sb.WriteString("\n")
+			//}
+
+			input.Pos = Position{
+				Side:      "",
+				Entry:     pos.EntryPrice,
+				Qty:       pos.Quantity,
+				SL:        nil,
+				PnlPct:    pos.UnrealizedPnLPct,
+				PnlPctMax: pos.PeakPnLPct,
 			}
+
+			//
 		}
 	} else {
 		sb.WriteString("当前持仓: 无\n\n")
@@ -425,22 +498,27 @@ func buildUserPrompt(ctx *Context) string {
 	sb.WriteString(fmt.Sprintf("## 候选币种 (%d个)\n\n", len(ctx.MarketDataMap)))
 	displayedCount := 0
 	for _, coin := range ctx.CandidateCoins {
-		marketData, hasData := ctx.MarketDataMap[coin.Symbol]
-		if !hasData {
-			continue
-		}
+		//marketData, hasData := ctx.MarketDataMap[coin.Symbol]
+		//if !hasData {
+		//	continue
+		//}
 		displayedCount++
 
-		sourceTags := ""
-		if len(coin.Sources) > 1 {
-			sourceTags = " (AI500+OI_Top双重信号)"
-		} else if len(coin.Sources) == 1 && coin.Sources[0] == "oi_top" {
-			sourceTags = " (OI_Top持仓增长)"
-		}
+		//sourceTags := ""
+		//if len(coin.Sources) > 1 {
+		//	sourceTags = " (AI500+OI_Top双重信号)"
+		//} else if len(coin.Sources) == 1 && coin.Sources[0] == "oi_top" {
+		//	sourceTags = " (OI_Top持仓增长)"
+		//}
 
 		// 使用FormatMarketData输出完整市场数据
-		sb.WriteString(fmt.Sprintf("### %d. %s%s\n\n", displayedCount, coin.Symbol, sourceTags))
-		sb.WriteString(market.Format(marketData))
+		sb.WriteString(fmt.Sprintf("### %d. %s%s\n\n", displayedCount, coin.Symbol))
+		//sb.WriteString(market.Format(marketData))
+		b, err := json.MarshalIndent(input, "", "  ")
+		if err != nil {
+			panic(err)
+		}
+		sb.WriteString(string(b))
 		sb.WriteString("\n")
 	}
 	sb.WriteString("\n")
