@@ -479,8 +479,9 @@ func buildUserPrompt(ctx *Context) string {
 			//	sb.WriteString("\n")
 			//}
 
+			s := NormalizeSide(pos.Side, true)
 			input.Pos = Position{
-				Side:      "",
+				Side:      s,
 				Entry:     pos.EntryPrice,
 				Qty:       pos.Quantity,
 				SL:        nil,
@@ -924,4 +925,21 @@ func validateDecision(d *Decision, accountEquity float64, btcEthLeverage, altcoi
 	}
 
 	return nil
+}
+
+func NormalizeSide(raw string, hasPosition bool) string {
+	// 优先根据是否有仓来判断平仓状态
+	if !hasPosition {
+		return "F"
+	}
+
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "long":
+		return "L"
+	case "short":
+		return "S"
+	default:
+		// 不认识的字符串，当作无仓处理，避免乱来
+		return "F"
+	}
 }
