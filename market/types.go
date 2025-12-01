@@ -61,6 +61,14 @@ type SymbolInfo struct {
 	QuantityPrecision int    `json:"quantityPrecision"`
 }
 
+type InputKline struct {
+	TS int64   `json:"ts"`
+	O  float64 `json:"o"`
+	H  float64 `json:"h"`
+	C  float64 `json:"c"`
+	L  float64 `json:"l"`
+}
+
 type Kline struct {
 	OpenTime            int64   `json:"openTime"`
 	Open                float64 `json:"open"`

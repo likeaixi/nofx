@@ -35,6 +35,7 @@ type PositionInfo struct {
 	Side             string  `json:"side"` // "long" or "short"
 	EntryPrice       float64 `json:"entry_price"`
 	MarkPrice        float64 `json:"mark_price"`
+	StopLoss         float64 `json:"stop_loss"`
 	Quantity         float64 `json:"quantity"`
 	Leverage         int     `json:"leverage"`
 	UnrealizedPnL    float64 `json:"unrealized_pnl"`
@@ -98,6 +99,7 @@ type Direction struct {
 
 type Position struct {
 	Side      string   `json:"side"` // "F" / "L" / "S"
+	Leverage  int      `json:"leverage"`
 	Entry     float64  `json:"entry"`
 	Qty       float64  `json:"qty"`
 	SL        *float64 `json:"sl"`          // 允许为 null => *float64
@@ -106,19 +108,25 @@ type Position struct {
 }
 
 type Config struct {
-	MaxLoss  float64 `json:"max_loss"`  // 默认 0.05
-	TrailGap float64 `json:"trail_gap"` // 默认 0.10
+	MaxLoss     float64 `json:"max_loss"`      // 默认 0.05
+	TrailGap    float64 `json:"trail_gap"`     // 默认 0.10
+	UseSspEdges bool    `json:"use_ssp_edges"` // 默认true
 }
 
 // 所有输入统一在这个 struct 里
 type Input struct {
-	P   json.Number   `json:"P"`
-	SSP []json.Number `json:"SSP"`
-	T   json.Number   `json:"T"`
+	Symbol string  `json:"symbol"`
+	P      string  `json:"P"`
+	SSP    []int64 `json:"SSP"`
+	T      int64   `json:"T"`
 
 	C1 Direction `json:"C1"`
 	C3 Direction `json:"C3"`
 	C5 Direction `json:"C5"`
+
+	Bars1m []market.InputKline `json:"bars_1m"`
+
+	SSPBias float64 `json:"ssp_bias"`
 
 	Pos Position `json:"pos"`
 	Cfg Config   `json:"cfg"`
@@ -421,31 +429,7 @@ func buildUserPrompt(ctx *Context) string {
 		ctx.Account.MarginUsedPct,
 		ctx.Account.PositionCount))
 
-	input := Input{
-		P:   "",
-		SSP: nil,
-		T:   "",
-		C1:  Direction{},
-		C3:  Direction{},
-		C5:  Direction{},
-		Pos: Position{},
-		Cfg: Config{},
-	}
-
-	_, c1, c3, c5 := spider.FetchCombo()
-	ssp, err := spider.FetchSpiderRaw()
-	if err != nil {
-		sb.WriteString(fmt.Sprintf("获取蜘蛛丝数据失败 %v", err))
-	}
-
-	input.P = ssp.P
-	input.SSP = ssp.SSP
-	input.P = ssp.P
-	input.T = ssp.T
-
-	input.C1.Dir = c1
-	input.C3.Dir = c3
-	input.C5.Dir = c5
+	input := buildInput()
 
 	// 持仓（完整市场数据）
 	if len(ctx.Positions) > 0 {
@@ -482,9 +466,10 @@ func buildUserPrompt(ctx *Context) string {
 			s := NormalizeSide(pos.Side, true)
 			input.Pos = Position{
 				Side:      s,
+				Leverage:  pos.Leverage,
 				Entry:     pos.EntryPrice,
 				Qty:       pos.Quantity,
-				SL:        nil,
+				SL:        &pos.StopLoss,
 				PnlPct:    pos.UnrealizedPnLPct,
 				PnlPctMax: pos.PeakPnLPct,
 			}
@@ -542,6 +527,53 @@ func buildUserPrompt(ctx *Context) string {
 	sb.WriteString("现在请分析并输出决策（思维链 + JSON）\n")
 
 	return sb.String()
+}
+
+func buildInput() Input {
+	symbol := "BTCUSDT"
+
+	input := Input{
+		Symbol:  symbol,
+		P:       "",
+		SSP:     nil,
+		T:       0,
+		C1:      Direction{},
+		C3:      Direction{},
+		C5:      Direction{},
+		Bars1m:  nil,
+		SSPBias: 0,
+		Pos:     Position{},
+		Cfg:     Config{},
+	}
+
+	_, c1, c3, c5 := spider.FetchCombo()
+	ssp, err := spider.FetchSpiderRaw()
+	sspResult := spider.NewSSPResult(ssp)
+	if err != nil {
+		log.Printf("获取蜘蛛丝数据失败 %v", err)
+	}
+
+	klines, err := market.GetInputKlines(symbol)
+	if err != nil {
+		log.Printf("获取Input Klines失败 %v", err)
+	}
+
+	input.P = ssp.P
+	input.SSP = ssp.SSP
+	input.T = ssp.T
+
+	input.C1.Dir = c1
+	input.C3.Dir = c3
+	input.C5.Dir = c5
+
+	input.Bars1m = klines
+	input.SSPBias = sspResult.Bias
+
+	input.Cfg.MaxLoss = 0.05
+	input.Cfg.TrailGap = 0.1
+	input.Cfg.UseSspEdges = true
+
+	return input
 }
 
 // parseFullDecisionResponse 解析AI的完整决策响应

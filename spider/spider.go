@@ -23,11 +23,11 @@ var (
 
 // ================ 蜘蛛丝获取与过滤 ================
 
-type SSPResponse struct {
-	P   json.Number   `json:"P"`
-	SSP []json.Number `json:"SSP"`
-	T   json.Number   `json:"T"`
-}
+//type SSPResponse struct {
+//	P   json.Number   `json:"P"`
+//	SSP []json.Number `json:"SSP"`
+//	T   json.Number   `json:"T"`
+//}
 
 func FetchSpiderRaw() (SSPResponse, error) {
 	data := SSPResponse{}

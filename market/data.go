@@ -24,6 +24,35 @@ var (
 	frCacheTTL     = 1 * time.Hour
 )
 
+func GetInputKlines(symbol string) ([]InputKline, error) {
+	klines1m := make([]InputKline, 0)
+	// 标准化symbol
+	symbol = Normalize(symbol)
+	// 获取3分钟K线数据 (最近10个)
+	klines, err := WSMonitorCli.GetCurrentKlines(symbol, "1m") // 多获取一些用于计算
+	if err != nil {
+		return nil, fmt.Errorf("获取1分钟K线失败: %v", err)
+	}
+
+	if len(klines) < 3 {
+		return nil, fmt.Errorf("获取1分钟K线数据小于3条: %v", len(klines))
+	}
+
+	for _, l := range klines {
+		var k = InputKline{
+			TS: l.OpenTime,
+			O:  l.Open,
+			H:  l.High,
+			C:  l.Close,
+			L:  l.Low,
+		}
+
+		klines1m = append(klines1m, k)
+	}
+
+	return klines1m, nil
+}
+
 // Get 获取指定代币的市场数据
 func Get(symbol string) (*Data, error) {
 	var klines3m, klines4h []Kline

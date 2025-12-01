@@ -10,6 +10,7 @@ import (
 	"nofx/market"
 	"nofx/mcp"
 	"nofx/pool"
+	"nofx/spider"
 	"strings"
 	"sync"
 	"time"
@@ -595,11 +596,27 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 		peakPnlPct := at.peakPnLCache[posKey]
 		at.peakPnLCacheMutex.RUnlock()
 
+		// 获取蜘蛛丝快照
+		baseDir := fmt.Sprintf("decision_logs/%s", at.id)
+
+		stopLoss := float64(0)
+		snapshot, err := spider.LoadSnapshotForSymbol(baseDir, symbol)
+		if err != nil {
+			log.Println("加载蜘蛛丝快照失败", err)
+			log.Printf("symbol %s", symbol)
+		}
+
+		if snapshot != nil {
+			stopLoss = snapshot.StopLoss
+			log.Printf("加载蜘蛛丝快照 snapsho: %v, stopLoss: %v", snapshot, stopLoss)
+		}
+
 		positionInfos = append(positionInfos, decision.PositionInfo{
 			Symbol:           symbol,
 			Side:             side,
 			EntryPrice:       entryPrice,
 			MarkPrice:        markPrice,
+			StopLoss:         stopLoss,
 			Quantity:         quantity,
 			Leverage:         leverage,
 			UnrealizedPnL:    unrealizedPnl,
@@ -753,6 +770,14 @@ func (at *AutoTrader) executeOpenLongWithRecord(decision *decision.Decision, act
 		return err
 	}
 
+	// 保存蜘蛛丝快照
+	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
+	timeNow := time.Now().UnixMilli()
+	err = spider.SaveSnapshotOnOpen(baseDir, decision.Symbol, "LONG", decision.StopLoss, timeNow)
+	if err != nil {
+		log.Printf("保存蜘蛛丝快照失败: %v", err)
+	}
+
 	// 记录订单ID
 	if orderID, ok := order["orderId"].(int64); ok {
 		actionRecord.OrderID = orderID
@@ -831,6 +856,14 @@ func (at *AutoTrader) executeOpenShortWithRecord(decision *decision.Decision, ac
 	order, err := at.trader.OpenShort(decision.Symbol, quantity, decision.Leverage)
 	if err != nil {
 		return err
+	}
+
+	// 保存蜘蛛丝快照
+	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
+	timeNow := time.Now().UnixMilli()
+	err = spider.SaveSnapshotOnOpen(baseDir, decision.Symbol, "SHORT", decision.StopLoss, timeNow)
+	if err != nil {
+		log.Printf("保存蜘蛛丝快照失败: %v", err)
 	}
 
 	// 记录订单ID
@@ -985,6 +1018,13 @@ func (at *AutoTrader) executeUpdateStopLossWithRecord(decision *decision.Decisio
 	err = at.trader.SetStopLoss(decision.Symbol, positionSide, quantity, decision.NewStopLoss)
 	if err != nil {
 		return fmt.Errorf("修改止损失败: %w", err)
+	}
+
+	// 更新蜘蛛丝快照
+	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
+	err = spider.UpdateStopLossForSymbol(baseDir, decision.Symbol, decision.NewStopLoss)
+	if err != nil {
+		log.Printf("更新蜘蛛丝快照失败: %v", err)
 	}
 
 	log.Printf("  ✓ 止损已调整: %.2f (当前价格: %.2f)", decision.NewStopLoss, marketData.CurrentPrice)
