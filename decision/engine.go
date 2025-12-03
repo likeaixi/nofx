@@ -510,18 +510,18 @@ func buildUserPrompt(ctx *Context) string {
 	sb.WriteString("\n")
 
 	// 夏普比率（直接传值，不要复杂格式化）
-	if ctx.Performance != nil {
-		// 直接从interface{}中提取SharpeRatio
-		type PerformanceData struct {
-			SharpeRatio float64 `json:"sharpe_ratio"`
-		}
-		var perfData PerformanceData
-		if jsonData, err := json.Marshal(ctx.Performance); err == nil {
-			if err := json.Unmarshal(jsonData, &perfData); err == nil {
-				sb.WriteString(fmt.Sprintf("## 📊 夏普比率: %.2f\n\n", perfData.SharpeRatio))
-			}
-		}
-	}
+	//if ctx.Performance != nil {
+	//	// 直接从interface{}中提取SharpeRatio
+	//	type PerformanceData struct {
+	//		SharpeRatio float64 `json:"sharpe_ratio"`
+	//	}
+	//	var perfData PerformanceData
+	//	if jsonData, err := json.Marshal(ctx.Performance); err == nil {
+	//		if err := json.Unmarshal(jsonData, &perfData); err == nil {
+	//			sb.WriteString(fmt.Sprintf("## 📊 夏普比率: %.2f\n\n", perfData.SharpeRatio))
+	//		}
+	//	}
+	//}
 
 	sb.WriteString("---\n\n")
 	sb.WriteString("现在请分析并输出决策（思维链 + JSON）\n")
