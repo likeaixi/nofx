@@ -108,9 +108,9 @@ type Position struct {
 }
 
 type Config struct {
-	MaxLoss     float64 `json:"max_loss"`      // 默认 0.05
-	TrailGap    float64 `json:"trail_gap"`     // 默认 0.10
-	UseSspEdges bool    `json:"use_ssp_edges"` // 默认true
+	MaxLoss  float64 `json:"max_loss"`  // 默认 0.05
+	TrailGap float64 `json:"trail_gap"` // 默认 0.10
+	//UseSspEdges bool    `json:"use_ssp_edges"` // 默认true
 }
 
 // 所有输入统一在这个 struct 里
@@ -124,9 +124,9 @@ type Input struct {
 	C3 Direction `json:"C3"`
 	C5 Direction `json:"C5"`
 
-	Bars1m []market.InputKline `json:"bars_1m"`
+	//Bars1m []market.InputKline `json:"bars_1m"`
 
-	SSPBias float64 `json:"ssp_bias"`
+	//SSPBias float64 `json:"ssp_bias"`
 
 	Pos Position `json:"pos"`
 	Cfg Config   `json:"cfg"`
@@ -533,30 +533,28 @@ func buildInput() Input {
 	symbol := "BTCUSDT"
 
 	input := Input{
-		Symbol:  symbol,
-		P:       "",
-		SSP:     nil,
-		T:       0,
-		C1:      Direction{},
-		C3:      Direction{},
-		C5:      Direction{},
-		Bars1m:  nil,
-		SSPBias: 0,
-		Pos:     Position{},
-		Cfg:     Config{},
+		Symbol: symbol,
+		P:      "",
+		SSP:    nil,
+		T:      0,
+		C1:     Direction{},
+		C3:     Direction{},
+		C5:     Direction{},
+		Pos:    Position{},
+		Cfg:    Config{},
 	}
 
 	_, c1, c3, c5 := spider.FetchCombo()
 	ssp, err := spider.FetchSpiderRaw()
-	sspResult := spider.NewSSPResult(ssp)
+	//sspResult := spider.NewSSPResult(ssp)
 	if err != nil {
 		log.Printf("获取蜘蛛丝数据失败 %v", err)
 	}
 
-	klines, err := market.GetInputKlines(symbol)
-	if err != nil {
-		log.Printf("获取Input Klines失败 %v", err)
-	}
+	//klines, err := market.GetInputKlines(symbol)
+	//if err != nil {
+	//	log.Printf("获取Input Klines失败 %v", err)
+	//}
 
 	input.P = ssp.P
 	input.SSP = ssp.SSP
@@ -566,12 +564,12 @@ func buildInput() Input {
 	input.C3.Dir = c3
 	input.C5.Dir = c5
 
-	input.Bars1m = klines
-	input.SSPBias = sspResult.Bias
+	//input.Bars1m = klines
+	//input.SSPBias = sspResult.Bias
 
 	input.Cfg.MaxLoss = 0.05
 	input.Cfg.TrailGap = 0.1
-	input.Cfg.UseSspEdges = true
+	//input.Cfg.UseSspEdges = true
 
 	return input
 }
