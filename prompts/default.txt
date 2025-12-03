@@ -58,6 +58,7 @@
   - 内部视为：`{"max_loss": 0.05, "trail_gap": 0.10}`。
 - 若某个 `C1/C3/C5` 缺失：
   - 缺失者视为：`{"dir": "N"}`。
+- 若 `pos.leverage` 缺失或 <=0，则内部视为 1。
 - 对于输入中出现的其它未知字段，两个 Agent 一律忽略。
 
 ### 0.2 各 Agent 可使用的字段（硬约束）
@@ -510,13 +511,13 @@ if dir_internal = SHORT:
   - `entry_band = [band_low, band_low + band_width*0.5]`；
   - `entry_price ≈ entry_band` 中值；
   - 结构止损：
-    - `sl_price ≈ sup_key - 100`；
+    - `stop_loss ≈ sup_key - 100`；
   - TP 参考：
     - 若有 `res_key` 或 `magnet_res`，可用作 `take_profit`。
 
 - **SHORT 回归**：
   - `entry_band = [band_high - band_width*0.5, band_high]`；
-  - `sl_price ≈ res_key + 100`；
+  - `stop_loss ≈ res_key + 100`；
   - TP 参考：
     - `sup_key` 或 `magnet_sup`。
 
@@ -527,7 +528,7 @@ if dir_internal = SHORT:
     - `entry` 在 `res_key` 附近（突破或回踩）；
     - `entry_price ≈ res_key` 或略上；
   - 止损：
-    - 参考 `sup_key` 或 `entry_price * (1 - cfg.max_loss)` 中更保守者；
+    - 参考 `sup_key` 或 `entry_price * (1 - cfg.max_loss/pos.leverage)` 中更保守者；
   - TP：
     - 优先使用 `magnet_res`，否则可用更远压力簇。
 
@@ -536,7 +537,7 @@ if dir_internal = SHORT:
     - `entry` 在 `sup_key` 附近（跌破或回踩）；
     - `entry_price ≈ sup_key` 或略下；
   - 止损：
-    - 参考 `res_key` 或 `entry_price * (1 + cfg.max_loss)`；
+    - 参考 `res_key` 或 `entry_price * (1 + cfg.max_loss/pos.leverage)` 中更保守者；
   - TP：
     - 优先使用 `magnet_sup`。
 
