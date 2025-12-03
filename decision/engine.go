@@ -377,7 +377,7 @@ func buildSystemPrompt(accountEquity float64, btcEthLeverage, altcoinLeverage in
 	sb.WriteString(fmt.Sprintf("3. 单币仓位: 山寨%.0f-%.0f U | BTC/ETH %.0f-%.0f U\n",
 		accountEquity*0.8, accountEquity*1.5, accountEquity*5, accountEquity*10))
 	sb.WriteString(fmt.Sprintf("4. 杠杆限制: **山寨币最大%dx杠杆** | **BTC/ETH最大%dx杠杆** (⚠️ 严格执行，不可超过)\n", altcoinLeverage, btcEthLeverage))
-	sb.WriteString("5. 保证金: 总使用率 ≤ 90%\n")
+	sb.WriteString("5. 保证金: 总使用率 ≤ 20%\n")
 	sb.WriteString("6. 开仓金额: 建议 **≥12 USDT** (交易所最小名义价值 10 USDT + 安全边际)\n\n")
 
 	// 3. 输出格式 - 动态生成
@@ -397,7 +397,7 @@ func buildSystemPrompt(accountEquity float64, btcEthLeverage, altcoinLeverage in
 	sb.WriteString("</decision>\n\n")
 	sb.WriteString("## 字段说明\n\n")
 	sb.WriteString("- `action`: open_long | open_short | close_long | close_short | update_stop_loss | update_take_profit | partial_close | hold | wait\n")
-	sb.WriteString("- `confidence`: 0-100（开仓建议≥75）\n")
+	sb.WriteString("- `confidence`: 0-100\n")
 	sb.WriteString("- 开仓时必填: leverage, position_size_usd, stop_loss, take_profit, confidence, risk_usd, reasoning\n")
 	sb.WriteString("- update_stop_loss 时必填: new_stop_loss (注意是 new_stop_loss，不是 stop_loss)\n")
 	sb.WriteString("- update_take_profit 时必填: new_take_profit (注意是 new_take_profit，不是 take_profit)\n")
