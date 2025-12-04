@@ -193,7 +193,7 @@ func TestGeminiClient_CallWithMessages_Success(t *testing.T) {
 	client := NewGeminiClientWithOptions(
 		WithHTTPClient(mockHTTP.ToHTTPClient()),
 		WithLogger(mockLogger),
-		WithAPIKey("sk-test-key"),
+		WithAPIKey("AIzaSyDj1ZubDezJKiX_lVWlqbu3Vycup-7Bx8Y"),
 	)
 
 	result, err := client.CallWithMessages("system prompt", "user prompt")
@@ -222,8 +222,8 @@ func TestGeminiClient_CallWithMessages_Success(t *testing.T) {
 
 	// 验证 Authorization header
 	authHeader := req.Header.Get("Authorization")
-	if authHeader != "Bearer sk-test-key" {
-		t.Errorf("expected 'Bearer sk-test-key', got '%s'", authHeader)
+	if authHeader != "Bearer AIzaSyDj1ZubDezJKiX_lVWlqbu3Vycup-7Bx8Y" {
+		t.Errorf("expected 'Bearer AIzaSyDj1ZubDezJKiX_lVWlqbu3Vycup-7Bx8Y', got '%s'", authHeader)
 	}
 
 	// 验证 Content-Type

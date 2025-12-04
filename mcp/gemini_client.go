@@ -1,18 +1,76 @@
 package mcp
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 )
 
 const (
 	ProviderGemini       = "gemini"
-	DefaultGeminiBaseURL = "https://generativelanguage.googleapis.com/v1beta"
+	DefaultGeminiBaseURL = "https://generativelanguage.googleapis.com"
 	// 可根据需要改成你要用的默认模型
-	DefaultGeminiModel = "gemini-2.0-flash"
+	DefaultGeminiModel = "gemini-2.5-flash"
 )
 
 type GeminiClient struct {
 	*Client
+}
+
+type geminiPart struct {
+	Text         string              `json:"text,omitempty"`
+	FunctionCall *geminiFunctionCall `json:"functionCall,omitempty"`
+	// 如果要支持 tool 结果，还可以加 functionResponse 等
+}
+
+type geminiFunctionCall struct {
+	Name string                 `json:"name"`
+	Args map[string]interface{} `json:"args,omitempty"`
+}
+
+type geminiContent struct {
+	Role  string       `json:"role,omitempty"`
+	Parts []geminiPart `json:"parts"`
+}
+
+type geminiFunctionDeclaration struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description,omitempty"`
+	Parameters  map[string]interface{} `json:"parameters,omitempty"`
+}
+
+type geminiTool struct {
+	FunctionDeclarations []geminiFunctionDeclaration `json:"functionDeclarations,omitempty"`
+}
+
+type geminiGenerationConfig struct {
+	Temperature     *float32 `json:"temperature,omitempty"`
+	TopP            *float32 `json:"topP,omitempty"`
+	MaxOutputTokens *int     `json:"maxOutputTokens,omitempty"`
+}
+
+type geminiChatRequest struct {
+	Contents         []geminiContent         `json:"contents"`
+	Tools            []geminiTool            `json:"tools,omitempty"`
+	GenerationConfig *geminiGenerationConfig `json:"generationConfig,omitempty"`
+	// SystemInstruction 等也可以放这里，看需要
+}
+
+type geminiUsageMetadata struct {
+	PromptTokenCount     int `json:"promptTokenCount"`
+	CandidatesTokenCount int `json:"candidatesTokenCount"`
+	TotalTokenCount      int `json:"totalTokenCount"`
+}
+
+type geminiCandidate struct {
+	Content geminiContent `json:"content"`
+	// SafetyRatings, finishReason 等可以按需添加
+}
+
+type geminiChatResponse struct {
+	Candidates    []geminiCandidate    `json:"candidates"`
+	UsageMetadata *geminiUsageMetadata `json:"usageMetadata,omitempty"`
 }
 
 // NewGeminiClient 创建 Gemini 客户端（向前兼容）
@@ -82,5 +140,63 @@ func (gmClient *GeminiClient) SetAPIKey(apiKey string, customURL string, customM
 
 func (gmClient *GeminiClient) setAuthHeader(reqHeaders http.Header) {
 	// 使用 OpenAI 兼容端点时，仍然是 Authorization: Bearer <API_KEY>
-	gmClient.Client.setAuthHeader(reqHeaders)
+	//gmClient.Client.setAuthHeader(reqHeaders)
+}
+
+func (gmClient *GeminiClient) buildUrl() string {
+	return fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", gmClient.BaseURL, gmClient.Model, gmClient.APIKey)
+}
+
+func (gmClient *GeminiClient) buildMCPRequestBody(systemPrompt, userPrompt string) map[string]any {
+	// 构建 messages 数组
+	messages := []geminiContent{}
+
+	// 如果有 system prompt，添加 system message
+	if systemPrompt != "" {
+		messages = append(messages, geminiContent{
+			Role: "system",
+			Parts: []geminiPart{
+				{Text: systemPrompt},
+			},
+		})
+	}
+	// 添加 user message
+	messages = append(messages, geminiContent{
+		Role: "user",
+		Parts: []geminiPart{
+			{Text: userPrompt},
+		},
+	})
+
+	// 构建请求体
+	requestBody := map[string]interface{}{
+		"contents": messages,
+	}
+	return requestBody
+}
+
+func (gmClient *GeminiClient) parseMCPResponse(body []byte) (string, error) {
+	var result geminiChatResponse
+
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("解析响应失败: %w", err)
+	}
+
+	if len(result.Candidates) == 0 {
+		return "", fmt.Errorf("API返回空响应")
+	}
+
+	cand := result.Candidates[0]
+
+	// 把所有 text part 拼起来
+	var sb strings.Builder
+	for _, p := range cand.Content.Parts {
+		if p.Text != "" {
+			sb.WriteString(p.Text)
+		}
+	}
+
+	outText := sb.String()
+
+	return outText, nil
 }

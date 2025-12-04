@@ -1089,6 +1089,8 @@ func (tm *TraderManager) loadSingleTrader(traderCfg *config.TraderRecord, aiMode
 		traderConfig.DeepSeekKey = aiModelCfg.APIKey
 	}
 
+	traderConfig.CustomAPIKey = aiModelCfg.APIKey
+
 	// 创建trader实例
 	at, err := trader.NewAutoTrader(traderConfig, database, userID)
 	if err != nil {

@@ -21,7 +21,7 @@ type AutoTraderConfig struct {
 	// Trader标识
 	ID      string // Trader唯一标识（用于日志目录等）
 	Name    string // Trader显示名称
-	AIModel string // AI模型: "qwen" 或 "deepseek"
+	AIModel string // AI模型: "qwen"/"deepseek"/"openai"/"gemini"
 
 	// 交易平台选择
 	Exchange string // "binance", "bybit", "hyperliquid", "aster" 或 "lighter"
@@ -152,6 +152,23 @@ func NewAutoTrader(config AutoTraderConfig, database interface{}, userID string)
 			log.Printf("🤖 [%s] 使用阿里云Qwen AI (自定义URL: %s, 模型: %s)", config.Name, config.CustomAPIURL, config.CustomModelName)
 		} else {
 			log.Printf("🤖 [%s] 使用阿里云Qwen AI", config.Name)
+		}
+	} else if config.AIModel == "openai" {
+		mcpClient = mcp.NewOpenAIClient()
+		mcpClient.SetAPIKey(config.CustomAPIKey, config.CustomAPIURL, config.CustomModelName)
+		if config.CustomAPIURL != "" || config.CustomModelName != "" {
+			log.Printf("🤖 [%s] 使用OpenAi (自定义URL: %s, 模型: %s)", config.Name, config.CustomAPIURL, config.CustomModelName)
+		} else {
+			log.Printf("🤖 [%s] 使用OpenAi", config.Name)
+		}
+
+	} else if config.AIModel == "gemini" {
+		mcpClient = mcp.NewGeminiClient()
+		mcpClient.SetAPIKey(config.CustomAPIKey, config.CustomAPIURL, config.CustomModelName)
+		if config.CustomAPIURL != "" || config.CustomModelName != "" {
+			log.Printf("🤖 [%s] 使用Gemini AI (自定义URL: %s, 模型: %s)", config.Name, config.CustomAPIURL, config.CustomModelName)
+		} else {
+			log.Printf("🤖 [%s] 使用Gemini AI", config.Name)
 		}
 	} else {
 		// 默认使用DeepSeek (支持自定义URL和Model)

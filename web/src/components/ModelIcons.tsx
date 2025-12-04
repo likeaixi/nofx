@@ -21,6 +21,9 @@ export const getModelIcon = (modelType: string, props: IconProps = {}) => {
     case 'gemini':
       iconPath = '/icons/gemini.svg'
       break
+    case 'openai':
+      iconPath = '/icons/openai.svg'
+      break
     default:
       return null
   }
