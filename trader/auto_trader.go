@@ -133,9 +133,9 @@ func NewAutoTrader(config AutoTraderConfig, database interface{}, userID string)
 		config.AIModel = "deepseek"
 	}
 
-	fmt.Printf("ID是 %s", config.ID)
-	fmt.Printf("模型是 %s", config.AIModel)
-	fmt.Printf("APIKey是 %s", config.CustomAPIKey)
+	fmt.Printf("ID是 %s ", config.ID)
+	fmt.Printf("模型是 %s ", config.AIModel)
+	fmt.Printf("APIKey是 %s ", config.CustomAPIKey)
 	mcpClient := mcp.New()
 
 	// 初始化AI
