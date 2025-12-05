@@ -1306,9 +1306,22 @@ func (at *AutoTrader) GetDecisionLogger() logger.IDecisionLogger {
 
 // GetStatus 获取系统状态（用于API）
 func (at *AutoTrader) GetStatus() map[string]interface{} {
-	aiProvider := "DeepSeek"
-	if at.config.UseQwen {
+	aiProvider := ""
+
+	if at.aiModel == "deepseek" {
+		aiProvider = "DeepSeek"
+	}
+
+	if at.aiModel == "qwen" {
 		aiProvider = "Qwen"
+	}
+
+	if at.aiModel == "gemini" {
+		aiProvider = "Gemini"
+	}
+
+	if at.aiModel == "openai" {
+		aiProvider = "Openai"
 	}
 
 	return map[string]interface{}{
