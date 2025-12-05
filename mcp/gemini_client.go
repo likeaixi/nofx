@@ -154,7 +154,7 @@ func (gmClient *GeminiClient) buildMCPRequestBody(systemPrompt, userPrompt strin
 	// 如果有 system prompt，添加 system message
 	if systemPrompt != "" {
 		messages = append(messages, geminiContent{
-			Role: "system",
+			Role: "user",
 			Parts: []geminiPart{
 				{Text: systemPrompt},
 			},
