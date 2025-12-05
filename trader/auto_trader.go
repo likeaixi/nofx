@@ -170,8 +170,8 @@ func NewAutoTrader(config AutoTraderConfig, database interface{}, userID string)
 		} else {
 			log.Printf("🤖 [%s] 使用Gemini AI", config.Name)
 		}
-	} else {
-		// 默认使用DeepSeek (支持自定义URL和Model)
+	} else if config.AIModel == "deepseek" {
+		// 使用DeepSeek (支持自定义URL和Model)
 		mcpClient = mcp.NewDeepSeekClient()
 		mcpClient.SetAPIKey(config.DeepSeekKey, config.CustomAPIURL, config.CustomModelName)
 		if config.CustomAPIURL != "" || config.CustomModelName != "" {
