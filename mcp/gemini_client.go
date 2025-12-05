@@ -50,11 +50,16 @@ type geminiGenerationConfig struct {
 	MaxOutputTokens *int     `json:"maxOutputTokens,omitempty"`
 }
 
+type geminiSystemInstruction struct {
+	Role  string       `json:"role,omitempty"`
+	Parts []geminiPart `json:"parts"`
+}
+
 type geminiChatRequest struct {
-	Contents         []geminiContent         `json:"contents"`
-	Tools            []geminiTool            `json:"tools,omitempty"`
-	GenerationConfig *geminiGenerationConfig `json:"generationConfig,omitempty"`
-	// SystemInstruction 等也可以放这里，看需要
+	Contents          []geminiContent          `json:"contents"`
+	Tools             []geminiTool             `json:"tools,omitempty"`
+	GenerationConfig  *geminiGenerationConfig  `json:"generationConfig,omitempty"`
+	SystemInstruction *geminiSystemInstruction `json:"systemInstruction,omitempty"`
 }
 
 type geminiUsageMetadata struct {
@@ -151,14 +156,15 @@ func (gmClient *GeminiClient) buildMCPRequestBody(systemPrompt, userPrompt strin
 	// 构建 messages 数组
 	messages := []geminiContent{}
 
+	system := &geminiSystemInstruction{}
 	// 如果有 system prompt，添加 system message
 	if systemPrompt != "" {
-		messages = append(messages, geminiContent{
-			Role: "user",
+		system = &geminiSystemInstruction{
+			Role: "user", // 或者不写 Role
 			Parts: []geminiPart{
 				{Text: systemPrompt},
 			},
-		})
+		}
 	}
 	// 添加 user message
 	messages = append(messages, geminiContent{
@@ -170,7 +176,8 @@ func (gmClient *GeminiClient) buildMCPRequestBody(systemPrompt, userPrompt strin
 
 	// 构建请求体
 	requestBody := map[string]interface{}{
-		"contents": messages,
+		"contents":          messages,
+		"systemInstruction": system,
 	}
 	return requestBody
 }
