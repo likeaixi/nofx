@@ -268,6 +268,8 @@ func (tm *TraderManager) addTraderFromDB(traderCfg *config.TraderRecord, aiModel
 		traderConfig.DeepSeekKey = aiModelCfg.APIKey
 	}
 
+	traderConfig.CustomAPIKey = aiModelCfg.APIKey
+
 	// 创建trader实例
 	at, err := trader.NewAutoTrader(traderConfig, database, userID)
 	if err != nil {
@@ -380,6 +382,8 @@ func (tm *TraderManager) AddTraderFromDB(traderCfg *config.TraderRecord, aiModel
 	} else if aiModelCfg.Provider == "deepseek" {
 		traderConfig.DeepSeekKey = aiModelCfg.APIKey
 	}
+
+	traderConfig.CustomAPIKey = aiModelCfg.APIKey
 
 	// 创建trader实例
 	at, err := trader.NewAutoTrader(traderConfig, database, userID)
