@@ -53,9 +53,9 @@ type AutoTraderConfig struct {
 	CoinPoolAPIURL string
 
 	// AI配置
-	UseQwen     bool
-	DeepSeekKey string
-	QwenKey     string
+	//UseQwen     bool
+	//DeepSeekKey string
+	//QwenKey     string
 
 	// 自定义AI API配置
 	CustomAPIURL    string
@@ -130,11 +130,7 @@ func NewAutoTrader(config AutoTraderConfig, database interface{}, userID string)
 		config.Name = "Default Trader"
 	}
 	if config.AIModel == "" {
-		if config.UseQwen {
-			config.AIModel = "qwen"
-		} else {
-			config.AIModel = "deepseek"
-		}
+		config.AIModel = "deepseek"
 	}
 
 	mcpClient := mcp.New()
@@ -144,10 +140,10 @@ func NewAutoTrader(config AutoTraderConfig, database interface{}, userID string)
 		// 使用自定义API
 		mcpClient.SetAPIKey(config.CustomAPIKey, config.CustomAPIURL, config.CustomModelName)
 		log.Printf("🤖 [%s] 使用自定义AI API: %s (模型: %s)", config.Name, config.CustomAPIURL, config.CustomModelName)
-	} else if config.UseQwen || config.AIModel == "qwen" {
+	} else if config.AIModel == "qwen" {
 		// 使用Qwen (支持自定义URL和Model)
 		mcpClient = mcp.NewQwenClient()
-		mcpClient.SetAPIKey(config.QwenKey, config.CustomAPIURL, config.CustomModelName)
+		mcpClient.SetAPIKey(config.CustomAPIKey, config.CustomAPIURL, config.CustomModelName)
 		if config.CustomAPIURL != "" || config.CustomModelName != "" {
 			log.Printf("🤖 [%s] 使用阿里云Qwen AI (自定义URL: %s, 模型: %s)", config.Name, config.CustomAPIURL, config.CustomModelName)
 		} else {
@@ -173,7 +169,7 @@ func NewAutoTrader(config AutoTraderConfig, database interface{}, userID string)
 	} else if config.AIModel == "deepseek" {
 		// 使用DeepSeek (支持自定义URL和Model)
 		mcpClient = mcp.NewDeepSeekClient()
-		mcpClient.SetAPIKey(config.DeepSeekKey, config.CustomAPIURL, config.CustomModelName)
+		mcpClient.SetAPIKey(config.CustomAPIKey, config.CustomAPIURL, config.CustomModelName)
 		if config.CustomAPIURL != "" || config.CustomModelName != "" {
 			log.Printf("🤖 [%s] 使用DeepSeek AI (自定义URL: %s, 模型: %s)", config.Name, config.CustomAPIURL, config.CustomModelName)
 		} else {

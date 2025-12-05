@@ -223,22 +223,23 @@ func (tm *TraderManager) addTraderFromDB(traderCfg *config.TraderRecord, aiModel
 		HyperliquidPrivateKey: "",
 		HyperliquidTestnet:    exchangeCfg.Testnet,
 		CoinPoolAPIURL:        effectiveCoinPoolURL,
-		UseQwen:               aiModelCfg.Provider == "qwen",
-		DeepSeekKey:           "",
-		QwenKey:               "",
-		CustomAPIURL:          aiModelCfg.CustomAPIURL,    // 自定义API URL
-		CustomModelName:       aiModelCfg.CustomModelName, // 自定义模型名称
-		ScanInterval:          time.Duration(traderCfg.ScanIntervalMinutes) * time.Minute,
-		InitialBalance:        traderCfg.InitialBalance,
-		BTCETHLeverage:        traderCfg.BTCETHLeverage,
-		AltcoinLeverage:       traderCfg.AltcoinLeverage,
-		MaxDailyLoss:          maxDailyLoss,
-		MaxDrawdown:           maxDrawdown,
-		StopTradingTime:       time.Duration(stopTradingMinutes) * time.Minute,
-		IsCrossMargin:         traderCfg.IsCrossMargin,
-		DefaultCoins:          defaultCoins,
-		TradingCoins:          tradingCoins,
-		SystemPromptTemplate:  traderCfg.SystemPromptTemplate, // 系统提示词模板
+		//UseQwen:               aiModelCfg.Provider == "qwen",
+		//DeepSeekKey:           "",
+		//QwenKey:               "",
+		CustomAPIURL:         aiModelCfg.CustomAPIURL, // 自定义API URL
+		CustomAPIKey:         aiModelCfg.APIKey,
+		CustomModelName:      aiModelCfg.CustomModelName, // 自定义模型名称
+		ScanInterval:         time.Duration(traderCfg.ScanIntervalMinutes) * time.Minute,
+		InitialBalance:       traderCfg.InitialBalance,
+		BTCETHLeverage:       traderCfg.BTCETHLeverage,
+		AltcoinLeverage:      traderCfg.AltcoinLeverage,
+		MaxDailyLoss:         maxDailyLoss,
+		MaxDrawdown:          maxDrawdown,
+		StopTradingTime:      time.Duration(stopTradingMinutes) * time.Minute,
+		IsCrossMargin:        traderCfg.IsCrossMargin,
+		DefaultCoins:         defaultCoins,
+		TradingCoins:         tradingCoins,
+		SystemPromptTemplate: traderCfg.SystemPromptTemplate, // 系统提示词模板
 	}
 
 	// 根据交易所类型设置API密钥
@@ -262,13 +263,13 @@ func (tm *TraderManager) addTraderFromDB(traderCfg *config.TraderRecord, aiModel
 	}
 
 	// 根据AI模型设置API密钥
-	if aiModelCfg.Provider == "qwen" {
-		traderConfig.QwenKey = aiModelCfg.APIKey
-	} else if aiModelCfg.Provider == "deepseek" {
-		traderConfig.DeepSeekKey = aiModelCfg.APIKey
-	}
-
-	traderConfig.CustomAPIKey = aiModelCfg.APIKey
+	//if aiModelCfg.Provider == "qwen" {
+	//	traderConfig.QwenKey = aiModelCfg.APIKey
+	//} else if aiModelCfg.Provider == "deepseek" {
+	//	traderConfig.DeepSeekKey = aiModelCfg.APIKey
+	//}
+	//
+	//traderConfig.CustomAPIKey = aiModelCfg.APIKey
 
 	// 创建trader实例
 	at, err := trader.NewAutoTrader(traderConfig, database, userID)
@@ -339,21 +340,22 @@ func (tm *TraderManager) AddTraderFromDB(traderCfg *config.TraderRecord, aiModel
 		HyperliquidPrivateKey: "",
 		HyperliquidTestnet:    exchangeCfg.Testnet,
 		CoinPoolAPIURL:        effectiveCoinPoolURL,
-		UseQwen:               aiModelCfg.Provider == "qwen",
-		DeepSeekKey:           "",
-		QwenKey:               "",
-		CustomAPIURL:          aiModelCfg.CustomAPIURL,    // 自定义API URL
-		CustomModelName:       aiModelCfg.CustomModelName, // 自定义模型名称
-		ScanInterval:          time.Duration(traderCfg.ScanIntervalMinutes) * time.Minute,
-		InitialBalance:        traderCfg.InitialBalance,
-		BTCETHLeverage:        traderCfg.BTCETHLeverage,
-		AltcoinLeverage:       traderCfg.AltcoinLeverage,
-		MaxDailyLoss:          maxDailyLoss,
-		MaxDrawdown:           maxDrawdown,
-		StopTradingTime:       time.Duration(stopTradingMinutes) * time.Minute,
-		IsCrossMargin:         traderCfg.IsCrossMargin,
-		DefaultCoins:          defaultCoins,
-		TradingCoins:          tradingCoins,
+		//UseQwen:               aiModelCfg.Provider == "qwen",
+		//DeepSeekKey:           "",
+		//QwenKey:               "",
+		CustomAPIURL:    aiModelCfg.CustomAPIURL, // 自定义API URL
+		CustomAPIKey:    aiModelCfg.APIKey,
+		CustomModelName: aiModelCfg.CustomModelName, // 自定义模型名称
+		ScanInterval:    time.Duration(traderCfg.ScanIntervalMinutes) * time.Minute,
+		InitialBalance:  traderCfg.InitialBalance,
+		BTCETHLeverage:  traderCfg.BTCETHLeverage,
+		AltcoinLeverage: traderCfg.AltcoinLeverage,
+		MaxDailyLoss:    maxDailyLoss,
+		MaxDrawdown:     maxDrawdown,
+		StopTradingTime: time.Duration(stopTradingMinutes) * time.Minute,
+		IsCrossMargin:   traderCfg.IsCrossMargin,
+		DefaultCoins:    defaultCoins,
+		TradingCoins:    tradingCoins,
 	}
 
 	// 根据交易所类型设置API密钥
@@ -377,13 +379,13 @@ func (tm *TraderManager) AddTraderFromDB(traderCfg *config.TraderRecord, aiModel
 	}
 
 	// 根据AI模型设置API密钥
-	if aiModelCfg.Provider == "qwen" {
-		traderConfig.QwenKey = aiModelCfg.APIKey
-	} else if aiModelCfg.Provider == "deepseek" {
-		traderConfig.DeepSeekKey = aiModelCfg.APIKey
-	}
-
-	traderConfig.CustomAPIKey = aiModelCfg.APIKey
+	//if aiModelCfg.Provider == "qwen" {
+	//	traderConfig.QwenKey = aiModelCfg.APIKey
+	//} else if aiModelCfg.Provider == "deepseek" {
+	//	traderConfig.DeepSeekKey = aiModelCfg.APIKey
+	//}
+	//
+	//traderConfig.CustomAPIKey = aiModelCfg.APIKey
 
 	// 创建trader实例
 	at, err := trader.NewAutoTrader(traderConfig, database, userID)
@@ -1044,18 +1046,19 @@ func (tm *TraderManager) loadSingleTrader(traderCfg *config.TraderRecord, aiMode
 
 	// 构建AutoTraderConfig
 	traderConfig := trader.AutoTraderConfig{
-		ID:                   traderCfg.ID,
-		Name:                 traderCfg.Name,
-		AIModel:              aiModelCfg.Provider, // 使用provider作为模型标识
-		Exchange:             exchangeCfg.ID,      // 使用exchange ID
-		InitialBalance:       traderCfg.InitialBalance,
-		BTCETHLeverage:       traderCfg.BTCETHLeverage,
-		AltcoinLeverage:      traderCfg.AltcoinLeverage,
-		ScanInterval:         time.Duration(traderCfg.ScanIntervalMinutes) * time.Minute,
-		CoinPoolAPIURL:       effectiveCoinPoolURL,
-		CustomAPIURL:         aiModelCfg.CustomAPIURL,    // 自定义API URL
-		CustomModelName:      aiModelCfg.CustomModelName, // 自定义模型名称
-		UseQwen:              aiModelCfg.Provider == "qwen",
+		ID:              traderCfg.ID,
+		Name:            traderCfg.Name,
+		AIModel:         aiModelCfg.Provider, // 使用provider作为模型标识
+		Exchange:        exchangeCfg.ID,      // 使用exchange ID
+		InitialBalance:  traderCfg.InitialBalance,
+		BTCETHLeverage:  traderCfg.BTCETHLeverage,
+		AltcoinLeverage: traderCfg.AltcoinLeverage,
+		ScanInterval:    time.Duration(traderCfg.ScanIntervalMinutes) * time.Minute,
+		CoinPoolAPIURL:  effectiveCoinPoolURL,
+		CustomAPIURL:    aiModelCfg.CustomAPIURL, // 自定义API URL
+		CustomAPIKey:    aiModelCfg.APIKey,
+		CustomModelName: aiModelCfg.CustomModelName, // 自定义模型名称
+		//UseQwen:              aiModelCfg.Provider == "qwen",
 		MaxDailyLoss:         maxDailyLoss,
 		MaxDrawdown:          maxDrawdown,
 		StopTradingTime:      time.Duration(stopTradingMinutes) * time.Minute,
@@ -1087,13 +1090,13 @@ func (tm *TraderManager) loadSingleTrader(traderCfg *config.TraderRecord, aiMode
 	}
 
 	// 根据AI模型设置API密钥
-	if aiModelCfg.Provider == "qwen" {
-		traderConfig.QwenKey = aiModelCfg.APIKey
-	} else if aiModelCfg.Provider == "deepseek" {
-		traderConfig.DeepSeekKey = aiModelCfg.APIKey
-	}
-
-	traderConfig.CustomAPIKey = aiModelCfg.APIKey
+	//if aiModelCfg.Provider == "qwen" {
+	//	traderConfig.QwenKey = aiModelCfg.APIKey
+	//} else if aiModelCfg.Provider == "deepseek" {
+	//	traderConfig.DeepSeekKey = aiModelCfg.APIKey
+	//}
+	//
+	//traderConfig.CustomAPIKey = aiModelCfg.APIKey
 
 	// 创建trader实例
 	at, err := trader.NewAutoTrader(traderConfig, database, userID)
