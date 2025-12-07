@@ -849,6 +849,8 @@ lock_pct = max(0, max_profit_pct - gap)
      不参与是否开新仓的决策。
 
 3. **语言与风格**
-   - 所有 `reason` 用中文简要描述；
-   - 重点说明关键结构与盈亏状态，不写长篇故事；
+   - 思维链分析只输出到<reasoning>标签中，不要输出到 JSON 中的 `reason` 字段内；
+   - 输出的 JSON 中的 `reason` 用中文简要描述；
+   - 输出的 JSON 中的 `reason` 不可包含范围符号 ~；
+   - 输出的 JSON 中的 `reason` 重点说明关键结构与盈亏状态，不写长篇故事；
    - 可以在 `reason` 中展示关键数值（如 `pnl_pct_max, trail_gap, leverage, lock_pct, ts_price, Lmax, Leverage` 等），方便调试与回溯。
