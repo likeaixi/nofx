@@ -115,10 +115,11 @@ type Config struct {
 
 // 所有输入统一在这个 struct 里
 type Input struct {
-	Symbol string  `json:"symbol"`
-	P      string  `json:"P"`
-	SSP    []int64 `json:"SSP"`
-	T      int64   `json:"T"`
+	Symbol   string  `json:"symbol"`
+	P        string  `json:"P"`
+	Leverage int     `json:"Leverage"`
+	SSP      []int64 `json:"SSP"`
+	T        int64   `json:"T"`
 
 	C1 Direction `json:"C1"`
 	C3 Direction `json:"C3"`
@@ -429,7 +430,7 @@ func buildUserPrompt(ctx *Context) string {
 		ctx.Account.MarginUsedPct,
 		ctx.Account.PositionCount))
 
-	input := buildInput()
+	input := buildInput(ctx.BTCETHLeverage)
 
 	// 持仓（完整市场数据）
 	if len(ctx.Positions) > 0 {
@@ -529,19 +530,20 @@ func buildUserPrompt(ctx *Context) string {
 	return sb.String()
 }
 
-func buildInput() Input {
+func buildInput(leverage int) Input {
 	symbol := "BTCUSDT"
 
 	input := Input{
-		Symbol: symbol,
-		P:      "",
-		SSP:    nil,
-		T:      0,
-		C1:     Direction{},
-		C3:     Direction{},
-		C5:     Direction{},
-		Pos:    Position{},
-		Cfg:    Config{},
+		Symbol:   symbol,
+		P:        "",
+		Leverage: leverage,
+		SSP:      nil,
+		T:        0,
+		C1:       Direction{},
+		C3:       Direction{},
+		C5:       Direction{},
+		Pos:      Position{},
+		Cfg:      Config{},
 	}
 
 	_, c1, c3, c5 := spider.FetchCombo()
