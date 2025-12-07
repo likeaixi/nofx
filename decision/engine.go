@@ -125,12 +125,14 @@ type Input struct {
 	C3 Direction `json:"C3"`
 	C5 Direction `json:"C5"`
 
-	//Bars1m []market.InputKline `json:"bars_1m"`
+	Bars1m  []market.InputKline `json:"bars_1m"`
+	Bars5m  []market.InputKline `json:"bars_5m"`
+	Bars15m []market.InputKline `json:"bars_15m"`
 
 	//SSPBias float64 `json:"ssp_bias"`
-
-	Pos Position `json:"pos"`
-	Cfg Config   `json:"cfg"`
+	StructCtx spider.StructCtx `json:"struct_ctx"`
+	Pos       Position         `json:"pos"`
+	Cfg       Config           `json:"cfg"`
 }
 
 // Decision AI的交易决策
@@ -553,10 +555,22 @@ func buildInput(leverage int) Input {
 		log.Printf("获取蜘蛛丝数据失败 %v", err)
 	}
 
-	//klines, err := market.GetInputKlines(symbol)
-	//if err != nil {
-	//	log.Printf("获取Input Klines失败 %v", err)
-	//}
+	klines1m, err := market.GetInputKlines(symbol, "1m")
+	if err != nil {
+		log.Printf("获取Input Klines失败 %v", err)
+	}
+
+	klines5m, err := market.GetInputKlines(symbol, "5m")
+	if err != nil {
+		log.Printf("获取Input Klines失败 %v", err)
+	}
+
+	klines15m, err := market.GetInputKlines(symbol, "15m")
+	if err != nil {
+		log.Printf("获取Input Klines失败 %v", err)
+	}
+
+	structCtx := spider.BuildStructCtx(klines1m, klines5m, klines15m, 10, 3, 4, 5)
 
 	input.P = ssp.P
 	input.SSP = ssp.SSP
@@ -566,8 +580,15 @@ func buildInput(leverage int) Input {
 	input.C3.Dir = c3
 	input.C5.Dir = c5
 
-	//input.Bars1m = klines
+	last1m := min(len(klines1m), 5)
+	input.Bars1m = klines1m[(len(klines1m) - last1m):]
+	last5m := min(len(klines5m), 3)
+	input.Bars5m = klines5m[(len(klines5m) - last5m):]
+	last15m := min(len(klines15m), 3)
+	input.Bars15m = klines15m[(len(klines15m) - last15m):]
 	//input.SSPBias = sspResult.Bias
+
+	input.StructCtx = structCtx
 
 	input.Cfg.MaxLoss = 0.05
 	input.Cfg.TrailGap = 0.1
