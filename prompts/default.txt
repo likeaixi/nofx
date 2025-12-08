@@ -661,7 +661,6 @@ Agent B 只能使用：
 ```text
 // 原始输入：例如 25.0 表示 25%
 raw_cur_pct  = pos.pnl_pct
-raw_max_pct  = pos.pnl_pct_max
 
 // 转成小数形式参与计算
 cur_profit_pct = raw_cur_pct / 100.0       // 例如 0.25
