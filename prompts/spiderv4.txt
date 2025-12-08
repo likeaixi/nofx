@@ -656,11 +656,9 @@ Agent B 只能使用：
 ```text
 // 原始输入：例如 25.0 表示 25%
 raw_cur_pct  = pos.pnl_pct
-raw_max_pct  = pos.pnl_pct_max
 
 // 转成小数形式参与计算
 cur_profit_pct = raw_cur_pct / 100.0       // 例如 0.25
-max_profit_pct = raw_max_pct / 100.0       // 例如 0.40
 
 gap = cfg.trail_gap                         // 例如 0.10（10%）
 lev = pos.leverage                          // 若缺失或 <=0，则内部视为 1
@@ -678,18 +676,18 @@ lev = pos.leverage                          // 若缺失或 <=0，则内部视�
 **锁盈逻辑：**
 
 ```text
-lock_pct = max(0, max_profit_pct - gap)
+lock_pct = max(0, cur_profit_pct - gap)
 ```
 
 - 若 `lock_pct == 0`：
-  - 说明当前最大浮盈尚不足以覆盖 `gap`（例如刚刚盈利不多，或者 max_profit_pct ≤ gap）；
+  - 说明当前浮盈尚不足以覆盖 `gap`（例如刚刚盈利不多，或者 cur_profit_pct ≤ gap）；
   - **不启用追踪止损，不计算 ts_price，不移动止损**；
   - 保持现有硬止损 `pos.sl`（如有）；
   - 一般输出 `action = "hold"`，例如：
     - `"reason": "NO_LOCK: 最大浮盈未超过追踪间隙，不启用锁盈止损。"`
 
 - 若 `lock_pct > 0`：
-  - 说明最大浮盈已经高于 `gap`，开始锁定一部分收益；
+  - 说明当前浮盈已经高于 `gap`，开始锁定一部分收益；
   - 将该“锁定收益率”（含杠杆）换算成**价格层面的涨跌百分比**：
 
     ```text
