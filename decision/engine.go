@@ -121,9 +121,9 @@ type Input struct {
 	SSP      []int64 `json:"SSP"`
 	T        int64   `json:"T"`
 
-	C1 Direction `json:"C1"`
-	C3 Direction `json:"C3"`
-	C5 Direction `json:"C5"`
+	C1 string `json:"C1"`
+	C3 string `json:"C3"`
+	C5 string `json:"C5"`
 
 	Bars1m  []market.InputKline `json:"bars_1m"`
 	Bars5m  []market.InputKline `json:"bars_5m"`
@@ -541,9 +541,9 @@ func buildInput(leverage int) Input {
 		Leverage: leverage,
 		SSP:      nil,
 		T:        0,
-		C1:       Direction{},
-		C3:       Direction{},
-		C5:       Direction{},
+		C1:       "",
+		C3:       "",
+		C5:       "",
 		Pos:      Position{},
 		Cfg:      Config{},
 	}
@@ -576,9 +576,9 @@ func buildInput(leverage int) Input {
 	input.SSP = ssp.SSP
 	input.T = ssp.T
 
-	input.C1.Dir = c1
-	input.C3.Dir = c3
-	input.C5.Dir = c5
+	input.C1 = c1
+	input.C3 = c3
+	input.C5 = c5
 
 	last1m := min(len(klines1m), 5)
 	input.Bars1m = klines1m[(len(klines1m) - last1m):]
