@@ -305,7 +305,7 @@ func (at *AutoTrader) Run() error {
 	defer at.monitorWg.Done()
 
 	// 启动回撤监控
-	at.startDrawdownMonitor()
+	//at.startDrawdownMonitor()
 
 	ticker := time.NewTicker(at.config.ScanInterval)
 	defer ticker.Stop()
