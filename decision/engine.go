@@ -10,6 +10,7 @@ import (
 	"nofx/pool"
 	"nofx/spider"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -418,9 +419,12 @@ func buildUserPrompt(ctx *Context) string {
 		ctx.CurrentTime, ctx.CallCount, ctx.RuntimeMinutes))
 
 	// BTC 市场
+	currentPrice := ""
 	if btcData, hasBTC := ctx.MarketDataMap["BTCUSDT"]; hasBTC {
 		sb.WriteString(fmt.Sprintf("BTC: %.2f (1h: %+.2f%%, 4h: %+.2f%%) \n\n",
 			btcData.CurrentPrice, btcData.PriceChange1h, btcData.PriceChange4h))
+
+		currentPrice = strconv.FormatFloat(btcData.CurrentPrice, 'f', 0, 64)
 	}
 
 	// 账户
@@ -432,7 +436,7 @@ func buildUserPrompt(ctx *Context) string {
 		ctx.Account.MarginUsedPct,
 		ctx.Account.PositionCount))
 
-	input := buildInput(ctx.BTCETHLeverage)
+	input := buildInput(ctx.BTCETHLeverage, currentPrice)
 
 	// 持仓（完整市场数据）
 	if len(ctx.Positions) > 0 {
@@ -532,7 +536,7 @@ func buildUserPrompt(ctx *Context) string {
 	return sb.String()
 }
 
-func buildInput(leverage int) Input {
+func buildInput(leverage int, price string) Input {
 	symbol := "BTCUSDT"
 
 	input := Input{
@@ -572,7 +576,12 @@ func buildInput(leverage int) Input {
 
 	structCtx := spider.BuildStructCtx(klines1m, klines5m, klines15m, 10, 3, 4, 5)
 
-	input.P = ssp.P
+	if price == "" {
+		input.P = ssp.P
+	} else {
+		input.P = price
+	}
+
 	input.SSP = ssp.SSP
 	input.T = ssp.T
 
