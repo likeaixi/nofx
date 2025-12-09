@@ -600,7 +600,7 @@ func buildInput(leverage int, price string) Input {
 	input.StructCtx = structCtx
 
 	input.Cfg.MaxLoss = 0.05
-	input.Cfg.TrailGap = 0.1
+	input.Cfg.TrailGap = 0.02
 	//input.Cfg.UseSspEdges = true
 
 	return input
