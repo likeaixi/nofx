@@ -722,6 +722,7 @@ func (t *FuturesTrader) CalculatePositionSize(balance, riskPercent, price float6
 
 // SetStopLoss 设置止损单
 func (t *FuturesTrader) SetStopLoss(symbol string, positionSide string, quantity, stopPrice float64) error {
+	fmt.Printf("Stop Loss, symbol: %s, side: %s, quantity: %v, stop price: %v", symbol, positionSide, quantity, stopPrice)
 	var side futures.SideType
 	var posSide futures.PositionSideType
 
