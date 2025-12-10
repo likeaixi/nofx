@@ -418,3 +418,31 @@ func TestGetBrOrderID(t *testing.T) {
 		ids[id] = true
 	}
 }
+
+func TestNewFuturesTrader2(t *testing.T) {
+	apiKey := ""
+	secretKey := ""
+	userId := "123456789"
+
+	trader := NewFuturesTrader(apiKey, secretKey, userId)
+
+	// 开单
+	symbol := "BTCUSDT"
+	quantity := 0.005
+	//order, err := trader.OpenLong(symbol, quantity, 50)
+	//if err != nil {
+	//	t.Errorf("open long error %v", err)
+	//}
+	//
+	//t.Logf("  ✓ 开仓成功，订单ID: %v, 数量: %.4f", order["orderId"], quantity)
+
+	//err := trader.SetStopLoss(symbol, "LONG", quantity, 92000)
+	//if err != nil {
+	//	t.Errorf("set stop loss error %v", err)
+	//}
+
+	err := trader.SetTakeProfit(symbol, "LONG", quantity, 94000)
+	if err != nil {
+		t.Errorf("set take profit error %v", err)
+	}
+}
