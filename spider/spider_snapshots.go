@@ -12,11 +12,12 @@ import (
 
 // 可选的附加信息（方便排查 / 画图），你可以删掉不需要的字段
 type SymbolPositionSnapshot struct {
-	Symbol    string  `json:"symbol"`
-	Side      string  `json:"side"` // "LONG"/"SHORT"
-	StopLoss  float64 `json:"stop_loss"`
-	EntryTime int64   `json:"entry_time"` // 毫秒时间戳
-	SavedAt   int64   `json:"saved_at"`   // 写入时间
+	Symbol     string  `json:"symbol"`
+	Side       string  `json:"side"` // "LONG"/"SHORT"
+	StopLoss   float64 `json:"stop_loss"`
+	TakeProfit float64 `json:"take_profit"`
+	EntryTime  int64   `json:"entry_time"` // 毫秒时间戳
+	SavedAt    int64   `json:"saved_at"`   // 写入时间
 }
 
 // baseDir 例如 "data/spider_snapshots"
@@ -46,15 +47,16 @@ func saveSymbolSnapshot(baseDir string, record *SymbolPositionSnapshot) error {
 }
 
 // SaveSnapshotOnOpen 开仓时保存蜘蛛丝快照（同 symbol 直接覆盖）
-func SaveSnapshotOnOpen(baseDir, symbol, side string, stopLoss float64, entryTimeMillis int64) error {
+func SaveSnapshotOnOpen(baseDir, symbol, side string, stopLoss float64, takeProfit float64, entryTimeMillis int64) error {
 	symbol = strings.ToUpper(symbol)
 
 	record := &SymbolPositionSnapshot{
-		Symbol:    symbol,
-		Side:      strings.ToUpper(side),
-		StopLoss:  stopLoss,
-		EntryTime: entryTimeMillis,
-		SavedAt:   time.Now().UnixMilli(),
+		Symbol:     symbol,
+		Side:       strings.ToUpper(side),
+		StopLoss:   stopLoss,
+		TakeProfit: takeProfit,
+		EntryTime:  entryTimeMillis,
+		SavedAt:    time.Now().UnixMilli(),
 	}
 
 	return saveSymbolSnapshot(baseDir, record)
@@ -114,6 +116,31 @@ func UpdateStopLossForSymbol(baseDir, symbol string, newStopLoss float64) error 
 	}
 
 	record.StopLoss = newStopLoss
+	record.SavedAt = time.Now().UnixMilli()
+
+	return saveSymbolSnapshot(baseDir, &record)
+}
+
+// UpdateTakeProfitForSymbol 更新某个 symbol 当前仓位的止损价
+func UpdateTakeProfitForSymbol(baseDir, symbol string, newTakeProfit float64) error {
+	symbol = strings.ToUpper(symbol)
+	path := symbolFilePath(baseDir, symbol)
+
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		// 没有快照文件：你可以改成创建新文件，这里先返回错误更安全
+		return fmt.Errorf("no snapshot file for symbol %s", symbol)
+	}
+	if err != nil {
+		return err
+	}
+
+	var record SymbolPositionSnapshot
+	if err := json.Unmarshal(data, &record); err != nil {
+		return err
+	}
+
+	record.TakeProfit = newTakeProfit
 	record.SavedAt = time.Now().UnixMilli()
 
 	return saveSymbolSnapshot(baseDir, &record)

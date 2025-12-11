@@ -617,6 +617,7 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 		baseDir := fmt.Sprintf("decision_logs/%s", at.id)
 
 		stopLoss := float64(0)
+		takeProfit := float64(0)
 		snapshot, err := spider.LoadSnapshotForSymbol(baseDir, symbol)
 		if err != nil {
 			log.Println("加载蜘蛛丝快照失败", err)
@@ -625,7 +626,8 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 
 		if snapshot != nil {
 			stopLoss = snapshot.StopLoss
-			log.Printf("加载蜘蛛丝快照 snapsho: %v, stopLoss: %v", snapshot, stopLoss)
+			takeProfit = snapshot.TakeProfit
+			log.Printf("加载蜘蛛丝快照 snapsho: %v, stopLoss: %v, takeProfit: %v", snapshot, stopLoss, takeProfit)
 		}
 
 		positionInfos = append(positionInfos, decision.PositionInfo{
@@ -634,6 +636,7 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 			EntryPrice:       entryPrice,
 			MarkPrice:        markPrice,
 			StopLoss:         stopLoss,
+			TakeProfit:       takeProfit,
 			Quantity:         quantity,
 			Leverage:         leverage,
 			UnrealizedPnL:    unrealizedPnl,
@@ -790,7 +793,7 @@ func (at *AutoTrader) executeOpenLongWithRecord(decision *decision.Decision, act
 	// 保存蜘蛛丝快照
 	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
 	timeNow := time.Now().UnixMilli()
-	err = spider.SaveSnapshotOnOpen(baseDir, decision.Symbol, "LONG", decision.StopLoss, timeNow)
+	err = spider.SaveSnapshotOnOpen(baseDir, decision.Symbol, "LONG", decision.StopLoss, decision.TakeProfit, timeNow)
 	if err != nil {
 		log.Printf("保存蜘蛛丝快照失败: %v", err)
 	}
@@ -878,7 +881,7 @@ func (at *AutoTrader) executeOpenShortWithRecord(decision *decision.Decision, ac
 	// 保存蜘蛛丝快照
 	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
 	timeNow := time.Now().UnixMilli()
-	err = spider.SaveSnapshotOnOpen(baseDir, decision.Symbol, "SHORT", decision.StopLoss, timeNow)
+	err = spider.SaveSnapshotOnOpen(baseDir, decision.Symbol, "SHORT", decision.StopLoss, decision.TakeProfit, timeNow)
 	if err != nil {
 		log.Printf("保存蜘蛛丝快照失败: %v", err)
 	}
@@ -927,6 +930,13 @@ func (at *AutoTrader) executeCloseLongWithRecord(decision *decision.Decision, ac
 		actionRecord.OrderID = orderID
 	}
 
+	// 删除蜘蛛丝快照
+	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
+	err = spider.DeleteSnapshotOnClose(baseDir, decision.Symbol)
+	if err != nil {
+		log.Printf("删除蜘蛛丝快照失败: %v", err)
+	}
+
 	log.Printf("  ✓ 平仓成功")
 	return nil
 }
@@ -951,6 +961,13 @@ func (at *AutoTrader) executeCloseShortWithRecord(decision *decision.Decision, a
 	// 记录订单ID
 	if orderID, ok := order["orderId"].(int64); ok {
 		actionRecord.OrderID = orderID
+	}
+
+	// 删除蜘蛛丝快照
+	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
+	err = spider.DeleteSnapshotOnClose(baseDir, decision.Symbol)
+	if err != nil {
+		log.Printf("删除蜘蛛丝快照失败: %v", err)
 	}
 
 	log.Printf("  ✓ 平仓成功")
@@ -1126,6 +1143,13 @@ func (at *AutoTrader) executeUpdateTakeProfitWithRecord(decision *decision.Decis
 	err = at.trader.SetTakeProfit(decision.Symbol, positionSide, quantity, decision.NewTakeProfit)
 	if err != nil {
 		return fmt.Errorf("修改止盈失败: %w", err)
+	}
+
+	// 更新蜘蛛丝快照
+	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
+	err = spider.UpdateTakeProfitForSymbol(baseDir, decision.Symbol, decision.NewTakeProfit)
+	if err != nil {
+		log.Printf("更新蜘蛛丝快照失败: %v", err)
 	}
 
 	log.Printf("  ✓ 止盈已调整: %.2f (当前价格: %.2f)", decision.NewTakeProfit, marketData.CurrentPrice)

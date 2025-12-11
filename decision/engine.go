@@ -36,6 +36,7 @@ type PositionInfo struct {
 	EntryPrice       float64 `json:"entry_price"`
 	MarkPrice        float64 `json:"mark_price"`
 	StopLoss         float64 `json:"stop_loss"`
+	TakeProfit       float64 `json:"take_profit"`
 	Quantity         float64 `json:"quantity"`
 	Leverage         int     `json:"leverage"`
 	UnrealizedPnL    float64 `json:"unrealized_pnl"`
@@ -103,6 +104,7 @@ type Position struct {
 	Entry     float64  `json:"entry"`
 	Qty       float64  `json:"qty"`
 	SL        *float64 `json:"sl"`          // 允许为 null => *float64
+	TP        *float64 `json:"tp"`          // 允许为 null => *float64
 	PnlPct    float64  `json:"pnl_pct"`     // 0.15 = 15%
 	PnlPctMax float64  `json:"pnl_pct_max"` // 开仓以来最大浮盈百分比
 }
@@ -476,6 +478,7 @@ func buildUserPrompt(ctx *Context) string {
 				Entry:     pos.EntryPrice,
 				Qty:       pos.Quantity,
 				SL:        &pos.StopLoss,
+				TP:        &pos.TakeProfit,
 				PnlPct:    pos.UnrealizedPnLPct,
 				PnlPctMax: pos.PeakPnLPct,
 			}
