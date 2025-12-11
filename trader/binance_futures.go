@@ -535,7 +535,7 @@ func (t *FuturesTrader) CloseShort(symbol string, quantity float64) (map[string]
 // CancelStopLossOrders 仅取消止损单（不影响止盈单）
 func (t *FuturesTrader) CancelStopLossOrders(symbol string) error {
 	// 获取该币种的所有未完成订单
-	orders, err := t.client.NewListOpenOrdersService().
+	orders, err := t.client.NewListOpenAlgoOrdersService().
 		Symbol(symbol).
 		Do(context.Background())
 
@@ -547,24 +547,23 @@ func (t *FuturesTrader) CancelStopLossOrders(symbol string) error {
 	canceledCount := 0
 	var cancelErrors []error
 	for _, order := range orders {
-		orderType := order.Type
+		orderType := order.OrderType
 
 		// 只取消止损订单（不取消止盈订单）
-		if orderType == futures.OrderTypeStopMarket || orderType == futures.OrderTypeStop {
-			_, err := t.client.NewCancelOrderService().
-				Symbol(symbol).
-				OrderID(order.OrderID).
+		if orderType == futures.AlgoOrderTypeStopMarket || orderType == futures.AlgoOrderTypeStop {
+			_, err := t.client.NewCancelAlgoOrderService().
+				AlgoID(order.AlgoId).
 				Do(context.Background())
 
 			if err != nil {
-				errMsg := fmt.Sprintf("订单ID %d: %v", order.OrderID, err)
+				errMsg := fmt.Sprintf("订单ID %d: %v", order.AlgoId, err)
 				cancelErrors = append(cancelErrors, fmt.Errorf("%s", errMsg))
 				log.Printf("  ⚠ 取消止损单失败: %s", errMsg)
 				continue
 			}
 
 			canceledCount++
-			log.Printf("  ✓ 已取消止损单 (订单ID: %d, 类型: %s, 方向: %s)", order.OrderID, orderType, order.PositionSide)
+			log.Printf("  ✓ 已取消止损单 (订单ID: %d, 类型: %s, 方向: %s)", order.AlgoId, orderType, order.PositionSide)
 		}
 	}
 
@@ -585,7 +584,7 @@ func (t *FuturesTrader) CancelStopLossOrders(symbol string) error {
 // CancelTakeProfitOrders 仅取消止盈单（不影响止损单）
 func (t *FuturesTrader) CancelTakeProfitOrders(symbol string) error {
 	// 获取该币种的所有未完成订单
-	orders, err := t.client.NewListOpenOrdersService().
+	orders, err := t.client.NewListOpenAlgoOrdersService().
 		Symbol(symbol).
 		Do(context.Background())
 
@@ -597,24 +596,23 @@ func (t *FuturesTrader) CancelTakeProfitOrders(symbol string) error {
 	canceledCount := 0
 	var cancelErrors []error
 	for _, order := range orders {
-		orderType := order.Type
+		orderType := order.OrderType
 
 		// 只取消止盈订单（不取消止损订单）
-		if orderType == futures.OrderTypeTakeProfitMarket || orderType == futures.OrderTypeTakeProfit {
-			_, err := t.client.NewCancelOrderService().
-				Symbol(symbol).
-				OrderID(order.OrderID).
+		if orderType == futures.AlgoOrderTypeTakeProfitMarket || orderType == futures.AlgoOrderTypeTakeProfit {
+			_, err := t.client.NewCancelAlgoOrderService().
+				AlgoID(order.AlgoId).
 				Do(context.Background())
 
 			if err != nil {
-				errMsg := fmt.Sprintf("订单ID %d: %v", order.OrderID, err)
+				errMsg := fmt.Sprintf("订单ID %d: %v", order.AlgoId, err)
 				cancelErrors = append(cancelErrors, fmt.Errorf("%s", errMsg))
 				log.Printf("  ⚠ 取消止盈单失败: %s", errMsg)
 				continue
 			}
 
 			canceledCount++
-			log.Printf("  ✓ 已取消止盈单 (订单ID: %d, 类型: %s, 方向: %s)", order.OrderID, orderType, order.PositionSide)
+			log.Printf("  ✓ 已取消止盈单 (订单ID: %d, 类型: %s, 方向: %s)", order.AlgoId, orderType, order.PositionSide)
 		}
 	}
 
@@ -634,7 +632,7 @@ func (t *FuturesTrader) CancelTakeProfitOrders(symbol string) error {
 
 // CancelAllOrders 取消该币种的所有挂单
 func (t *FuturesTrader) CancelAllOrders(symbol string) error {
-	err := t.client.NewCancelAllOpenOrdersService().
+	err := t.client.NewCancelAllAlgoOpenOrdersService().
 		Symbol(symbol).
 		Do(context.Background())
 
@@ -649,7 +647,7 @@ func (t *FuturesTrader) CancelAllOrders(symbol string) error {
 // CancelStopOrders 取消该币种的止盈/止损单（用于调整止盈止损位置）
 func (t *FuturesTrader) CancelStopOrders(symbol string) error {
 	// 获取该币种的所有未完成订单
-	orders, err := t.client.NewListOpenOrdersService().
+	orders, err := t.client.NewListOpenAlgoOrdersService().
 		Symbol(symbol).
 		Do(context.Background())
 
@@ -660,27 +658,26 @@ func (t *FuturesTrader) CancelStopOrders(symbol string) error {
 	// 过滤出止盈止损单并取消
 	canceledCount := 0
 	for _, order := range orders {
-		orderType := order.Type
+		orderType := order.OrderType
 
 		// 只取消止损和止盈订单
-		if orderType == futures.OrderTypeStopMarket ||
-			orderType == futures.OrderTypeTakeProfitMarket ||
-			orderType == futures.OrderTypeStop ||
-			orderType == futures.OrderTypeTakeProfit {
+		if orderType == futures.AlgoOrderTypeStopMarket ||
+			orderType == futures.AlgoOrderTypeTakeProfitMarket ||
+			orderType == futures.AlgoOrderTypeStop ||
+			orderType == futures.AlgoOrderTypeTakeProfit {
 
-			_, err := t.client.NewCancelOrderService().
-				Symbol(symbol).
-				OrderID(order.OrderID).
+			_, err := t.client.NewCancelAlgoOrderService().
+				AlgoID(order.AlgoId).
 				Do(context.Background())
 
 			if err != nil {
-				log.Printf("  ⚠ 取消订单 %d 失败: %v", order.OrderID, err)
+				log.Printf("  ⚠ 取消订单 %d 失败: %v", order.AlgoId, err)
 				continue
 			}
 
 			canceledCount++
 			log.Printf("  ✓ 已取消 %s 的止盈/止损单 (订单ID: %d, 类型: %s)",
-				symbol, order.OrderID, orderType)
+				symbol, order.AlgoId, orderType)
 		}
 	}
 
@@ -735,18 +732,17 @@ func (t *FuturesTrader) SetStopLoss(symbol string, positionSide string, quantity
 	}
 
 	// 格式化数量
-	quantityStr, err := t.FormatQuantity(symbol, quantity)
-	if err != nil {
-		return err
-	}
+	//quantityStr, err := t.FormatQuantity(symbol, quantity)
+	//if err != nil {
+	//	return err
+	//}
 
-	_, err = t.client.NewCreateOrderService().
+	_, err := t.client.NewCreateAlgoOrderService().
 		Symbol(symbol).
 		Side(side).
 		PositionSide(posSide).
-		Type(futures.OrderTypeStopMarket).
-		StopPrice(fmt.Sprintf("%.8f", stopPrice)).
-		Quantity(quantityStr).
+		Type(futures.AlgoOrderTypeStopMarket).
+		TriggerPrice(fmt.Sprintf("%.8f", stopPrice)).
 		WorkingType(futures.WorkingTypeContractPrice).
 		ClosePosition(true).
 		Do(context.Background())
@@ -774,18 +770,17 @@ func (t *FuturesTrader) SetTakeProfit(symbol string, positionSide string, quanti
 	}
 
 	// 格式化数量
-	quantityStr, err := t.FormatQuantity(symbol, quantity)
-	if err != nil {
-		return err
-	}
+	//quantityStr, err := t.FormatQuantity(symbol, quantity)
+	//if err != nil {
+	//	return err
+	//}
 
-	_, err = t.client.NewCreateOrderService().
+	_, err := t.client.NewCreateAlgoOrderService().
 		Symbol(symbol).
 		Side(side).
 		PositionSide(posSide).
-		Type(futures.OrderTypeTakeProfitMarket).
-		StopPrice(fmt.Sprintf("%.8f", takeProfitPrice)).
-		Quantity(quantityStr).
+		Type(futures.AlgoOrderTypeTakeProfitMarket).
+		TriggerPrice(fmt.Sprintf("%.8f", takeProfitPrice)).
 		WorkingType(futures.WorkingTypeContractPrice).
 		ClosePosition(true).
 		Do(context.Background())
