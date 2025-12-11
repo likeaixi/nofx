@@ -10,7 +10,6 @@ import (
 	"nofx/pool"
 	"nofx/spider"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -116,11 +115,11 @@ type Config struct {
 
 // 所有输入统一在这个 struct 里
 type Input struct {
-	Symbol   string  `json:"symbol"`
-	P        string  `json:"P"`
-	Leverage int     `json:"Leverage"`
-	SSP      []int64 `json:"SSP"`
-	T        int64   `json:"T"`
+	Symbol   string    `json:"symbol"`
+	P        float64   `json:"P"`
+	Leverage int       `json:"Leverage"`
+	SSP      []float64 `json:"SSP"`
+	T        int64     `json:"T"`
 
 	C1 Direction `json:"C1"`
 	C3 Direction `json:"C3"`
@@ -417,12 +416,12 @@ func buildUserPrompt(ctx *Context) string {
 		ctx.CurrentTime, ctx.CallCount, ctx.RuntimeMinutes))
 
 	// BTC 市场
-	currentPrice := ""
+	currentPrice := float64(0)
 	if btcData, hasBTC := ctx.MarketDataMap["BTCUSDT"]; hasBTC {
 		sb.WriteString(fmt.Sprintf("BTC: %.2f (1h: %+.2f%%, 4h: %+.2f%%) \n\n",
 			btcData.CurrentPrice, btcData.PriceChange1h, btcData.PriceChange4h))
 
-		currentPrice = strconv.FormatFloat(btcData.CurrentPrice, 'f', 0, 64)
+		currentPrice = btcData.CurrentPrice
 	}
 
 	// 账户
@@ -534,12 +533,12 @@ func buildUserPrompt(ctx *Context) string {
 	return sb.String()
 }
 
-func buildInput(leverage int, price string) Input {
+func buildInput(leverage int, price float64) Input {
 	symbol := "BTCUSDT"
 
 	input := Input{
 		Symbol:   symbol,
-		P:        "",
+		P:        0,
 		Leverage: leverage,
 		SSP:      nil,
 		T:        0,
@@ -562,7 +561,7 @@ func buildInput(leverage int, price string) Input {
 	//	log.Printf("获取Input Klines失败 %v", err)
 	//}
 
-	if price == "" {
+	if price == 0 {
 		input.P = ssp.P
 	} else {
 		input.P = price

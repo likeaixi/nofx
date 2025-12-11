@@ -23,11 +23,12 @@ var (
 
 // ================ 蜘蛛丝获取与过滤 ================
 
-//type SSPResponse struct {
-//	P   json.Number   `json:"P"`
-//	SSP []json.Number `json:"SSP"`
-//	T   json.Number   `json:"T"`
-//}
+// 最新的蜘蛛丝返回结构
+type SSPResponse struct {
+	P   float64   `json:"P,string"` // JSON 是字符串，这里用 ,string 让 encoding/json 自动转 float64
+	SSP []float64 `json:"SSP"`      // JSON 数组 number -> []float64
+	T   int64     `json:"T"`        // 毫秒时间戳 -> int64
+}
 
 func FetchSpiderRaw() (SSPResponse, error) {
 	data := SSPResponse{}
