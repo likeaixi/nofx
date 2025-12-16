@@ -551,7 +551,6 @@ func buildInput(leverage int, price float64) Input {
 		C3:       "",
 		C5:       "",
 		Pos:      Position{},
-		Cfg:      Config{},
 	}
 
 	_, c1, c3, c5 := spider.FetchCombo()
@@ -601,8 +600,8 @@ func buildInput(leverage int, price float64) Input {
 
 	input.StructCtx = structCtx
 
-	input.Cfg.MaxLoss = 0.05
-	input.Cfg.TrailGap = 0.02
+	//input.Cfg.MaxLoss = 0.05
+	//input.Cfg.TrailGap = 0.02
 	//input.Cfg.UseSspEdges = true
 
 	return input
