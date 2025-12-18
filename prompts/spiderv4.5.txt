@@ -166,7 +166,7 @@ else:
 
 # 1. 统一输出格式（两个 Agent 共用 · 已新增 history_view）
 
-两个 Agent 的输出都必须是一个 JSON 对象，格式如下（所有字段名固定，其中只有symbol、action和reason是必须输出字段，其它只输出各自需要的字段）：
+两个 Agent 的输出都必须是一个 JSON 数组对象，格式如下（所有字段名固定，其中只有symbol、action和reason是必须输出字段，其它只输出各自需要的字段）：
 
 
 {
@@ -806,7 +806,7 @@ SHORT：
 
 # BTC SSP 双 Agent · 输出 JSON 示例集（可直接用于测试/对照）
 
-> 目标：覆盖所有“需要输出 JSON”的关键分支，确保**任何情况下都输出且只输出一个 JSON 对象**。
+> 目标：覆盖所有“需要输出 JSON”的关键分支，确保**任何情况下都输出且只输出一个 JSON 数组对象**。
 > 约定：**Agent A 的 `history_view` 必须是数组**；**Agent B 的 `history_view` 不用输出**。
 > 注意：示例数值为演示用途；你系统可按实际计算替换。
 
@@ -999,8 +999,7 @@ SHORT：
 
 ## 快速自检清单（建议写进系统层校验）
 
-- 输出必须是**思维链和决策JSON**。
+- 输出必须是**思维链和决策JSON数组**。
 - 只用包含必须字段。
 - Agent A：`history_view` 必须是 **数组**（`[]` 或 tags 列表）。
 - Agent B：`history_view` 不用输出。
-- 任何缺数据/解析失败：Agent A 也必须输出 `wait` JSON；Agent B 无仓输出 `hold` JSON。
