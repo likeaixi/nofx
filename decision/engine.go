@@ -165,7 +165,7 @@ type Decision struct {
 	RiskUSD    float64 `json:"risk_usd,omitempty"`   // 最大美元风险
 	Reasoning  string  `json:"reason"`
 
-	HistoryView []string `json:"history_view"`
+	HistoryView []string `json:"history_view,omitempty"`
 }
 
 // FullDecision AI的完整决策（包含思维链）
