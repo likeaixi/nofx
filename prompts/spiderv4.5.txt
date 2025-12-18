@@ -168,22 +168,22 @@ else:
 
 # 1. 统一输出格式（两个 Agent 共用 · 已新增 history_view）
 
-两个 Agent 的输出都必须是一个 JSON 对象，格式如下（所有字段名固定，只输出需要的字段）：
+两个 Agent 的输出都必须是一个 JSON 对象，格式如下（所有字段名固定，其中只有symbol、action和reason是必须输出字段，其它只输出各自需要的字段）：
 
 ```jsonc
 {
   "symbol": string,
   "action": string,
 
-  "leverage": 0,
-  "position_size_usd": 0,
-  "stop_loss": 0,
-  "take_profit": 0,
-  "confidence": 0,
-  "risk_usd": 0,
+  "leverage": int,
+  "position_size_usd": float64,
+  "stop_loss": float64,
+  "take_profit": float64,
+  "confidence": int,
+  "risk_usd": float64,
 
-  "new_stop_loss": 0,
-  "new_take_profit": 0,
+  "new_stop_loss": float64,
+  "new_take_profit": float64,
 
   "history_view": [],          // Agent A: 数组 tags（下次写入 history_ctx.tags）；Agent B: 不用输出
 
@@ -207,7 +207,7 @@ else:
 ## 1.2 history_view 字段规则（硬约束）
 - Agent A：`history_view` **必须是数组**（JSON array），元素为 tag 字符串；无标签则输出 `[]`。
 - 系统层：下次调用 Agent A 时，将上次输出的 `history_view` **直接写入**输入的 `history_ctx.tags`。
-- Agent B：`history_view` 可不用输出。
+- Agent B：`history_view` 不用输出。
 
 ---
 
@@ -215,7 +215,7 @@ else:
 
 ## 2.1 角色与职责
 - 无仓时：决定是否开仓（`open_long/open_short/wait`）
-- 输出初始 `stop_loss/take_profit/confidence/risk_usd`
+- 输出初始 `stop_loss/take_profit/confidence/risk_usd`，决策是 `wait` 时，不用输出这些字段
 - 维护并输出标签状态到 `history_view`（供下次输入 `history_ctx.tags`）
 
 ---
@@ -797,7 +797,7 @@ SHORT：
 1) 只能使用定义的输入字段；未知字段忽略。
 2) 职责边界：
 - Agent A：只开仓 + 初始 SL/TP + 输出 `history_view(tags[])`
-- Agent B：只管理已有仓位；`history_view=null`
+- Agent B：只管理已有仓位
 3) 语言与风格约束：
 - 内部推理过程放在 `<reasoning>...</reasoning>` 标签中，**不写入 JSON 的 `reason` 字段**；
 - 输出 JSON 中的 `reason`：
@@ -811,8 +811,8 @@ SHORT：
 
 # BTC SSP 双 Agent · 输出 JSON 示例集（可直接用于测试/对照）
 
-> 目标：覆盖所有“需要输出 JSON”的关键分支，确保**任何情况下都输出且只输出一个 JSON 对象**（字段齐全）。
-> 约定：**Agent A 的 `history_view` 必须是数组**；**Agent B 的 `history_view` 必须为 `null`**。
+> 目标：覆盖所有“需要输出 JSON”的关键分支，确保**任何情况下都输出且只输出一个 JSON 对象**。
+> 约定：**Agent A 的 `history_view` 必须是数组**；**Agent B 的 `history_view` 不用输出**。
 > 注意：示例数值为演示用途；你系统可按实际计算替换。
 
 ---
@@ -1029,7 +1029,7 @@ SHORT：
 ## 快速自检清单（建议写进系统层校验）
 
 - 输出必须是**思维链和决策JSON**。
-- 必须包含**完整字段集合**；不用的填 `null`。
+- 只用包含必须字段。
 - Agent A：`history_view` 必须是 **数组**（`[]` 或 tags 列表）。
-- Agent B：`history_view` 必须为 `null`。
+- Agent B：`history_view` 不用输出。
 - 任何缺数据/解析失败：Agent A 也必须输出 `wait` JSON；Agent B 无仓输出 `hold` JSON。
