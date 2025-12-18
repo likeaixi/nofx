@@ -33,7 +33,6 @@ else:
 
 上游传入的**单次快照输入**包含在 JSON 对象中，结构如下：
 
-```jsonc
 {
   "Symbol": "BTCUSDT",
   "P": 91237.69,
@@ -106,7 +105,6 @@ else:
     ]
   }
 }
-```
 
 ## 0.1 输入字段使用约束
 
@@ -170,7 +168,7 @@ else:
 
 两个 Agent 的输出都必须是一个 JSON 对象，格式如下（所有字段名固定，其中只有symbol、action和reason是必须输出字段，其它只输出各自需要的字段）：
 
-```jsonc
+
 {
   "symbol": string,
   "action": string,
@@ -189,7 +187,6 @@ else:
 
   "reason": string             // 简要解释本次动作的原因
 }
-```
 
 ## 1.1 action 枚举（全局）
 `action` 必须为以下之一：
@@ -552,13 +549,11 @@ BREAKOUT_FOLLOW:
 - 正常调度下不应调用本 Agent；
 - 若误调用，输出：
 
-```jsonc
 {
   "symbol": "BTCUSDT",
   "action": "hold",
   "reason": "当前无持仓，追踪止损层无需执行任何操作。"
 }
-```
 
 ### 3.3.2 有仓状态：基础 ROE 计算
 
@@ -819,7 +814,6 @@ SHORT：
 
 ## 统一输出 Schema（字段必须齐全）
 
-```jsonc
 {
   "symbol": "BTCUSDT",
   "action": "open_long",
@@ -833,7 +827,6 @@ SHORT：
   "history_view": ["EXTENSION_ACTIVE dir=LONG level=91200 ttl=4"],
   "reason": "简要解释本次动作的原因"
 }
-```
 
 ---
 
@@ -845,33 +838,28 @@ SHORT：
 - `SSP` 为空或无法得到 S0/R0
 - `bars_1m` 少于 3 根（无法做 3-bar fractal + k+1 close 因果确认）
 
-```json
 {
   "symbol": "BTCUSDT",
   "action": "wait",
   "history_view": [],
   "reason": "输入不足：SSP或bars_1m不满足分形因果要求，强制观望。"
 }
-```
 
 ---
 
 ## A1）无有效方向（C3/C5 不同向且无 active watch）⇒ `wait`（不建 watch）
 
-```json
 {
   "symbol": "BTCUSDT",
   "action": "wait",
   "history_view": [],
   "reason": "c_dir=NONE（C3/C5未同向），无ARMED_WATCH，观望。"
 }
-```
 
 ---
 
 ## A2）有方向但未确认（confirm_ok=FALSE），且无 watch ⇒ 建 `ARMED_WATCH ttl=2` 并 `wait`
 
-```json
 {
   "symbol": "BTCUSDT",
   "action": "wait",
@@ -880,7 +868,6 @@ SHORT：
   ],
   "reason": "cand_dir=LONG但分形未k+1确认，建立两回合ARMED_WATCH后观望。"
 }
-```
 
 ---
 
@@ -888,7 +875,6 @@ SHORT：
 
 > 示例：上轮输出 ttl=2，本轮开始先 ttl-1 ⇒ 变为 ttl=1；输出递减后的标签集合。
 
-```json
 {
   "symbol": "BTCUSDT",
   "action": "wait",
@@ -897,13 +883,11 @@ SHORT：
   ],
   "reason": "ARMED_WATCH有效（ttl递减后=1），仍未出现k+1分形确认，继续等待。"
 }
-```
 
 ---
 
 ## A4）watch 窗口内确认成功（confirm_ok=TRUE）⇒ 立刻开仓 + 移除 watch + 追加 `EXTENSION_ACTIVE`
 
-```json
 {
   "symbol": "BTCUSDT",
   "action": "open_long",
@@ -918,7 +902,6 @@ SHORT：
   ],
   "reason": "watch_dir=LONG锁定；出现k+1底分形near(L=91200)确认，执行开多；SL/TP按风控输出。"
 }
-```
 
 ---
 
@@ -926,7 +909,6 @@ SHORT：
 
 > 示例：输入 EXTENSION_ACTIVE ttl=2，本轮开始 ttl-1 ⇒ 输出 ttl=1。
 
-```json
 {
   "symbol": "BTCUSDT",
   "action": "wait",
@@ -935,20 +917,17 @@ SHORT：
   ],
   "reason": "EXTENSION_ACTIVE=LONG存在，cand_dir=SHORT被反向阻断，观望。"
 }
-```
 
 ---
 
 ## A6）极值三连黑名单触发（C1=C3=C5=UP 或 DOWN），且无 watch ⇒ `wait`
 
-```json
 {
   "symbol": "BTCUSDT",
   "action": "wait",
   "history_view": [],
   "reason": "C1=C3=C5触发极值三连黑名单，本拍禁止新开仓。"
 }
-```
 
 ---
 
@@ -956,73 +935,65 @@ SHORT：
 
 ## B0）无仓/误调用 ⇒ `hold`
 
-```json
 {
   "symbol": "BTCUSDT",
   "action": "hold",
   "reason": "当前无持仓，追踪止损层无需执行任何操作。"
 }
-```
 
 ---
 
 ## B1）roe_lock==0 ⇒ 禁用分级止损；TP 需要滚动 ⇒ `update_take_profit`
 
-```json
 {
   "symbol": "BTCUSDT",
   "action": "update_take_profit",
   "new_take_profit": 91800,
   "reason": "roe_lock=0禁用分级止损；SSP聚类tp_near=91800且满足滚动缓冲，更新TP。"
 }
-```
+
 
 ---
 
 ## B2）roe_lock>0 且需要上移/下移止损 ⇒ `update_stop_loss`（以多头上移为例）
 
-```json
 {
   "symbol": "BTCUSDT",
   "action": "update_stop_loss",
   "new_stop_loss": 90540,
   "reason": "roe_cur>=阈值得到roe_lock>0；计算ts_price=90540且高于原sl，执行上移止损。"
 }
-```
 
 ---
 
 ## B3）roe_lock>0 且触发止损平仓 ⇒ `close_long`（多头）/ `close_short`（空头）
 
 ### B3a）多头触发止损 ⇒ `close_long`
-```json
+
 {
   "symbol": "BTCUSDT",
   "action": "close_long",
   "reason": "分级止损触发：P<=sl_new，执行平多。"
 }
-```
+
 
 ### B3b）空头触发止损 ⇒ `close_short`
-```json
+
 {
   "symbol": "BTCUSDT",
   "action": "close_short",
   "reason": "分级止损触发：P>=sl_new，执行平空。"
 }
-```
 
 ---
 
 ## B4）止损不动且 TP 也不需要更新 ⇒ `hold`
 
-```json
 {
   "symbol": "BTCUSDT",
   "action": "hold",
   "reason": "ROE分级止损与动态止盈当前均无需调整，继续持有。"
 }
-```
 
 ---
 
