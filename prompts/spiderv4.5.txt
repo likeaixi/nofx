@@ -168,26 +168,26 @@ else:
 
 # 1. 统一输出格式（两个 Agent 共用 · 已新增 history_view）
 
-两个 Agent 的输出都必须是一个 JSON 对象，格式如下（所有字段名固定）：
+两个 Agent 的输出都必须是一个 JSON 对象，格式如下（所有字段名固定，只输出需要的字段）：
 
 ```jsonc
 {
-  "symbol": "BTCUSDT",
-  "action": "open_short",
+  "symbol": string,
+  "action": string,
 
-  "leverage": 5,
-  "position_size_usd": 3000,
-  "stop_loss": 97000,
-  "take_profit": 91000,
-  "confidence": 85,
-  "risk_usd": 300,
+  "leverage": 0,
+  "position_size_usd": 0,
+  "stop_loss": 0,
+  "take_profit": 0,
+  "confidence": 0,
+  "risk_usd": 0,
 
-  "new_stop_loss": null,
-  "new_take_profit": null,
+  "new_stop_loss": 0,
+  "new_take_profit": 0,
 
-  "history_view": null,          // Agent A: 数组 tags（下次写入 history_ctx.tags）；Agent B: 必须为 null
+  "history_view": [],          // Agent A: 数组 tags（下次写入 history_ctx.tags）；Agent B: 不用输出
 
-  "reason": "简要解释本次动作的原因"
+  "reason": string             // 简要解释本次动作的原因
 }
 ```
 
@@ -207,7 +207,7 @@ else:
 ## 1.2 history_view 字段规则（硬约束）
 - Agent A：`history_view` **必须是数组**（JSON array），元素为 tag 字符串；无标签则输出 `[]`。
 - 系统层：下次调用 Agent A 时，将上次输出的 `history_view` **直接写入**输入的 `history_ctx.tags`。
-- Agent B：`history_view` 必须为 `null`。
+- Agent B：`history_view` 可不用输出。
 
 ---
 
@@ -556,7 +556,6 @@ BREAKOUT_FOLLOW:
 {
   "symbol": "BTCUSDT",
   "action": "hold",
-  "history_view": null,
   "reason": "当前无持仓，追踪止损层无需执行任何操作。"
 }
 ```
@@ -823,20 +822,15 @@ SHORT：
 ```jsonc
 {
   "symbol": "BTCUSDT",
-  "action": "open_short",
+  "action": "open_long",
 
   "leverage": 5,
   "position_size_usd": 3000,
-  "stop_loss": 97000,
-  "take_profit": 91000,
+  "stop_loss": 87000,
+  "take_profit": 97000,
   "confidence": 85,
   "risk_usd": 300,
-
-  "new_stop_loss": null,
-  "new_take_profit": null,
-
-  "history_view": null,
-
+  "history_view": ["EXTENSION_ACTIVE dir=LONG level=91200 ttl=4"],
   "reason": "简要解释本次动作的原因"
 }
 ```
@@ -855,14 +849,6 @@ SHORT：
 {
   "symbol": "BTCUSDT",
   "action": "wait",
-  "leverage": null,
-  "position_size_usd": null,
-  "stop_loss": null,
-  "take_profit": null,
-  "confidence": 0,
-  "risk_usd": null,
-  "new_stop_loss": null,
-  "new_take_profit": null,
   "history_view": [],
   "reason": "输入不足：SSP或bars_1m不满足分形因果要求，强制观望。"
 }
@@ -876,14 +862,6 @@ SHORT：
 {
   "symbol": "BTCUSDT",
   "action": "wait",
-  "leverage": null,
-  "position_size_usd": null,
-  "stop_loss": null,
-  "take_profit": null,
-  "confidence": 40,
-  "risk_usd": null,
-  "new_stop_loss": null,
-  "new_take_profit": null,
   "history_view": [],
   "reason": "c_dir=NONE（C3/C5未同向），无ARMED_WATCH，观望。"
 }
@@ -897,14 +875,6 @@ SHORT：
 {
   "symbol": "BTCUSDT",
   "action": "wait",
-  "leverage": null,
-  "position_size_usd": null,
-  "stop_loss": null,
-  "take_profit": null,
-  "confidence": 55,
-  "risk_usd": null,
-  "new_stop_loss": null,
-  "new_take_profit": null,
   "history_view": [
     "ARMED_WATCH watch_level=91200 watch_dir=LONG ttl=2 arm_reason=EDGE_LOW+LONG等待k+1分形确认"
   ],
@@ -922,14 +892,6 @@ SHORT：
 {
   "symbol": "BTCUSDT",
   "action": "wait",
-  "leverage": null,
-  "position_size_usd": null,
-  "stop_loss": null,
-  "take_profit": null,
-  "confidence": 58,
-  "risk_usd": null,
-  "new_stop_loss": null,
-  "new_take_profit": null,
   "history_view": [
     "ARMED_WATCH watch_level=91200 watch_dir=LONG ttl=1 arm_reason=EDGE_LOW+LONG等待k+1分形确认"
   ],
@@ -951,8 +913,6 @@ SHORT：
   "take_profit": 91650,
   "confidence": 82,
   "risk_usd": 150,
-  "new_stop_loss": null,
-  "new_take_profit": null,
   "history_view": [
     "EXTENSION_ACTIVE dir=LONG level=91200 ttl=4"
   ],
@@ -970,14 +930,6 @@ SHORT：
 {
   "symbol": "BTCUSDT",
   "action": "wait",
-  "leverage": null,
-  "position_size_usd": null,
-  "stop_loss": null,
-  "take_profit": null,
-  "confidence": 35,
-  "risk_usd": null,
-  "new_stop_loss": null,
-  "new_take_profit": null,
   "history_view": [
     "EXTENSION_ACTIVE dir=LONG level=91200 ttl=1"
   ],
@@ -993,14 +945,6 @@ SHORT：
 {
   "symbol": "BTCUSDT",
   "action": "wait",
-  "leverage": null,
-  "position_size_usd": null,
-  "stop_loss": null,
-  "take_profit": null,
-  "confidence": 30,
-  "risk_usd": null,
-  "new_stop_loss": null,
-  "new_take_profit": null,
   "history_view": [],
   "reason": "C1=C3=C5触发极值三连黑名单，本拍禁止新开仓。"
 }
@@ -1016,15 +960,6 @@ SHORT：
 {
   "symbol": "BTCUSDT",
   "action": "hold",
-  "leverage": null,
-  "position_size_usd": null,
-  "stop_loss": null,
-  "take_profit": null,
-  "confidence": null,
-  "risk_usd": null,
-  "new_stop_loss": null,
-  "new_take_profit": null,
-  "history_view": null,
   "reason": "当前无持仓，追踪止损层无需执行任何操作。"
 }
 ```
@@ -1037,15 +972,7 @@ SHORT：
 {
   "symbol": "BTCUSDT",
   "action": "update_take_profit",
-  "leverage": null,
-  "position_size_usd": null,
-  "stop_loss": null,
-  "take_profit": null,
-  "confidence": null,
-  "risk_usd": null,
-  "new_stop_loss": null,
   "new_take_profit": 91800,
-  "history_view": null,
   "reason": "roe_lock=0禁用分级止损；SSP聚类tp_near=91800且满足滚动缓冲，更新TP。"
 }
 ```
@@ -1058,15 +985,7 @@ SHORT：
 {
   "symbol": "BTCUSDT",
   "action": "update_stop_loss",
-  "leverage": null,
-  "position_size_usd": null,
-  "stop_loss": null,
-  "take_profit": null,
-  "confidence": null,
-  "risk_usd": null,
   "new_stop_loss": 90540,
-  "new_take_profit": null,
-  "history_view": null,
   "reason": "roe_cur>=阈值得到roe_lock>0；计算ts_price=90540且高于原sl，执行上移止损。"
 }
 ```
@@ -1080,15 +999,6 @@ SHORT：
 {
   "symbol": "BTCUSDT",
   "action": "close_long",
-  "leverage": null,
-  "position_size_usd": null,
-  "stop_loss": null,
-  "take_profit": null,
-  "confidence": null,
-  "risk_usd": null,
-  "new_stop_loss": null,
-  "new_take_profit": null,
-  "history_view": null,
   "reason": "分级止损触发：P<=sl_new，执行平多。"
 }
 ```
@@ -1098,15 +1008,6 @@ SHORT：
 {
   "symbol": "BTCUSDT",
   "action": "close_short",
-  "leverage": null,
-  "position_size_usd": null,
-  "stop_loss": null,
-  "take_profit": null,
-  "confidence": null,
-  "risk_usd": null,
-  "new_stop_loss": null,
-  "new_take_profit": null,
-  "history_view": null,
   "reason": "分级止损触发：P>=sl_new，执行平空。"
 }
 ```
@@ -1119,15 +1020,6 @@ SHORT：
 {
   "symbol": "BTCUSDT",
   "action": "hold",
-  "leverage": null,
-  "position_size_usd": null,
-  "stop_loss": null,
-  "take_profit": null,
-  "confidence": null,
-  "risk_usd": null,
-  "new_stop_loss": null,
-  "new_take_profit": null,
-  "history_view": null,
   "reason": "ROE分级止损与动态止盈当前均无需调整，继续持有。"
 }
 ```
