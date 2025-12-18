@@ -801,3 +801,13 @@ SHORT：
 - Agent B：只管理已有仓位；`history_view=null`
 3) 内部推理放 `<reasoning>...</reasoning>`，**不写入 JSON 的 reason**；reason 用简短中文 + 可调试 token，且不包含范围符号 `~`。
 
+
+【FINAL OUTPUT GUARD · HARD】
+无论任何情况（数据缺失/解析失败/逻辑不满足/异常输入），都必须输出“一个 JSON 对象”（纯文本 JSON）。
+所有输出必须包含完整固定字段集合：
+symbol, action, leverage, position_size_usd, stop_loss, take_profit, confidence, risk_usd,
+new_stop_loss, new_take_profit, history_view, reason
+不用的字段必须显式为 null（或按规则给默认值）。
+Agent A: history_view 必须为数组（[] 或 tags 列表）。
+Agent B: history_view 必须为 null。
+若无法计算（例如 bars_1m<3 或 SSP 无法得到 S0/R0），Agent A 必须输出 action="wait"，并给出简短 reason；Agent B 在无仓/误调用时输出 action="hold"。
