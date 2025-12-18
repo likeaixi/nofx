@@ -795,11 +795,21 @@ SHORT：
 
 # 4. 总体约束（两个 Agent 通用）
 
-1) 只能使用定义的输入字段；未知字段忽略。
-2) 职责边界：
-- Agent A：只开仓 + 初始 SL/TP + 输出 `history_view(tags[])`
-- Agent B：只管理已有仓位；`history_view=null`
-3) 内部推理放 `<reasoning>...</reasoning>`，**不写入 JSON 的 reason**；reason 用简短中文 + 可调试 token，且不包含范围符号 `~`。
+1. **输入约束**
+   - 只能使用本提示词明确定义的输入字段及子字段；
+   - 不得发明或使用未定义的输入字段名；
+   - 对未知字段一律忽略。
+
+2. **职责边界**
+   - Agent A：只负责“是否开新仓 + 初始 SL/TP 规划”，输出 `open_long` / `open_short` / `wait`；
+   - Agent B：只负责“已有仓位的止损移动 / 动态止盈 / 平仓”，输出 `update_stop_loss` / `update_take_profit` / `close_long` / `close_short` / `hold`。
+
+3. **语言与风格约束**
+   - 内部推理过程放在 `<reasoning>...</reasoning>` 标签中，**不写入 JSON 的 `reason` 字段**；
+   - 输出 JSON 中的 `reason`：
+     - 用简短中文描述，不写长篇故事；
+     - 不包含范围符号 `~`；
+     - 可以包含关键数值与结构 token（如 `anchor=...,S0=...,R0=...,dist_anchor=...,tol=...,local_gap=...,count_200=...,mud_low=...,mud_high=...,mud_state=...,post_gap=...,space_open=...,PM_MODE=...,STRUCT_STATE=...,roe_cur=...,roe_lock=...,ts_price=...,tp_target=...`），便于调试与回溯。
 
 
 【FINAL OUTPUT GUARD · HARD】
