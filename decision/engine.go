@@ -677,7 +677,7 @@ func extractDecisions(response string) ([]Decision, error) {
 	// 预清洗：去零宽/BOM
 	s := removeInvisibleRunes(response)
 	s = strings.TrimSpace(s)
-
+	fmt.Printf("AI Decision ordi %s", s)
 	// 🔧 关键修复 (Critical Fix)：在正则匹配之前就先修复全角字符！
 	// 否则正则表达式 \[ 无法匹配全角的 ［
 	s = fixMissingQuotes(s)
@@ -711,6 +711,7 @@ func extractDecisions(response string) ([]Decision, error) {
 		return decisions, nil
 	}
 
+	fmt.Printf("AI Decision json part %s", jsonPart)
 	// 2) 退而求其次 (Fallback)：全文寻找首个对象数组
 	// 注意：此时 jsonPart 已经过 fixMissingQuotes()，全角字符已转换为半角
 	jsonContent := strings.TrimSpace(reJSONArray.FindString(jsonPart))
