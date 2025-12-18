@@ -569,6 +569,7 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 
 	// 当前持仓的key集合（用于清理已平仓的记录）
 	currentPositionKeys := make(map[string]bool)
+	historyView := make([]string, 0)
 
 	for _, pos := range positions {
 		symbol := pos["symbol"].(string)
@@ -627,6 +628,7 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 		if snapshot != nil {
 			stopLoss = snapshot.StopLoss
 			takeProfit = snapshot.TakeProfit
+			historyView = snapshot.HistoryView
 			log.Printf("加载蜘蛛丝快照 snapsho: %v, stopLoss: %v, takeProfit: %v", snapshot, stopLoss, takeProfit)
 		}
 
@@ -702,6 +704,7 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 		Positions:      positionInfos,
 		CandidateCoins: candidateCoins,
 		Performance:    performance, // 添加历史表现分析
+		HistoryView:    historyView,
 	}
 
 	return ctx, nil
@@ -724,12 +727,28 @@ func (at *AutoTrader) executeDecisionWithRecord(decision *decision.Decision, act
 		return at.executeUpdateTakeProfitWithRecord(decision, actionRecord)
 	case "partial_close":
 		return at.executePartialCloseWithRecord(decision, actionRecord)
-	case "hold", "wait":
+	case "wait":
+		return at.saveHistoryView(decision, actionRecord)
+	case "hold":
 		// 无需执行，仅记录
 		return nil
 	default:
 		return fmt.Errorf("未知的action: %s", decision.Action)
 	}
+}
+
+func (at *AutoTrader) saveHistoryView(decision *decision.Decision, actionRecord *logger.DecisionAction) error {
+	log.Printf("保存History View, %s", decision.HistoryView)
+
+	// 保存蜘蛛丝快照
+	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
+	timeNow := time.Now().UnixMilli()
+	err := spider.SaveSnapshotOnOpen(baseDir, decision.Symbol, "", 0, 0, timeNow, decision.HistoryView)
+	if err != nil {
+		log.Printf("保存蜘蛛丝快照失败: %v", err)
+	}
+
+	return nil
 }
 
 // executeOpenLongWithRecord 执行开多仓并记录详细信息
@@ -793,7 +812,7 @@ func (at *AutoTrader) executeOpenLongWithRecord(decision *decision.Decision, act
 	// 保存蜘蛛丝快照
 	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
 	timeNow := time.Now().UnixMilli()
-	err = spider.SaveSnapshotOnOpen(baseDir, decision.Symbol, "LONG", decision.StopLoss, decision.TakeProfit, timeNow)
+	err = spider.SaveSnapshotOnOpen(baseDir, decision.Symbol, "LONG", decision.StopLoss, decision.TakeProfit, timeNow, decision.HistoryView)
 	if err != nil {
 		log.Printf("保存蜘蛛丝快照失败: %v", err)
 	}
@@ -881,7 +900,7 @@ func (at *AutoTrader) executeOpenShortWithRecord(decision *decision.Decision, ac
 	// 保存蜘蛛丝快照
 	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
 	timeNow := time.Now().UnixMilli()
-	err = spider.SaveSnapshotOnOpen(baseDir, decision.Symbol, "SHORT", decision.StopLoss, decision.TakeProfit, timeNow)
+	err = spider.SaveSnapshotOnOpen(baseDir, decision.Symbol, "SHORT", decision.StopLoss, decision.TakeProfit, timeNow, decision.HistoryView)
 	if err != nil {
 		log.Printf("保存蜘蛛丝快照失败: %v", err)
 	}

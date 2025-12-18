@@ -88,6 +88,7 @@ type Context struct {
 	Performance     interface{}             `json:"-"` // 历史表现分析（logger.PerformanceAnalysis）
 	BTCETHLeverage  int                     `json:"-"` // BTC/ETH杠杆倍数（从配置读取）
 	AltcoinLeverage int                     `json:"-"` // 山寨币杠杆倍数（从配置读取）
+	HistoryView     []string                `json:"history_view"`
 }
 
 // 输入信号的结构
@@ -115,6 +116,10 @@ type Config struct {
 	//UseSspEdges bool    `json:"use_ssp_edges"` // 默认true
 }
 
+type HCtx struct {
+	Tags []string `json:"tags"`
+}
+
 // 所有输入统一在这个 struct 里
 type Input struct {
 	Symbol   string    `json:"symbol"`
@@ -135,6 +140,8 @@ type Input struct {
 	StructCtx spider.StructCtx `json:"struct_ctx"`
 	Pos       Position         `json:"pos"`
 	Cfg       Config           `json:"cfg"`
+
+	HistoryCtx HCtx `json:"history_ctx"`
 }
 
 // Decision AI的交易决策
@@ -157,6 +164,8 @@ type Decision struct {
 	Confidence int     `json:"confidence,omitempty"` // 信心度 (0-100)
 	RiskUSD    float64 `json:"risk_usd,omitempty"`   // 最大美元风险
 	Reasoning  string  `json:"reason"`
+
+	HistoryView []string `json:"history_view"`
 }
 
 // FullDecision AI的完整决策（包含思维链）
@@ -437,7 +446,7 @@ func buildUserPrompt(ctx *Context) string {
 		ctx.Account.MarginUsedPct,
 		ctx.Account.PositionCount))
 
-	input := buildInput(ctx.BTCETHLeverage, currentPrice)
+	input := buildInput(ctx.BTCETHLeverage, currentPrice, ctx.HistoryView)
 
 	// 持仓（完整市场数据）
 	if len(ctx.Positions) > 0 {
@@ -538,19 +547,20 @@ func buildUserPrompt(ctx *Context) string {
 	return sb.String()
 }
 
-func buildInput(leverage int, price float64) Input {
+func buildInput(leverage int, price float64, tags []string) Input {
 	symbol := "BTCUSDT"
 
 	input := Input{
-		Symbol:   symbol,
-		P:        0,
-		Leverage: leverage,
-		SSP:      nil,
-		T:        0,
-		C1:       "",
-		C3:       "",
-		C5:       "",
-		Pos:      Position{},
+		Symbol:     symbol,
+		P:          0,
+		Leverage:   leverage,
+		SSP:        nil,
+		T:          0,
+		C1:         "",
+		C3:         "",
+		C5:         "",
+		Pos:        Position{},
+		HistoryCtx: HCtx{},
 	}
 
 	_, c1, c3, c5 := spider.FetchCombo()
@@ -599,6 +609,8 @@ func buildInput(leverage int, price float64) Input {
 	//input.SSPBias = sspResult.Bias
 
 	input.StructCtx = structCtx
+
+	input.HistoryCtx.Tags = tags
 
 	//input.Cfg.MaxLoss = 0.05
 	//input.Cfg.TrailGap = 0.02

@@ -12,12 +12,13 @@ import (
 
 // 可选的附加信息（方便排查 / 画图），你可以删掉不需要的字段
 type SymbolPositionSnapshot struct {
-	Symbol     string  `json:"symbol"`
-	Side       string  `json:"side"` // "LONG"/"SHORT"
-	StopLoss   float64 `json:"stop_loss"`
-	TakeProfit float64 `json:"take_profit"`
-	EntryTime  int64   `json:"entry_time"` // 毫秒时间戳
-	SavedAt    int64   `json:"saved_at"`   // 写入时间
+	Symbol      string   `json:"symbol"`
+	Side        string   `json:"side"` // "LONG"/"SHORT"
+	StopLoss    float64  `json:"stop_loss"`
+	TakeProfit  float64  `json:"take_profit"`
+	EntryTime   int64    `json:"entry_time"`   // 毫秒时间戳
+	SavedAt     int64    `json:"saved_at"`     // 写入时间
+	HistoryView []string `json:"history_view"` // Agent A 输出的 history_view
 }
 
 // baseDir 例如 "data/spider_snapshots"
@@ -46,23 +47,33 @@ func saveSymbolSnapshot(baseDir string, record *SymbolPositionSnapshot) error {
 	return os.Rename(tmpPath, path)
 }
 
-// SaveSnapshotOnOpen 开仓时保存蜘蛛丝快照（同 symbol 直接覆盖）
-func SaveSnapshotOnOpen(baseDir, symbol, side string, stopLoss float64, takeProfit float64, entryTimeMillis int64) error {
+// SaveSnapshotOnOpen 开仓时保存快照（同 symbol 直接覆盖）
+// 多了一个 historyView，用于保存 Agent A 的 history_view
+func SaveSnapshotOnOpen(
+	baseDir string,
+	symbol string,
+	side string,
+	stopLoss float64,
+	takeProfit float64,
+	entryTimeMillis int64,
+	historyView []string,
+) error {
 	symbol = strings.ToUpper(symbol)
 
 	record := &SymbolPositionSnapshot{
-		Symbol:     symbol,
-		Side:       strings.ToUpper(side),
-		StopLoss:   stopLoss,
-		TakeProfit: takeProfit,
-		EntryTime:  entryTimeMillis,
-		SavedAt:    time.Now().UnixMilli(),
+		Symbol:      symbol,
+		Side:        strings.ToUpper(side),
+		StopLoss:    stopLoss,
+		TakeProfit:  takeProfit,
+		EntryTime:   entryTimeMillis,
+		SavedAt:     time.Now().UnixMilli(),
+		HistoryView: historyView,
 	}
 
 	return saveSymbolSnapshot(baseDir, record)
 }
 
-// LoadSnapshotForSymbol 读取某个 symbol 当前仓位的蜘蛛丝快照
+// LoadSnapshotForSymbol 读取某个 symbol 当前仓位的快照
 // 如果文件不存在，返回 (nil, nil)
 func LoadSnapshotForSymbol(baseDir, symbol string) (*SymbolPositionSnapshot, error) {
 	symbol = strings.ToUpper(symbol)
@@ -121,7 +132,7 @@ func UpdateStopLossForSymbol(baseDir, symbol string, newStopLoss float64) error 
 	return saveSymbolSnapshot(baseDir, &record)
 }
 
-// UpdateTakeProfitForSymbol 更新某个 symbol 当前仓位的止损价
+// UpdateTakeProfitForSymbol 更新某个 symbol 当前仓位的止盈价
 func UpdateTakeProfitForSymbol(baseDir, symbol string, newTakeProfit float64) error {
 	symbol = strings.ToUpper(symbol)
 	path := symbolFilePath(baseDir, symbol)
@@ -141,6 +152,30 @@ func UpdateTakeProfitForSymbol(baseDir, symbol string, newTakeProfit float64) er
 	}
 
 	record.TakeProfit = newTakeProfit
+	record.SavedAt = time.Now().UnixMilli()
+
+	return saveSymbolSnapshot(baseDir, &record)
+}
+
+// UpdateHistoryViewForSymbol 更新某个 symbol 当前仓位的 HistoryView
+func UpdateHistoryViewForSymbol(baseDir, symbol string, historyView []string) error {
+	symbol = strings.ToUpper(symbol)
+	path := symbolFilePath(baseDir, symbol)
+
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("no snapshot file for symbol %s", symbol)
+	}
+	if err != nil {
+		return err
+	}
+
+	var record SymbolPositionSnapshot
+	if err := json.Unmarshal(data, &record); err != nil {
+		return err
+	}
+
+	record.HistoryView = historyView
 	record.SavedAt = time.Now().UnixMilli()
 
 	return saveSymbolSnapshot(baseDir, &record)
