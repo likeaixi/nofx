@@ -88,7 +88,31 @@ type Context struct {
 	Performance     interface{}             `json:"-"` // 历史表现分析（logger.PerformanceAnalysis）
 	BTCETHLeverage  int                     `json:"-"` // BTC/ETH杠杆倍数（从配置读取）
 	AltcoinLeverage int                     `json:"-"` // 山寨币杠杆倍数（从配置读取）
-	HistoryView     []string                `json:"history_view"`
+	Input           `json:"input"`
+}
+
+// Decision AI的交易决策
+type Decision struct {
+	Symbol string `json:"symbol"`
+	Action string `json:"action"` // "open_long", "open_short", "close_long", "close_short", "update_stop_loss", "update_take_profit", "partial_close", "hold", "wait"
+
+	// 开仓参数
+	Leverage        int     `json:"leverage,omitempty"`
+	PositionSizeUSD float64 `json:"position_size_usd,omitempty"`
+	StopLoss        float64 `json:"stop_loss,omitempty"`
+	TakeProfit      float64 `json:"take_profit,omitempty"`
+
+	// 调整参数（新增）
+	NewStopLoss     float64 `json:"new_stop_loss,omitempty"`    // 用于 update_stop_loss
+	NewTakeProfit   float64 `json:"new_take_profit,omitempty"`  // 用于 update_take_profit
+	ClosePercentage float64 `json:"close_percentage,omitempty"` // 用于 partial_close (0-100)
+
+	// 通用参数
+	Confidence int     `json:"confidence,omitempty"` // 信心度 (0-100)
+	RiskUSD    float64 `json:"risk_usd,omitempty"`   // 最大美元风险
+	Reasoning  string  `json:"reason"`
+
+	HistoryView string `json:"history_view,omitempty"`
 }
 
 // 输入信号的结构
@@ -120,17 +144,24 @@ type HCtx struct {
 	Tags []string `json:"tags"`
 }
 
-// 所有输入统一在这个 struct 里
-type Input struct {
-	Symbol   string    `json:"symbol"`
+type Market struct {
 	P        float64   `json:"P"`
 	Leverage int       `json:"Leverage"`
 	SSP      []float64 `json:"SSP"`
-	T        int64     `json:"T"`
 
 	C1 string `json:"C1"`
 	C3 string `json:"C3"`
 	C5 string `json:"C5"`
+
+	SspZone     string `json:"ssp_zone"`      // EDGE_LOW|EDGE_HIGH|OUT_UP|OUT_DOWN|BATTLE|...
+	SspBoxDrift string `json:"ssp_box_drift"` // UP_BOX|DOWN_BOX|FLAT_BOX|...
+}
+
+// 所有输入统一在这个 struct 里
+type Input struct {
+	Symbol string `json:"symbol"`
+
+	Market `json:"market"`
 
 	Bars1m  []market.InputKline `json:"bars_1m"`
 	Bars5m  []market.InputKline `json:"bars_5m"`
@@ -142,30 +173,6 @@ type Input struct {
 	Cfg       Config           `json:"cfg"`
 
 	HistoryCtx HCtx `json:"history_ctx"`
-}
-
-// Decision AI的交易决策
-type Decision struct {
-	Symbol string `json:"symbol"`
-	Action string `json:"action"` // "open_long", "open_short", "close_long", "close_short", "update_stop_loss", "update_take_profit", "partial_close", "hold", "wait"
-
-	// 开仓参数
-	Leverage        int     `json:"leverage,omitempty"`
-	PositionSizeUSD float64 `json:"position_size_usd,omitempty"`
-	StopLoss        float64 `json:"stop_loss,omitempty"`
-	TakeProfit      float64 `json:"take_profit,omitempty"`
-
-	// 调整参数（新增）
-	NewStopLoss     float64 `json:"new_stop_loss,omitempty"`    // 用于 update_stop_loss
-	NewTakeProfit   float64 `json:"new_take_profit,omitempty"`  // 用于 update_take_profit
-	ClosePercentage float64 `json:"close_percentage,omitempty"` // 用于 partial_close (0-100)
-
-	// 通用参数
-	Confidence int     `json:"confidence,omitempty"` // 信心度 (0-100)
-	RiskUSD    float64 `json:"risk_usd,omitempty"`   // 最大美元风险
-	Reasoning  string  `json:"reason"`
-
-	HistoryView []string `json:"history_view,omitempty"`
 }
 
 // FullDecision AI的完整决策（包含思维链）
@@ -437,6 +444,10 @@ func buildUserPrompt(ctx *Context) string {
 		currentPrice = btcData.CurrentPrice
 	}
 
+	if currentPrice != 0 {
+		ctx.Input.Market.P = currentPrice
+	}
+
 	// 账户
 	sb.WriteString(fmt.Sprintf("账户: 净值%.2f | 余额%.2f (%.1f%%) | 盈亏%+.2f%% | 保证金%.1f%% | 持仓%d个\n\n",
 		ctx.Account.TotalEquity,
@@ -445,8 +456,6 @@ func buildUserPrompt(ctx *Context) string {
 		ctx.Account.TotalPnLPct,
 		ctx.Account.MarginUsedPct,
 		ctx.Account.PositionCount))
-
-	input := buildInput(ctx.BTCETHLeverage, currentPrice, ctx.HistoryView)
 
 	// 持仓（完整市场数据）
 	if len(ctx.Positions) > 0 {
@@ -480,18 +489,6 @@ func buildUserPrompt(ctx *Context) string {
 			//	sb.WriteString("\n")
 			//}
 
-			s := NormalizeSide(pos.Side, true)
-			input.Pos = Position{
-				Side:      s,
-				Leverage:  pos.Leverage,
-				Entry:     pos.EntryPrice,
-				Qty:       pos.Quantity,
-				SL:        &pos.StopLoss,
-				TP:        &pos.TakeProfit,
-				PnlPct:    pos.UnrealizedPnLPct,
-				PnlPctMax: pos.PeakPnLPct,
-			}
-
 			//
 		}
 	} else {
@@ -518,7 +515,7 @@ func buildUserPrompt(ctx *Context) string {
 		// 使用FormatMarketData输出完整市场数据
 		sb.WriteString(fmt.Sprintf("### %d. %s\n\n", displayedCount, coin.Symbol))
 		//sb.WriteString(market.Format(marketData))
-		b, err := json.MarshalIndent(input, "", "  ")
+		b, err := json.MarshalIndent(ctx.Input, "", "  ")
 		if err != nil {
 			sb.WriteString(fmt.Sprintf("解析输入数据失败 %v", err))
 		}
@@ -545,78 +542,6 @@ func buildUserPrompt(ctx *Context) string {
 	sb.WriteString("现在请分析并输出决策（思维链 + JSON）\n")
 
 	return sb.String()
-}
-
-func buildInput(leverage int, price float64, tags []string) Input {
-	symbol := "BTCUSDT"
-
-	input := Input{
-		Symbol:     symbol,
-		P:          0,
-		Leverage:   leverage,
-		SSP:        nil,
-		T:          0,
-		C1:         "",
-		C3:         "",
-		C5:         "",
-		Pos:        Position{},
-		HistoryCtx: HCtx{},
-	}
-
-	_, c1, c3, c5 := spider.FetchCombo()
-	ssp, err := spider.FetchSpiderRaw()
-	//sspResult := spider.NewSSPResult(ssp)
-	if err != nil {
-		log.Printf("获取蜘蛛丝数据失败 %v", err)
-	}
-
-	klines1m, err := market.GetInputKlines(symbol, "1m")
-	if err != nil {
-		log.Printf("获取Input Klines失败 %v", err)
-	}
-
-	klines5m, err := market.GetInputKlines(symbol, "5m")
-	if err != nil {
-		log.Printf("获取Input Klines失败 %v", err)
-	}
-
-	klines15m, err := market.GetInputKlines(symbol, "15m")
-	if err != nil {
-		log.Printf("获取Input Klines失败 %v", err)
-	}
-
-	structCtx := spider.BuildStructCtx(klines1m, klines5m, klines15m, 10, 3, 4, 5)
-
-	if price == 0 {
-		input.P = ssp.P
-	} else {
-		input.P = price
-	}
-
-	input.SSP = ssp.SSP
-	input.T = ssp.T
-
-	input.C1 = c1
-	input.C3 = c3
-	input.C5 = c5
-
-	last1m := min(len(klines1m), 5)
-	input.Bars1m = klines1m[(len(klines1m) - last1m):]
-	last5m := min(len(klines5m), 3)
-	input.Bars5m = klines5m[(len(klines5m) - last5m):]
-	last15m := min(len(klines15m), 3)
-	input.Bars15m = klines15m[(len(klines15m) - last15m):]
-	//input.SSPBias = sspResult.Bias
-
-	input.StructCtx = structCtx
-
-	input.HistoryCtx.Tags = tags
-
-	//input.Cfg.MaxLoss = 0.05
-	//input.Cfg.TrailGap = 0.02
-	//input.Cfg.UseSspEdges = true
-
-	return input
 }
 
 // parseFullDecisionResponse 解析AI的完整决策响应
@@ -1001,21 +926,4 @@ func validateDecision(d *Decision, accountEquity float64, btcEthLeverage, altcoi
 	}
 
 	return nil
-}
-
-func NormalizeSide(raw string, hasPosition bool) string {
-	// 优先根据是否有仓来判断平仓状态
-	if !hasPosition {
-		return "F"
-	}
-
-	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "long":
-		return "L"
-	case "short":
-		return "S"
-	default:
-		// 不认识的字符串，当作无仓处理，避免乱来
-		return "F"
-	}
 }
