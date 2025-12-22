@@ -565,6 +565,7 @@ func ComputeSSPBoxDrift(P any, SSPHist []map[string]any) string {
 	// - if both box_low and box_high shift >= +120 => UP_BOX
 	// - if both shift <= -120 => DOWN_BOX
 	// - else FLAT_BOX
+	fmt.Printf("ComputeSSPBoxDrift len(SSPHist)=%v", len(SSPHist))
 	if len(SSPHist) < 2 {
 		return ""
 	}
@@ -581,12 +582,17 @@ func ComputeSSPBoxDrift(P any, SSPHist []map[string]any) string {
 
 	sspAAny, okA := asSliceAny(a["SSP"])
 	sspBAny, okB := asSliceAny(b["SSP"])
+
+	fmt.Printf("ComputeSSPBoxDrift sspAAny %v, okA %v", sspAAny, okA)
+	fmt.Printf("ComputeSSPBoxDrift sspBAny %v, okB %v", sspBAny, okB)
 	if !okA || !okB || len(sspAAny) == 0 || len(sspBAny) == 0 {
 		return ""
 	}
 
 	boxA, errA := BuildSuperBox(P, sspAAny)
 	boxB, errB := BuildSuperBox(P, sspBAny)
+	fmt.Printf("ComputeSSPBoxDrift boxA %v, errA %v", boxA, errA)
+	fmt.Printf("ComputeSSPBoxDrift boxB %v, errB %v", boxB, errB)
 	if errA != nil || errB != nil {
 		return ""
 	}
