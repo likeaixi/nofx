@@ -547,6 +547,52 @@ func asSliceAny(x any) ([]float64, bool) {
 	}
 }
 
+func asFloat64Slice(x any) ([]float64, bool) {
+	if x == nil {
+		return nil, false
+	}
+
+	switch v := x.(type) {
+
+	case []float64:
+		// 已经是目标类型
+		return v, true
+
+	case []any:
+		out := make([]float64, 0, len(v))
+		for _, e := range v {
+			switch n := e.(type) {
+			case float64:
+				out = append(out, n)
+			case float32:
+				out = append(out, float64(n))
+			case int:
+				out = append(out, float64(n))
+			case int64:
+				out = append(out, float64(n))
+			case json.Number:
+				f, err := n.Float64()
+				if err != nil {
+					return nil, false
+				}
+				out = append(out, f)
+			case string:
+				f, err := strconv.ParseFloat(strings.TrimSpace(n), 64)
+				if err != nil {
+					return nil, false
+				}
+				out = append(out, f)
+			default:
+				return nil, false
+			}
+		}
+		return out, true
+
+	default:
+		return nil, false
+	}
+}
+
 func asMapAny(x any) (map[string]any, bool) {
 	if x == nil {
 		return nil, false
@@ -565,7 +611,7 @@ func ComputeSSPBoxDrift(P any, SSPHist []map[string]any) string {
 	// - if both box_low and box_high shift >= +120 => UP_BOX
 	// - if both shift <= -120 => DOWN_BOX
 	// - else FLAT_BOX
-	fmt.Printf("ComputeSSPBoxDrift len(SSPHist)=%v", len(SSPHist))
+	fmt.Printf("ComputeSSPBoxDrift len(SSPHist)=%v \n", len(SSPHist))
 	if len(SSPHist) < 2 {
 		return ""
 	}
@@ -579,20 +625,22 @@ func ComputeSSPBoxDrift(P any, SSPHist []map[string]any) string {
 
 	a := SSPHist[len(SSPHist)-2]
 	b := SSPHist[len(SSPHist)-1]
+	fmt.Printf("ComputeSSPBoxDrift a %v \n", a)
+	fmt.Printf("ComputeSSPBoxDrift b %v \n", b)
 
-	sspAAny, okA := asSliceAny(a["SSP"])
-	sspBAny, okB := asSliceAny(b["SSP"])
+	sspAAny, okA := asFloat64Slice(a["SSP"])
+	sspBAny, okB := asFloat64Slice(b["SSP"])
 
-	fmt.Printf("ComputeSSPBoxDrift sspAAny %v, okA %v", sspAAny, okA)
-	fmt.Printf("ComputeSSPBoxDrift sspBAny %v, okB %v", sspBAny, okB)
+	fmt.Printf("ComputeSSPBoxDrift sspAAny %v, okA %v \n", sspAAny, okA)
+	fmt.Printf("ComputeSSPBoxDrift sspBAny %v, okB %v \n", sspBAny, okB)
 	if !okA || !okB || len(sspAAny) == 0 || len(sspBAny) == 0 {
 		return ""
 	}
 
 	boxA, errA := BuildSuperBox(P, sspAAny)
 	boxB, errB := BuildSuperBox(P, sspBAny)
-	fmt.Printf("ComputeSSPBoxDrift boxA %v, errA %v", boxA, errA)
-	fmt.Printf("ComputeSSPBoxDrift boxB %v, errB %v", boxB, errB)
+	fmt.Printf("ComputeSSPBoxDrift boxA %v, errA %v \n", boxA, errA)
+	fmt.Printf("ComputeSSPBoxDrift boxB %v, errB %v \n", boxB, errB)
 	if errA != nil || errB != nil {
 		return ""
 	}
