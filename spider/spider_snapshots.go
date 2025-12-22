@@ -133,15 +133,32 @@ func SaveSnapshotOnOpen(
 	return saveSymbolSnapshot(baseDir, &record)
 }
 
-// LoadSnapshotForSymbol 读取某个 symbol 当前仓位的快照
-// 如果文件不存在，返回 (nil, nil)
+// LoadSnapshotForSymbol 读取某个 symbol 当前仓位的快照。
+// 行为：
+//   - 如果文件存在：正常加载并返回 *SymbolPositionSnapshot
+//   - 如果文件不存在：创建一个默认快照文件写入磁盘，并返回该默认快照
 func LoadSnapshotForSymbol(baseDir, symbol string) (*SymbolPositionSnapshot, error) {
 	symbol = strings.ToUpper(symbol)
 	path := symbolFilePath(baseDir, symbol)
 
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
+		// 文件不存在：初始化一个默认快照，并立刻写入磁盘
+		record := &SymbolPositionSnapshot{
+			Symbol:      symbol,
+			Side:        "",
+			StopLoss:    0,
+			TakeProfit:  0,
+			EntryTime:   0,
+			SavedAt:     time.Now().UnixMilli(),
+			HistoryTags: nil,
+			HistorySSP:  nil,
+		}
+
+		if err := saveSymbolSnapshot(baseDir, record); err != nil {
+			return nil, err
+		}
+		return record, nil
 	}
 	if err != nil {
 		return nil, err
