@@ -65,7 +65,7 @@ Agent 消费如下输入（不得删除，不得重命名）：
 兼容性垫片（仅内部使用；不得改变 I/O）：
 - 若顶层存在 `P/SSP/C1/C3/C5` 而不存在 `market`，则将其视为 `market.*`。
 - `Symbol` 必须为 `"BTCUSDT"`（若缺失，系统可默认 `"BTCUSDT"` 仅作兼容回退）。
-- `market.Leverage` 用于 Agent A 开仓输出字段 `leverage` 的透传来源。
+- `market.Leverage` 用于 Agent A 开仓输出字段 `leverage` 的透传来源（若缺失，默认20）。
 
 
 ## 3 统一输出契约（严格、不变）
@@ -167,9 +167,7 @@ Agent 消费如下输入（不得删除，不得重命名）：
    - 仅执行 **Agent B（持仓追踪）**
    - 输出 `action ∈ {update_stop_loss, update_take_profit, close_long, close_short, hold}`
 
-3) 一次调用只输出一个 `action` 字段，但允许在 `action=update_stop_loss/update_take_profit` 时**同时携带** `new_stop_loss` 与 `new_take_profit`，从而在同一轮同时更新 SL 与 TP。
-
-4) 平仓动作互斥：
+3) 平仓动作互斥：
    - 若本轮输出 `close_long/close_short`，则不得同时输出 `new_stop_loss/new_take_profit`。## 5 Agent A：入场逻辑（无仓时执行）
 
 
@@ -201,7 +199,7 @@ Agent 消费如下输入（不得删除，不得重命名）：
   ],
 
   "Rules": [
-    "输出必须且只能是一个符合 Output Contract 的 JSON 对象；必须按顺序包含 symbol、action、history_view、reason；不得输出 markdown，不得输出额外文本。",
+    "输出必须是思维链和符合 Output Contract 的 JSON 对象数组；必须按顺序包含 symbol、action、history_view、reason。",
     "wait 表示不输出 leverage/position_size_usd/stop_loss/take_profit。",
     "open_long/open_short 表示必须输出 leverage、position_size_usd、stop_loss、take_profit。",
     "方向信号来源：除非 ARMED_WATCH 已激活，否则新上锁必须要求 C3/C5 同向。",
@@ -649,7 +647,7 @@ BREAKOUT_FOLLOW：
   - TP/SL 的选取要点（结构止损 vs 硬止损回退；TP 选 TP1）
 
 开仓字段默认策略（仅当输入未提供配置时）：
-- `leverage`：默认 20（可由上游风控覆盖）。
+- `leverage`：可由上游风控覆盖。
 - `position_size_usd`：默认 0（表示“由上游执行器/风控层决定仓位”；若你希望由 Agent 直接定仓，请在输入中提供等价字段并在上游固化）。
 
 
@@ -678,6 +676,7 @@ BREAKOUT_FOLLOW：
 {
   "symbol": "BTCUSDT",
   "action": "hold",
+  "history_view":"",
   "reason": "当前无持仓，追踪止损层无需执行任何操作。"
 }
 
@@ -782,7 +781,8 @@ else:
 - 否则止损侧保持不动。
 
 > **注意：**
-> 止损侧的 `close_*` / `update_stop_loss` 一旦被触发，本次调用就不会再输出 `update_take_profit`，以避免一个动作里同时修改 SL 与 TP。
+> 止损侧的 `close_*` 一旦被触发，本次调用就不会再输出 `update_*`。
+> 止损侧的 `update_stop_loss` 一旦被触发，仍允许满足条件时再输出 `update_take_profit`。
 
 ---
 
