@@ -231,3 +231,32 @@ func TestBuildSuperBox_EmptySSP(t *testing.T) {
 		t.Fatalf("BuildSuperBox with empty SSP, want error, got nil")
 	}
 }
+
+func TestBuildSuperBox(t *testing.T) {
+	SSP := []float64{
+		84700.49,
+		88300.66,
+		88300.89,
+		88400.77,
+		88400.78,
+		88400.92,
+		88500.25,
+		88500.82,
+		88600.04,
+		88700.52,
+		88800.18,
+		88900.59,
+		89000.26,
+		89500.39,
+		89900.21,
+		91300.15}
+
+	P := 88328.4
+
+	box, err := BuildSuperBox(P, SSP)
+	if err != nil {
+		t.Fatalf("BuildSuperBox error %v", err)
+	}
+
+	t.Logf("Box zone %v", box.Zone)
+}

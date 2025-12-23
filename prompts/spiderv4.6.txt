@@ -123,6 +123,7 @@ Agent 消费如下输入（不得删除，不得重命名）：
 
 约束：
 - `leverage` 必须等于输入 `market.Leverage`（透传，不得自行改写/计算）。
+- `position_size_usd` 必须根据账户保证金和风险控制计算一个值，不能输出0且不能小于12。
 
 #### (2) 更新止损（Agent B）
 当 `action` 为 `update_stop_loss` 时，必须追加：
@@ -963,6 +964,7 @@ SHORT：
 - 字段顺序必须为：`symbol → action → history_view → reason → (可选扩展字段...)`。
 - 无仓只允许 action：`open_long/open_short/wait`。
 - 有仓只允许 action：`update_stop_loss/update_take_profit/close_long/close_short/hold`。
+- 开仓时（open_long/open_short）必须追加leverage, position_size_usd, stop_loss, take_profit。
 - 若 SL 与 TP 同时需要更新：允许输出 **两行 JSON**（先 update_stop_loss，后 update_take_profit），不得合并到同一个对象。
 - 开仓时必须追加：`leverage/position_size_usd/stop_loss/take_profit`；且 leverage 必须透传 `market.Leverage`。
 - JSON的 reason字段中不包含字符 ~。
