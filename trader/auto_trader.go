@@ -1909,6 +1909,7 @@ func buildInput(leverage int, historySSP []map[string]any) (decision.Input, int6
 
 	input.Market.P = ssp.P
 	input.Market.SSP = ssp.SSP
+	input.Market.Leverage = leverage
 
 	input.Market.C1 = c1
 	input.Market.C3 = c3

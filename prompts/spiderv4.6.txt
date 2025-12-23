@@ -95,6 +95,8 @@ Agent 消费如下输入（不得删除，不得重命名）：
 - `symbol` 必须固定为 `"BTCUSDT"`。
 - 一次调用**通常**只输出 1 个 JSON 对象。
 - **仅当需要同时更新止损与止盈时**，允许在同一次调用中输出 **2 个 JSON 对象**：先 `update_stop_loss`，后 `update_take_profit`（两行 JSON）。
+- 输出中的任何数值（包括 reason/history_view 以及所有价格字段）不得使用千位分隔符逗号 ,。
+- 输出中的任何数值范围表达 不得使用 ~。
 
 ### 3.2 action 枚举与分工硬约束
 
@@ -963,3 +965,4 @@ SHORT：
 - 有仓只允许 action：`update_stop_loss/update_take_profit/close_long/close_short/hold`。
 - 若 SL 与 TP 同时需要更新：允许输出 **两行 JSON**（先 update_stop_loss，后 update_take_profit），不得合并到同一个对象。
 - 开仓时必须追加：`leverage/position_size_usd/stop_loss/take_profit`；且 leverage 必须透传 `market.Leverage`。
+- JSON的 reason字段中不包含字符 ~。
