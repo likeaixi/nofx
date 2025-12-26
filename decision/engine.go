@@ -36,6 +36,7 @@ type PositionInfo struct {
 	EntryPrice       float64 `json:"entry_price"`
 	MarkPrice        float64 `json:"mark_price"`
 	StopLoss         float64 `json:"stop_loss"`
+	TakeProfit       float64 `json:"take_profit"`
 	Quantity         float64 `json:"quantity"`
 	Leverage         int     `json:"leverage"`
 	UnrealizedPnL    float64 `json:"unrealized_pnl"`
@@ -87,50 +88,7 @@ type Context struct {
 	Performance     interface{}             `json:"-"` // 历史表现分析（logger.PerformanceAnalysis）
 	BTCETHLeverage  int                     `json:"-"` // BTC/ETH杠杆倍数（从配置读取）
 	AltcoinLeverage int                     `json:"-"` // 山寨币杠杆倍数（从配置读取）
-}
-
-// 输入信号的结构
-
-// ---------- 公共输入结构：A 和 B 共用 ----------
-
-type Direction struct {
-	Dir string `json:"dir"` // "U" / "D" / "N"
-}
-
-type Position struct {
-	Side      string   `json:"side"` // "F" / "L" / "S"
-	Leverage  int      `json:"leverage"`
-	Entry     float64  `json:"entry"`
-	Qty       float64  `json:"qty"`
-	SL        *float64 `json:"sl"`          // 允许为 null => *float64
-	PnlPct    float64  `json:"pnl_pct"`     // 0.15 = 15%
-	PnlPctMax float64  `json:"pnl_pct_max"` // 开仓以来最大浮盈百分比
-}
-
-type Config struct {
-	MaxLoss  float64 `json:"max_loss"`  // 默认 0.05
-	TrailGap float64 `json:"trail_gap"` // 默认 0.10
-	//UseSspEdges bool    `json:"use_ssp_edges"` // 默认true
-}
-
-// 所有输入统一在这个 struct 里
-type Input struct {
-	Symbol   string    `json:"symbol"`
-	P        float64   `json:"P"`
-	Leverage int       `json:"Leverage"`
-	SSP      []float64 `json:"SSP"`
-	T        int64     `json:"T"`
-
-	C1 Direction `json:"C1"`
-	C3 Direction `json:"C3"`
-	C5 Direction `json:"C5"`
-
-	//Bars1m []market.InputKline `json:"bars_1m"`
-
-	//SSPBias float64 `json:"ssp_bias"`
-
-	Pos Position `json:"pos"`
-	Cfg Config   `json:"cfg"`
+	Input           `json:"input"`
 }
 
 // Decision AI的交易决策
@@ -153,6 +111,68 @@ type Decision struct {
 	Confidence int     `json:"confidence,omitempty"` // 信心度 (0-100)
 	RiskUSD    float64 `json:"risk_usd,omitempty"`   // 最大美元风险
 	Reasoning  string  `json:"reason"`
+
+	HistoryView string `json:"history_view,omitempty"`
+}
+
+// 输入信号的结构
+
+// ---------- 公共输入结构：A 和 B 共用 ----------
+
+type Direction struct {
+	Dir string `json:"dir"` // "U" / "D" / "N"
+}
+
+type Position struct {
+	Side      string   `json:"side"` // "F" / "L" / "S"
+	Leverage  int      `json:"leverage"`
+	Entry     float64  `json:"entry"`
+	Qty       float64  `json:"qty"`
+	SL        *float64 `json:"sl"`          // 允许为 null => *float64
+	TP        *float64 `json:"tp"`          // 允许为 null => *float64
+	PnlPct    float64  `json:"pnl_pct"`     // 0.15 = 15%
+	PnlPctMax float64  `json:"pnl_pct_max"` // 开仓以来最大浮盈百分比
+}
+
+type Config struct {
+	MaxLoss  float64 `json:"max_loss"`  // 默认 0.05
+	TrailGap float64 `json:"trail_gap"` // 默认 0.10
+	//UseSspEdges bool    `json:"use_ssp_edges"` // 默认true
+}
+
+type HCtx struct {
+	Tags []string `json:"tags"`
+}
+
+type Market struct {
+	P        float64   `json:"P"`
+	Leverage int       `json:"Leverage"`
+	SSP      []float64 `json:"SSP"`
+
+	C1 string `json:"C1"`
+	C3 string `json:"C3"`
+	C5 string `json:"C5"`
+
+	SspZone     string `json:"ssp_zone"`      // EDGE_LOW|EDGE_HIGH|OUT_UP|OUT_DOWN|BATTLE|...
+	SspBoxDrift string `json:"ssp_box_drift"` // UP_BOX|DOWN_BOX|FLAT_BOX|...
+}
+
+// 所有输入统一在这个 struct 里
+type Input struct {
+	Symbol string `json:"symbol"`
+
+	Market `json:"market"`
+
+	Bars1m  []market.InputKline `json:"bars_1m"`
+	Bars5m  []market.InputKline `json:"bars_5m"`
+	Bars15m []market.InputKline `json:"bars_15m"`
+
+	//SSPBias float64 `json:"ssp_bias"`
+	StructCtx spider.StructCtx `json:"struct_ctx"`
+	Pos       Position         `json:"pos"`
+	Cfg       Config           `json:"cfg"`
+
+	HistoryCtx HCtx `json:"history_ctx"`
 }
 
 // FullDecision AI的完整决策（包含思维链）
@@ -391,15 +411,14 @@ func buildSystemPrompt(accountEquity float64, btcEthLeverage, altcoinLeverage in
 	sb.WriteString("</reasoning>\n\n")
 	sb.WriteString("<decision>\n")
 	sb.WriteString("```json\n[\n")
-	sb.WriteString(fmt.Sprintf("  {\"symbol\": \"BTCUSDT\", \"action\": \"open_short\", \"leverage\": %d, \"position_size_usd\": %.0f, \"stop_loss\": 97000, \"take_profit\": 91000, \"confidence\": 85, \"risk_usd\": 300, \"reason\": \"下跌趋势+MACD死叉\"},\n", btcEthLeverage, accountEquity*5))
+	sb.WriteString(fmt.Sprintf("  {\"symbol\": \"BTCUSDT\", \"action\": \"open_short\", \"leverage\": %d, \"position_size_usd\": %.0f, \"stop_loss\": 97000, \"take_profit\": 91000, \"reason\": \"下跌趋势+MACD死叉\"},\n", btcEthLeverage, accountEquity*5))
 	sb.WriteString("  {\"symbol\": \"SOLUSDT\", \"action\": \"update_stop_loss\", \"new_stop_loss\": 155, \"reason\": \"移动止损至保本位\"},\n")
 	sb.WriteString("  {\"symbol\": \"ETHUSDT\", \"action\": \"close_long\", \"reason\": \"止盈离场\"}\n")
 	sb.WriteString("]\n```\n")
 	sb.WriteString("</decision>\n\n")
 	sb.WriteString("## 字段说明\n\n")
 	sb.WriteString("- `action`: open_long | open_short | close_long | close_short | update_stop_loss | update_take_profit | partial_close | hold | wait\n")
-	sb.WriteString("- `confidence`: 0-100\n")
-	sb.WriteString("- 开仓时必填: leverage, position_size_usd, stop_loss, take_profit, confidence, risk_usd, reason\n")
+	sb.WriteString("- 开仓时必填: leverage, position_size_usd, stop_loss, take_profit, reason\n")
 	sb.WriteString("- update_stop_loss 时必填: new_stop_loss (注意是 new_stop_loss，不是 stop_loss)\n")
 	sb.WriteString("- update_take_profit 时必填: new_take_profit (注意是 new_take_profit，不是 take_profit)\n")
 	sb.WriteString("- partial_close 时必填: close_percentage (0-100)\n\n")
@@ -424,6 +443,10 @@ func buildUserPrompt(ctx *Context) string {
 		currentPrice = btcData.CurrentPrice
 	}
 
+	if currentPrice != 0 {
+		ctx.Input.Market.P = currentPrice
+	}
+
 	// 账户
 	sb.WriteString(fmt.Sprintf("账户: 净值%.2f | 余额%.2f (%.1f%%) | 盈亏%+.2f%% | 保证金%.1f%% | 持仓%d个\n\n",
 		ctx.Account.TotalEquity,
@@ -432,8 +455,6 @@ func buildUserPrompt(ctx *Context) string {
 		ctx.Account.TotalPnLPct,
 		ctx.Account.MarginUsedPct,
 		ctx.Account.PositionCount))
-
-	input := buildInput(ctx.BTCETHLeverage, currentPrice)
 
 	// 持仓（完整市场数据）
 	if len(ctx.Positions) > 0 {
@@ -467,17 +488,6 @@ func buildUserPrompt(ctx *Context) string {
 			//	sb.WriteString("\n")
 			//}
 
-			s := NormalizeSide(pos.Side, true)
-			input.Pos = Position{
-				Side:      s,
-				Leverage:  pos.Leverage,
-				Entry:     pos.EntryPrice,
-				Qty:       pos.Quantity,
-				SL:        &pos.StopLoss,
-				PnlPct:    pos.UnrealizedPnLPct,
-				PnlPctMax: pos.PeakPnLPct,
-			}
-
 			//
 		}
 	} else {
@@ -504,7 +514,7 @@ func buildUserPrompt(ctx *Context) string {
 		// 使用FormatMarketData输出完整市场数据
 		sb.WriteString(fmt.Sprintf("### %d. %s\n\n", displayedCount, coin.Symbol))
 		//sb.WriteString(market.Format(marketData))
-		b, err := json.MarshalIndent(input, "", "  ")
+		b, err := json.MarshalIndent(ctx.Input, "", "  ")
 		if err != nil {
 			sb.WriteString(fmt.Sprintf("解析输入数据失败 %v", err))
 		}
@@ -531,57 +541,6 @@ func buildUserPrompt(ctx *Context) string {
 	sb.WriteString("现在请分析并输出决策（思维链 + JSON）\n")
 
 	return sb.String()
-}
-
-func buildInput(leverage int, price float64) Input {
-	symbol := "BTCUSDT"
-
-	input := Input{
-		Symbol:   symbol,
-		P:        0,
-		Leverage: leverage,
-		SSP:      nil,
-		T:        0,
-		C1:       Direction{},
-		C3:       Direction{},
-		C5:       Direction{},
-		Pos:      Position{},
-		Cfg:      Config{},
-	}
-
-	_, c1, c3, c5 := spider.FetchCombo()
-	ssp, err := spider.FetchSpiderRaw()
-	//sspResult := spider.NewSSPResult(ssp)
-	if err != nil {
-		log.Printf("获取蜘蛛丝数据失败 %v", err)
-	}
-
-	//klines, err := market.GetInputKlines(symbol)
-	//if err != nil {
-	//	log.Printf("获取Input Klines失败 %v", err)
-	//}
-
-	if price == 0 {
-		input.P = ssp.P
-	} else {
-		input.P = price
-	}
-	//input.P = ssp.P
-	input.SSP = ssp.SSP
-	input.T = ssp.T
-
-	input.C1.Dir = c1
-	input.C3.Dir = c3
-	input.C5.Dir = c5
-
-	//input.Bars1m = klines
-	//input.SSPBias = sspResult.Bias
-
-	input.Cfg.MaxLoss = 0.05
-	input.Cfg.TrailGap = 0.1
-	//input.Cfg.UseSspEdges = true
-
-	return input
 }
 
 // parseFullDecisionResponse 解析AI的完整决策响应
@@ -642,7 +601,7 @@ func extractDecisions(response string) ([]Decision, error) {
 	// 预清洗：去零宽/BOM
 	s := removeInvisibleRunes(response)
 	s = strings.TrimSpace(s)
-
+	fmt.Printf("AI Decision ordi %s", s)
 	// 🔧 关键修复 (Critical Fix)：在正则匹配之前就先修复全角字符！
 	// 否则正则表达式 \[ 无法匹配全角的 ［
 	s = fixMissingQuotes(s)
@@ -676,6 +635,7 @@ func extractDecisions(response string) ([]Decision, error) {
 		return decisions, nil
 	}
 
+	fmt.Printf("AI Decision json part %s", jsonPart)
 	// 2) 退而求其次 (Fallback)：全文寻找首个对象数组
 	// 注意：此时 jsonPart 已经过 fixMissingQuotes()，全角字符已转换为半角
 	jsonContent := strings.TrimSpace(reJSONArray.FindString(jsonPart))
@@ -965,21 +925,4 @@ func validateDecision(d *Decision, accountEquity float64, btcEthLeverage, altcoi
 	}
 
 	return nil
-}
-
-func NormalizeSide(raw string, hasPosition bool) string {
-	// 优先根据是否有仓来判断平仓状态
-	if !hasPosition {
-		return "F"
-	}
-
-	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "long":
-		return "L"
-	case "short":
-		return "S"
-	default:
-		// 不认识的字符串，当作无仓处理，避免乱来
-		return "F"
-	}
 }

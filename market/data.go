@@ -24,18 +24,18 @@ var (
 	frCacheTTL     = 1 * time.Hour
 )
 
-func GetInputKlines(symbol string) ([]InputKline, error) {
-	klines1m := make([]InputKline, 0)
+func GetInputKlines(symbol, interval string) ([]InputKline, error) {
+	klinesxm := make([]InputKline, 0)
 	// 标准化symbol
 	symbol = Normalize(symbol)
-	// 获取3分钟K线数据 (最近10个)
-	klines, err := WSMonitorCli.GetCurrentKlines(symbol, "1m") // 多获取一些用于计算
+	// 获取x分钟K线数据 (最近10个)
+	klines, err := WSMonitorCli.GetCurrentKlines(symbol, interval) // 多获取一些用于计算
 	if err != nil {
-		return nil, fmt.Errorf("获取1分钟K线失败: %v", err)
+		return nil, fmt.Errorf("获取 %s K线失败: %v", interval, err)
 	}
 
-	if len(klines) < 3 {
-		return nil, fmt.Errorf("获取1分钟K线数据小于3条: %v", len(klines))
+	if len(klines) < 10 {
+		return nil, fmt.Errorf("获取 %s K线数据小于10条: %v", interval, len(klines))
 	}
 
 	for _, l := range klines {
@@ -47,10 +47,10 @@ func GetInputKlines(symbol string) ([]InputKline, error) {
 			L:  l.Low,
 		}
 
-		klines1m = append(klines1m, k)
+		klinesxm = append(klinesxm, k)
 	}
 
-	return klines1m, nil
+	return klinesxm, nil
 }
 
 // Get 获取指定代币的市场数据

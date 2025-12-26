@@ -118,6 +118,8 @@ type AutoTrader struct {
 	lastBalanceSyncTime   time.Time          // 上次余额同步时间
 	database              interface{}        // 数据库引用（用于自动更新余额）
 	userID                string             // 用户ID
+	T                     int64              `json:"T"`
+	SSP                   []float64          `json:"ssp"`
 }
 
 // NewAutoTrader 创建自动交易器
@@ -288,6 +290,8 @@ func NewAutoTrader(config AutoTraderConfig, database interface{}, userID string)
 		lastBalanceSyncTime:   time.Now(), // 初始化为当前时间
 		database:              database,
 		userID:                userID,
+		T:                     0,
+		SSP:                   make([]float64, 0),
 	}, nil
 }
 
@@ -475,14 +479,15 @@ func (at *AutoTrader) runCycle() error {
 	// log.Printf(strings.Repeat("-", 70) + "\n")
 
 	// 7. 打印AI决策
-	// log.Printf("📋 AI决策列表 (%d 个):\n", len(decision.Decisions))
-	// for i, d := range decision.Decisions {
-	//     log.Printf("  [%d] %s: %s - %s", i+1, d.Symbol, d.Action, d.Reasoning)
-	//     if d.Action == "open_long" || d.Action == "open_short" {
-	//        log.Printf("      杠杆: %dx | 仓位: %.2f USDT | 止损: %.4f | 止盈: %.4f",
-	//           d.Leverage, d.PositionSizeUSD, d.StopLoss, d.TakeProfit)
-	//     }
-	// }
+	log.Printf("📋 AI决策列表 (%d 个):\n", len(decision.Decisions))
+	for i, d := range decision.Decisions {
+		fmt.Printf("决策 %v", d)
+		log.Printf("  [%d] %s: %s - %s", i+1, d.Symbol, d.Action, d.Reasoning)
+		if d.Action == "open_long" || d.Action == "open_short" {
+			log.Printf("      杠杆: %dx | 仓位: %.2f USDT | 止损: %.4f | 止盈: %.4f",
+				d.Leverage, d.PositionSizeUSD, d.StopLoss, d.TakeProfit)
+		}
+	}
 	log.Println()
 	log.Print(strings.Repeat("-", 70))
 	// 8. 对决策排序：确保先平仓后开仓（防止仓位叠加超限）
@@ -569,6 +574,35 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 	// 当前持仓的key集合（用于清理已平仓的记录）
 	currentPositionKeys := make(map[string]bool)
 
+	// 构建AI的输入input
+	historyTags := make([]string, 0)
+	historySSP := make([]map[string]any, 0)
+
+	// 获取蜘蛛丝快照
+	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
+
+	stopLoss := float64(0)
+	takeProfit := float64(0)
+	symbol := "BTCUSDT"
+	snapshot, err := spider.LoadSnapshotForSymbol(baseDir, symbol)
+	if err != nil {
+		log.Println("加载蜘蛛丝快照失败", err)
+		log.Printf("symbol %s", symbol)
+	}
+
+	if snapshot != nil {
+		stopLoss = snapshot.StopLoss
+		takeProfit = snapshot.TakeProfit
+		historyTags = snapshot.HistoryTags
+		historySSP = snapshot.HistorySSP
+		log.Printf("加载蜘蛛丝快照 snapsho: %v, stopLoss: %v, takeProfit: %v, historyTas: %v, historySSP: %v", snapshot, stopLoss, takeProfit, historyTags, historySSP)
+	}
+
+	input, T, SSP := buildInput(at.config.BTCETHLeverage, historySSP)
+
+	at.T = T
+	at.SSP = SSP
+
 	for _, pos := range positions {
 		symbol := pos["symbol"].(string)
 		side := pos["side"].(string)
@@ -612,27 +646,13 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 		peakPnlPct := at.peakPnLCache[posKey]
 		at.peakPnLCacheMutex.RUnlock()
 
-		// 获取蜘蛛丝快照
-		baseDir := fmt.Sprintf("decision_logs/%s", at.id)
-
-		stopLoss := float64(0)
-		snapshot, err := spider.LoadSnapshotForSymbol(baseDir, symbol)
-		if err != nil {
-			log.Println("加载蜘蛛丝快照失败", err)
-			log.Printf("symbol %s", symbol)
-		}
-
-		if snapshot != nil {
-			stopLoss = snapshot.StopLoss
-			log.Printf("加载蜘蛛丝快照 snapsho: %v, stopLoss: %v", snapshot, stopLoss)
-		}
-
 		positionInfos = append(positionInfos, decision.PositionInfo{
 			Symbol:           symbol,
 			Side:             side,
 			EntryPrice:       entryPrice,
 			MarkPrice:        markPrice,
 			StopLoss:         stopLoss,
+			TakeProfit:       takeProfit,
 			Quantity:         quantity,
 			Leverage:         leverage,
 			UnrealizedPnL:    unrealizedPnl,
@@ -642,6 +662,18 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 			MarginUsed:       marginUsed,
 			UpdateTime:       updateTime,
 		})
+
+		s := NormalizeSide(side, true)
+		input.Pos = decision.Position{
+			Side:      s,
+			Leverage:  leverage,
+			Entry:     entryPrice,
+			Qty:       quantity,
+			SL:        &stopLoss,
+			TP:        &takeProfit,
+			PnlPct:    pnlPct,
+			PnlPctMax: peakPnlPct,
+		}
 	}
 
 	// 清理已平仓的持仓记录
@@ -679,6 +711,8 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 	}
 
 	// 6. 构建上下文
+	input.HistoryCtx.Tags = historyTags
+
 	ctx := &decision.Context{
 		CurrentTime:     time.Now().Format("2006-01-02 15:04:05"),
 		RuntimeMinutes:  int(time.Since(at.startTime).Minutes()),
@@ -698,6 +732,7 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 		Positions:      positionInfos,
 		CandidateCoins: candidateCoins,
 		Performance:    performance, // 添加历史表现分析
+		Input:          input,
 	}
 
 	return ctx, nil
@@ -720,12 +755,33 @@ func (at *AutoTrader) executeDecisionWithRecord(decision *decision.Decision, act
 		return at.executeUpdateTakeProfitWithRecord(decision, actionRecord)
 	case "partial_close":
 		return at.executePartialCloseWithRecord(decision, actionRecord)
-	case "hold", "wait":
+	case "wait":
+		return at.saveHistory(decision, actionRecord)
+	case "hold":
 		// 无需执行，仅记录
 		return nil
 	default:
 		return fmt.Errorf("未知的action: %s", decision.Action)
 	}
+}
+
+func (at *AutoTrader) saveHistory(decision *decision.Decision, actionRecord *logger.DecisionAction) error {
+	log.Printf("保存History Tag, %s", decision.HistoryView)
+
+	// 保存蜘蛛丝快照
+	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
+
+	err := spider.UpdateHistoryTagsForSymbol(baseDir, decision.Symbol, decision.HistoryView)
+	if err != nil {
+		log.Printf("更新蜘蛛丝快照失败: %v", err)
+	}
+
+	err = spider.AppendHistorySSPForSymbol(baseDir, decision.Symbol, at.T, at.SSP)
+	if err != nil {
+		log.Printf("更新蜘蛛丝快照失败: %v", err)
+	}
+
+	return nil
 }
 
 // executeOpenLongWithRecord 执行开多仓并记录详细信息
@@ -789,7 +845,15 @@ func (at *AutoTrader) executeOpenLongWithRecord(decision *decision.Decision, act
 	// 保存蜘蛛丝快照
 	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
 	timeNow := time.Now().UnixMilli()
-	err = spider.SaveSnapshotOnOpen(baseDir, decision.Symbol, "LONG", decision.StopLoss, timeNow)
+
+	historySSP := []map[string]any{
+		{
+			"T":   at.T,
+			"SSP": at.SSP,
+		},
+	}
+
+	err = spider.SaveSnapshotOnOpen(baseDir, decision.Symbol, "LONG", decision.StopLoss, decision.TakeProfit, timeNow, decision.HistoryView, historySSP)
 	if err != nil {
 		log.Printf("保存蜘蛛丝快照失败: %v", err)
 	}
@@ -809,9 +873,9 @@ func (at *AutoTrader) executeOpenLongWithRecord(decision *decision.Decision, act
 	if err := at.trader.SetStopLoss(decision.Symbol, "LONG", quantity, decision.StopLoss); err != nil {
 		log.Printf("  ⚠ 设置止损失败: %v", err)
 	}
-	//if err := at.trader.SetTakeProfit(decision.Symbol, "LONG", quantity, decision.TakeProfit); err != nil {
-	//	log.Printf("  ⚠ 设置止盈失败: %v", err)
-	//}
+	if err := at.trader.SetTakeProfit(decision.Symbol, "LONG", quantity, decision.TakeProfit); err != nil {
+		log.Printf("  ⚠ 设置止盈失败: %v", err)
+	}
 
 	return nil
 }
@@ -877,7 +941,15 @@ func (at *AutoTrader) executeOpenShortWithRecord(decision *decision.Decision, ac
 	// 保存蜘蛛丝快照
 	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
 	timeNow := time.Now().UnixMilli()
-	err = spider.SaveSnapshotOnOpen(baseDir, decision.Symbol, "SHORT", decision.StopLoss, timeNow)
+
+	historySSP := []map[string]any{
+		{
+			"T":   at.T,
+			"SSP": at.SSP,
+		},
+	}
+
+	err = spider.SaveSnapshotOnOpen(baseDir, decision.Symbol, "SHORT", decision.StopLoss, decision.TakeProfit, timeNow, decision.HistoryView, historySSP)
 	if err != nil {
 		log.Printf("保存蜘蛛丝快照失败: %v", err)
 	}
@@ -897,9 +969,9 @@ func (at *AutoTrader) executeOpenShortWithRecord(decision *decision.Decision, ac
 	if err := at.trader.SetStopLoss(decision.Symbol, "SHORT", quantity, decision.StopLoss); err != nil {
 		log.Printf("  ⚠ 设置止损失败: %v", err)
 	}
-	//if err := at.trader.SetTakeProfit(decision.Symbol, "SHORT", quantity, decision.TakeProfit); err != nil {
-	//	log.Printf("  ⚠ 设置止盈失败: %v", err)
-	//}
+	if err := at.trader.SetTakeProfit(decision.Symbol, "SHORT", quantity, decision.TakeProfit); err != nil {
+		log.Printf("  ⚠ 设置止盈失败: %v", err)
+	}
 
 	return nil
 }
@@ -926,6 +998,13 @@ func (at *AutoTrader) executeCloseLongWithRecord(decision *decision.Decision, ac
 		actionRecord.OrderID = orderID
 	}
 
+	// 删除蜘蛛丝快照
+	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
+	err = spider.DeleteSnapshotOnClose(baseDir, decision.Symbol)
+	if err != nil {
+		log.Printf("删除蜘蛛丝快照失败: %v", err)
+	}
+
 	log.Printf("  ✓ 平仓成功")
 	return nil
 }
@@ -950,6 +1029,13 @@ func (at *AutoTrader) executeCloseShortWithRecord(decision *decision.Decision, a
 	// 记录订单ID
 	if orderID, ok := order["orderId"].(int64); ok {
 		actionRecord.OrderID = orderID
+	}
+
+	// 删除蜘蛛丝快照
+	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
+	err = spider.DeleteSnapshotOnClose(baseDir, decision.Symbol)
+	if err != nil {
+		log.Printf("删除蜘蛛丝快照失败: %v", err)
 	}
 
 	log.Printf("  ✓ 平仓成功")
@@ -1037,6 +1123,8 @@ func (at *AutoTrader) executeUpdateStopLossWithRecord(decision *decision.Decisio
 	}
 
 	// 更新蜘蛛丝快照
+	_ = at.saveHistory(decision, actionRecord)
+
 	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
 	err = spider.UpdateStopLossForSymbol(baseDir, decision.Symbol, decision.NewStopLoss)
 	if err != nil {
@@ -1125,6 +1213,15 @@ func (at *AutoTrader) executeUpdateTakeProfitWithRecord(decision *decision.Decis
 	err = at.trader.SetTakeProfit(decision.Symbol, positionSide, quantity, decision.NewTakeProfit)
 	if err != nil {
 		return fmt.Errorf("修改止盈失败: %w", err)
+	}
+
+	// 更新蜘蛛丝快照
+	_ = at.saveHistory(decision, actionRecord)
+
+	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
+	err = spider.UpdateTakeProfitForSymbol(baseDir, decision.Symbol, decision.NewTakeProfit)
+	if err != nil {
+		log.Printf("更新蜘蛛丝快照失败: %v", err)
 	}
 
 	log.Printf("  ✓ 止盈已调整: %.2f (当前价格: %.2f)", decision.NewTakeProfit, marketData.CurrentPrice)
@@ -1755,4 +1852,101 @@ func (at *AutoTrader) ClearPeakPnLCache(symbol, side string) {
 
 	posKey := symbol + "_" + side
 	delete(at.peakPnLCache, posKey)
+}
+
+func buildInput(leverage int, historySSP []map[string]any) (decision.Input, int64, []float64) {
+	symbol := "BTCUSDT"
+
+	input := decision.Input{
+		Symbol:     symbol,
+		Market:     decision.Market{},
+		Bars1m:     nil,
+		Bars5m:     nil,
+		Bars15m:    nil,
+		StructCtx:  spider.StructCtx{},
+		Pos:        decision.Position{},
+		Cfg:        decision.Config{},
+		HistoryCtx: decision.HCtx{},
+	}
+
+	_, c1, c3, c5 := spider.FetchCombo()
+	ssp, err := spider.FetchSpiderRaw()
+	//sspResult := spider.NewSSPResult(ssp)
+	if err != nil {
+		log.Printf("获取蜘蛛丝数据失败 %v", err)
+	}
+
+	box, err1 := spider.BuildSuperBox(ssp.P, ssp.SSP)
+	if err1 != nil {
+		log.Printf("创建Box失败 %v", err1)
+	}
+
+	if box.Zone != "" {
+		input.Market.SspZone = box.Zone
+	}
+
+	drift := spider.ComputeSSPBoxDrift(ssp.P, historySSP)
+	if drift != "" {
+		input.Market.SspBoxDrift = drift
+	}
+
+	klines1m, err := market.GetInputKlines(symbol, "1m")
+	if err != nil {
+		log.Printf("获取Input Klines失败 %v", err)
+	}
+
+	klines5m, err := market.GetInputKlines(symbol, "5m")
+	if err != nil {
+		log.Printf("获取Input Klines失败 %v", err)
+	}
+
+	klines15m, err := market.GetInputKlines(symbol, "15m")
+	if err != nil {
+		log.Printf("获取Input Klines失败 %v", err)
+	}
+
+	structCtx := spider.BuildStructCtx(klines1m, klines5m, klines15m, 10, 3, 4, 5)
+
+	input.Market.P = ssp.P
+	input.Market.SSP = ssp.SSP
+	input.Market.Leverage = leverage
+
+	input.Market.C1 = c1
+	input.Market.C3 = c3
+	input.Market.C5 = c5
+
+	last1m := min(len(klines1m), 5)
+	input.Bars1m = klines1m[(len(klines1m) - last1m):]
+	last5m := min(len(klines5m), 3)
+	input.Bars5m = klines5m[(len(klines5m) - last5m):]
+	last15m := min(len(klines15m), 3)
+	input.Bars15m = klines15m[(len(klines15m) - last15m):]
+	//input.SSPBias = sspResult.Bias
+
+	input.StructCtx = structCtx
+
+	//input.HistoryCtx.Tags = tags
+
+	//input.Cfg.MaxLoss = 0.05
+	//input.Cfg.TrailGap = 0.02
+	//input.Cfg.UseSspEdges = true
+
+	return input, ssp.T, ssp.SSP
+}
+
+func NormalizeSide(raw string, hasPosition bool) string {
+	// 优先根据是否有仓来判断平仓状态
+	if !hasPosition {
+		return "F"
+	}
+
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "long":
+		return "L"
+	case "short":
+		return "S"
+	default:
+		// 不认识的字符串，当作无仓处理，避免乱来
+		return "F"
+	}
 }

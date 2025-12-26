@@ -1,17 +1,17 @@
 package spider
 
-//// SSPResponse 对应 Python 的 SSPResponse Pydantic 模型
-//// 协议示例:
-////
-////	{"P":"83951.82000000","SSP":[83950,83950,84050,...],"T":1763805060000}
+// SSPResponse 对应 Python 的 SSPResponse Pydantic 模型
+// 协议示例:
+//
+//	{"P":"83951.82000000","SSP":[83950,83950,84050,...],"T":1763805060000}
 //type SSPResponse struct {
 //	P   string  `json:"P"`   // current BTC price as string
 //	SSP []int64 `json:"SSP"` // spider-web price levels
 //	T   int64   `json:"T"`   // timestamp in milliseconds
 //}
-//
-//// SSPResult 对应 Python 的 SSPResult Pydantic 模型
-//// 注意：原来 Optional[Decimal] 的字段，这里统一用 0 表示无
+
+// SSPResult 对应 Python 的 SSPResult Pydantic 模型
+// 注意：原来 Optional[Decimal] 的字段，这里统一用 0 表示无
 //type SSPResult struct {
 //	Price     float64   `json:"price"`
 //	SSP       []int64   `json:"ssp"`

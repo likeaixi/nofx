@@ -91,11 +91,11 @@ func toLetter(s string) string {
 	t := strings.TrimSpace(strings.ToUpper(s))
 	switch t {
 	case "UP", "LONG", "BUY", "BULL":
-		return "U"
+		return "UP"
 	case "DOWN", "SHORT", "SELL", "BEAR":
-		return "D"
+		return "DOWN"
 	default:
-		return "N"
+		return "NEUTRAL"
 	}
 }
 
