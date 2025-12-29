@@ -433,7 +433,7 @@ func (at *AutoTrader) runCycle() error {
 		record.SystemPrompt = decision.SystemPrompt // 保存系统提示词
 		record.InputPrompt = decision.UserPrompt
 		record.CoTTrace = decision.CoTTrace
-		if len(decision.Decisions) > 0 {
+		if decision.Decisions.Decision != "" {
 			decisionJSON, _ := json.MarshalIndent(decision.Decisions, "", "  ")
 			record.DecisionJSON = string(decisionJSON)
 		}
@@ -479,48 +479,51 @@ func (at *AutoTrader) runCycle() error {
 	// log.Printf(strings.Repeat("-", 70) + "\n")
 
 	// 7. 打印AI决策
-	log.Printf("📋 AI决策列表 (%d 个):\n", len(decision.Decisions))
-	for i, d := range decision.Decisions {
-		fmt.Printf("决策 %v", d)
-		log.Printf("  [%d] %s: %s - %s", i+1, d.Symbol, d.Action, d.Reasoning)
-		if d.Action == "open_long" || d.Action == "open_short" {
-			log.Printf("      杠杆: %dx | 仓位: %.2f USDT | 止损: %.4f | 止盈: %.4f",
-				d.Leverage, d.PositionSizeUSD, d.StopLoss, d.TakeProfit)
-		}
-	}
+	//log.Printf("📋 AI决策列表 (%d 个):\n", len(decision.Decisions))
+	//for i, d := range decision.Decisions {
+	//	fmt.Printf("决策 %v", d)
+	//	log.Printf("  [%d] %s: %s - %s", i+1, d.Symbol, d.Action, d.Reasoning)
+	//	if d.Action == "open_long" || d.Action == "open_short" {
+	//		log.Printf("      杠杆: %dx | 仓位: %.2f USDT | 止损: %.4f | 止盈: %.4f",
+	//			d.Leverage, d.PositionSizeUSD, d.StopLoss, d.TakeProfit)
+	//	}
+	//}
+	fmt.Printf("决策 %v", decision.Decisions.Decision)
+	log.Printf("  %s: %s - %s", decision.Decisions.Decision, decision.Decisions.Mode, decision.Decisions.Logic.Summary)
+
 	log.Println()
 	log.Print(strings.Repeat("-", 70))
 	// 8. 对决策排序：确保先平仓后开仓（防止仓位叠加超限）
 	log.Print(strings.Repeat("-", 70))
 
 	// 8. 对决策排序：确保先平仓后开仓（防止仓位叠加超限）
-	sortedDecisions := sortDecisionsByPriority(decision.Decisions)
+	//sortedDecisions := sortDecisionsByPriority(decision.Decisions)
 
 	log.Println("🔄 执行顺序（已优化）: 先平仓→后开仓")
-	for i, d := range sortedDecisions {
-		log.Printf("  [%d] %s %s", i+1, d.Symbol, d.Action)
-	}
+	//for i, d := range sortedDecisions {
+	//	log.Printf("  [%d] %s %s", i+1, d.Symbol, d.Action)
+	//}
 	log.Println()
 
 	// 执行决策并记录结果
-	for _, d := range sortedDecisions {
+	if decision.Decisions.Decision != "" {
 		actionRecord := logger.DecisionAction{
-			Action:    d.Action,
-			Symbol:    d.Symbol,
+			Action:    decision.Decisions.Decision,
+			Symbol:    "BTCUSDT",
 			Quantity:  0,
-			Leverage:  d.Leverage,
+			Leverage:  20,
 			Price:     0,
 			Timestamp: time.Now(),
 			Success:   false,
 		}
 
-		if err := at.executeDecisionWithRecord(&d, &actionRecord); err != nil {
-			log.Printf("❌ 执行决策失败 (%s %s): %v", d.Symbol, d.Action, err)
+		if err := at.executeDecisionWithRecord(&decision.Decisions, &actionRecord); err != nil {
+			log.Printf("❌ 执行决策失败 (%s %s): %v", "BTCUSDT", decision.Decisions.Decision, err)
 			actionRecord.Error = err.Error()
-			record.ExecutionLog = append(record.ExecutionLog, fmt.Sprintf("❌ %s %s 失败: %v", d.Symbol, d.Action, err))
+			record.ExecutionLog = append(record.ExecutionLog, fmt.Sprintf("❌ %s %s 失败: %v", "BTCUSDT", decision.Decisions.Decision, err))
 		} else {
 			actionRecord.Success = true
-			record.ExecutionLog = append(record.ExecutionLog, fmt.Sprintf("✓ %s %s 成功", d.Symbol, d.Action))
+			record.ExecutionLog = append(record.ExecutionLog, fmt.Sprintf("✓ %s %s 成功", decision.Decisions.Decision, decision.Decisions.Decision))
 			// 成功执行后短暂延迟
 			time.Sleep(1 * time.Second)
 		}
@@ -739,44 +742,46 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 }
 
 // executeDecisionWithRecord 执行AI决策并记录详细信息
-func (at *AutoTrader) executeDecisionWithRecord(decision *decision.Decision, actionRecord *logger.DecisionAction) error {
-	switch decision.Action {
-	case "open_long":
-		return at.executeOpenLongWithRecord(decision, actionRecord)
-	case "open_short":
-		return at.executeOpenShortWithRecord(decision, actionRecord)
-	case "close_long":
-		return at.executeCloseLongWithRecord(decision, actionRecord)
-	case "close_short":
-		return at.executeCloseShortWithRecord(decision, actionRecord)
-	case "update_stop_loss":
-		return at.executeUpdateStopLossWithRecord(decision, actionRecord)
-	case "update_take_profit":
-		return at.executeUpdateTakeProfitWithRecord(decision, actionRecord)
-	case "partial_close":
-		return at.executePartialCloseWithRecord(decision, actionRecord)
-	case "wait":
-		return at.saveHistory(decision, actionRecord)
-	case "hold":
-		// 无需执行，仅记录
-		return nil
-	default:
-		return fmt.Errorf("未知的action: %s", decision.Action)
-	}
+func (at *AutoTrader) executeDecisionWithRecord(decision *decision.Output, actionRecord *logger.DecisionAction) error {
+	//switch decision.Action {
+	//case "open_long":
+	//	return at.executeOpenLongWithRecord(decision, actionRecord)
+	//case "open_short":
+	//	return at.executeOpenShortWithRecord(decision, actionRecord)
+	//case "close_long":
+	//	return at.executeCloseLongWithRecord(decision, actionRecord)
+	//case "close_short":
+	//	return at.executeCloseShortWithRecord(decision, actionRecord)
+	//case "update_stop_loss":
+	//	return at.executeUpdateStopLossWithRecord(decision, actionRecord)
+	//case "update_take_profit":
+	//	return at.executeUpdateTakeProfitWithRecord(decision, actionRecord)
+	//case "partial_close":
+	//	return at.executePartialCloseWithRecord(decision, actionRecord)
+	//case "wait":
+	//	return at.saveHistory(decision, actionRecord)
+	//case "hold":
+	//	// 无需执行，仅记录
+	//	return nil
+	//default:
+	//	return fmt.Errorf("未知的action: %s", decision.Action)
+	//}
+
+	return at.saveHistory(decision, actionRecord)
 }
 
-func (at *AutoTrader) saveHistory(decision *decision.Decision, actionRecord *logger.DecisionAction) error {
-	log.Printf("保存History Tag, %s", decision.HistoryView)
+func (at *AutoTrader) saveHistory(decision *decision.Output, actionRecord *logger.DecisionAction) error {
+	log.Printf("保存History Tag, %s", decision.Logic.HistoryView)
 
 	// 保存蜘蛛丝快照
 	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
 
-	err := spider.UpdateHistoryTagsForSymbol(baseDir, decision.Symbol, decision.HistoryView)
+	err := spider.UpdateHistoryTagsForSymbol(baseDir, "BTCUSDT", decision.Logic.HistoryView)
 	if err != nil {
 		log.Printf("更新蜘蛛丝快照失败: %v", err)
 	}
 
-	err = spider.AppendHistorySSPForSymbol(baseDir, decision.Symbol, at.T, at.SSP)
+	err = spider.AppendHistorySSPForSymbol(baseDir, "BTCUSDT", at.T, at.SSP)
 	if err != nil {
 		log.Printf("更新蜘蛛丝快照失败: %v", err)
 	}
@@ -1123,7 +1128,7 @@ func (at *AutoTrader) executeUpdateStopLossWithRecord(decision *decision.Decisio
 	}
 
 	// 更新蜘蛛丝快照
-	_ = at.saveHistory(decision, actionRecord)
+	//_ = at.saveHistory(decision, actionRecord)
 
 	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
 	err = spider.UpdateStopLossForSymbol(baseDir, decision.Symbol, decision.NewStopLoss)
@@ -1216,7 +1221,7 @@ func (at *AutoTrader) executeUpdateTakeProfitWithRecord(decision *decision.Decis
 	}
 
 	// 更新蜘蛛丝快照
-	_ = at.saveHistory(decision, actionRecord)
+	//_ = at.saveHistory(decision, actionRecord)
 
 	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
 	err = spider.UpdateTakeProfitForSymbol(baseDir, decision.Symbol, decision.NewTakeProfit)
