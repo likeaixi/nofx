@@ -456,7 +456,7 @@ func (at *AutoTrader) runCycle() error {
 				log.Println("💭 AI思维链分析（错误情况）:")
 				log.Println(strings.Repeat("-", 70))
 				log.Println(decision.CoTTrace)
-				log.Println(strings.Repeat("-", 70))
+				log.Println(strings.Repeat("-", 70) + "\n")
 			}
 		}
 

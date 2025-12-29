@@ -252,9 +252,7 @@ func (o Output) Validate() error {
 	default:
 		return fmt.Errorf("invalid mode: %q", o.Mode)
 	}
-	if strings.TrimSpace(o.EntryZone) == "" {
-		return errors.New("entry_zone is empty")
-	}
+
 	return nil
 }
 
