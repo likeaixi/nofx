@@ -433,7 +433,7 @@ func (at *AutoTrader) runCycle() error {
 		record.SystemPrompt = decision.SystemPrompt // 保存系统提示词
 		record.InputPrompt = decision.UserPrompt
 		record.CoTTrace = decision.CoTTrace
-		if decision.Decisions.Decision != "" {
+		if len(decision.Decisions) > 0 {
 			decisionJSON, _ := json.MarshalIndent(decision.Decisions, "", "  ")
 			record.DecisionJSON = string(decisionJSON)
 		}
@@ -479,17 +479,15 @@ func (at *AutoTrader) runCycle() error {
 	// log.Printf(strings.Repeat("-", 70) + "\n")
 
 	// 7. 打印AI决策
-	//log.Printf("📋 AI决策列表 (%d 个):\n", len(decision.Decisions))
-	//for i, d := range decision.Decisions {
-	//	fmt.Printf("决策 %v", d)
-	//	log.Printf("  [%d] %s: %s - %s", i+1, d.Symbol, d.Action, d.Reasoning)
-	//	if d.Action == "open_long" || d.Action == "open_short" {
-	//		log.Printf("      杠杆: %dx | 仓位: %.2f USDT | 止损: %.4f | 止盈: %.4f",
-	//			d.Leverage, d.PositionSizeUSD, d.StopLoss, d.TakeProfit)
-	//	}
-	//}
-	fmt.Printf("决策 %v", decision.Decisions.Decision)
-	log.Printf("  %s: %s - %s", decision.Decisions.Decision, decision.Decisions.Mode, decision.Decisions.Logic.Summary)
+	log.Printf("📋 AI决策列表 (%d 个):\n", len(decision.Decisions))
+	for _, d := range decision.Decisions {
+		fmt.Printf("决策 %v", d.Decision)
+		log.Printf("  %s: %s - %s", d.Decision, d.Mode, d.Logic.Summary)
+		//if d.Action == "open_long" || d.Action == "open_short" {
+		//	log.Printf("      杠杆: %dx | 仓位: %.2f USDT | 止损: %.4f | 止盈: %.4f",
+		//		d.Leverage, d.PositionSizeUSD, d.StopLoss, d.TakeProfit)
+		//}
+	}
 
 	log.Println()
 	log.Print(strings.Repeat("-", 70))
@@ -506,9 +504,9 @@ func (at *AutoTrader) runCycle() error {
 	log.Println()
 
 	// 执行决策并记录结果
-	if decision.Decisions.Decision != "" {
+	for _, d := range decision.Decisions {
 		actionRecord := logger.DecisionAction{
-			Action:    decision.Decisions.Decision,
+			Action:    d.Decision,
 			Symbol:    "BTCUSDT",
 			Quantity:  0,
 			Leverage:  20,
@@ -517,13 +515,13 @@ func (at *AutoTrader) runCycle() error {
 			Success:   false,
 		}
 
-		if err := at.executeDecisionWithRecord(&decision.Decisions, &actionRecord); err != nil {
-			log.Printf("❌ 执行决策失败 (%s %s): %v", "BTCUSDT", decision.Decisions.Decision, err)
+		if err := at.executeDecisionWithRecord(&d, &actionRecord); err != nil {
+			log.Printf("❌ 执行决策失败 (%s %s): %v", "BTCUSDT", d.Decision, err)
 			actionRecord.Error = err.Error()
-			record.ExecutionLog = append(record.ExecutionLog, fmt.Sprintf("❌ %s %s 失败: %v", "BTCUSDT", decision.Decisions.Decision, err))
+			record.ExecutionLog = append(record.ExecutionLog, fmt.Sprintf("❌ %s %s 失败: %v", "BTCUSDT", d.Decision, err))
 		} else {
 			actionRecord.Success = true
-			record.ExecutionLog = append(record.ExecutionLog, fmt.Sprintf("✓ %s %s 成功", decision.Decisions.Decision, decision.Decisions.Decision))
+			record.ExecutionLog = append(record.ExecutionLog, fmt.Sprintf("✓ %s %s 成功", d.Decision, d.Decision))
 			// 成功执行后短暂延迟
 			time.Sleep(1 * time.Second)
 		}

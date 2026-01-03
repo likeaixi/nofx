@@ -181,7 +181,7 @@ type FullDecision struct {
 	SystemPrompt string    `json:"system_prompt"` // 系统提示词（发送给AI的系统prompt）
 	UserPrompt   string    `json:"user_prompt"`   // 发送给AI的输入prompt
 	CoTTrace     string    `json:"cot_trace"`     // 思维链分析（AI输出）
-	Decisions    Output    `json:"decisions"`     // 具体决策列表
+	Decisions    []Output  `json:"decisions"`     // 具体决策列表
 	Timestamp    time.Time `json:"timestamp"`
 	// AIRequestDurationMs 记录 AI API 调用耗时（毫秒）方便排查延迟问题
 	AIRequestDurationMs int64 `json:"ai_request_duration_ms,omitempty"`
@@ -547,9 +547,9 @@ func buildSystemPrompt(accountEquity float64, btcEthLeverage, altcoinLeverage in
 	sb.WriteString("- Briefly analyze your thinking process \n")
 	sb.WriteString("</reasoning>\n\n")
 	sb.WriteString("<decision>\n")
-	sb.WriteString("```json\n")
-	sb.WriteString(fmt.Sprintf("{...}\n"))
-	sb.WriteString("```\n")
+	sb.WriteString("```json\n[\n")
+	sb.WriteString("{...}\n")
+	sb.WriteString("]\n```\n")
 	sb.WriteString("</decision>\n\n")
 	//sb.WriteString("## 字段说明\n\n")
 	//sb.WriteString("- `action`: open_long | open_short | close_long | close_short | update_stop_loss | update_take_profit | partial_close | hold | wait\n")
@@ -688,7 +688,7 @@ func parseFullDecisionResponse(aiResponse string, accountEquity float64, btcEthL
 	if err != nil {
 		return &FullDecision{
 			CoTTrace:  cotTrace,
-			Decisions: Output{},
+			Decisions: []Output{},
 		}, fmt.Errorf("提取决策失败: %w", err)
 	}
 
@@ -732,89 +732,89 @@ func extractCoTTrace(response string) string {
 }
 
 // extractDecisions 提取JSON决策列表
-func extractDecisions(response string) (output Output, err error) {
+func extractDecisions(response string) ([]Output, error) {
 	// 预清洗：去零宽/BOM
 	s := removeInvisibleRunes(response)
 	s = strings.TrimSpace(s)
 	fmt.Printf("AI Decision ordi %s", s)
-	//// 🔧 关键修复 (Critical Fix)：在正则匹配之前就先修复全角字符！
-	//// 否则正则表达式 \[ 无法匹配全角的 ［
-	//s = fixMissingQuotes(s)
-	//
-	//// 方法1: 优先尝试从 <decision> 标签中提取
-	//var jsonPart string
-	//if match := reDecisionTag.FindStringSubmatch(s); match != nil && len(match) > 1 {
-	//	jsonPart = strings.TrimSpace(match[1])
-	//	log.Printf("✓ 使用 <decision> 标签提取JSON")
-	//} else {
-	//	// 后备方案：使用整个响应
-	//	jsonPart = s
-	//	log.Printf("⚠️  未找到 <decision> 标签，使用全文搜索JSON")
-	//}
-	//
-	//// 修复 jsonPart 中的全角字符
-	//jsonPart = fixMissingQuotes(jsonPart)
-	//
-	//var out Output
-	//// 1) 优先从 ```json 代码块中提取
-	//if m := reJSONFence.FindStringSubmatch(jsonPart); m != nil && len(m) > 1 {
-	//	jsonContent := strings.TrimSpace(m[1])
-	//	jsonContent = compactArrayOpen(jsonContent) // 把 "[ {" 规整为 "[{"
-	//	jsonContent = fixMissingQuotes(jsonContent) // 二次修复（防止 regex 提取后还有残留全角）
-	//	if err := validateJSONFormat(jsonContent); err != nil {
-	//		return out, fmt.Errorf("JSON格式验证失败: %w\nJSON内容: %s\n完整响应:\n%s", err, jsonContent, response)
-	//	}
-	//	if err := json.Unmarshal([]byte(jsonContent), &out); err != nil {
-	//		return out, fmt.Errorf("JSON解析失败: %w\nJSON内容: %s", err, jsonContent)
-	//	}
-	//	return out, nil
-	//}
-	//
-	//fmt.Printf("AI Decision json part %s", jsonPart)
-	//// 2) 退而求其次 (Fallback)：全文寻找首个对象数组
-	//// 注意：此时 jsonPart 已经过 fixMissingQuotes()，全角字符已转换为半角
-	//jsonContent := strings.TrimSpace(reJSONArray.FindString(jsonPart))
-	//if jsonContent == "" {
-	//	// 🔧 安全回退 (Safe Fallback)：当AI只输出思维链没有JSON时，生成保底决策（避免系统崩溃）
-	//	log.Printf("⚠️  [SafeFallback] AI未输出JSON决策，进入安全等待模式 (AI response without JSON, entering safe wait mode)")
-	//
-	//	// 提取思维链摘要（最多 240 字符）
-	//	cotSummary := jsonPart
-	//	if len(cotSummary) > 240 {
-	//		cotSummary = cotSummary[:240] + "..."
-	//	}
-	//
-	//	// 生成保底决策：所有币种进入 wait 状态
-	//	fallbackDecision := Decision{
-	//		Symbol:    "ALL",
-	//		Action:    "wait",
-	//		Reasoning: fmt.Sprintf("模型未输出结构化JSON决策，进入安全等待；摘要：%s", cotSummary),
-	//	}
-	//
-	//	return []Decision{fallbackDecision}, nil
-	//}
-	//
-	//// 🔧 规整格式（此时全角字符已在前面修复过）
-	//jsonContent = compactArrayOpen(jsonContent)
-	//jsonContent = fixMissingQuotes(jsonContent) // 二次修复（防止 regex 提取后还有残留全角）
-	//
-	//// 🔧 验证 JSON 格式（检测常见错误）
-	//if err := validateJSONFormat(jsonContent); err != nil {
-	//	return nil, fmt.Errorf("JSON格式验证失败: %w\nJSON内容: %s\n完整响应:\n%s", err, jsonContent, response)
-	//}
-	//
-	//// 解析JSON
-	//var decisions []Decision
-	//if err := json.Unmarshal([]byte(jsonContent), &decisions); err != nil {
-	//	return nil, fmt.Errorf("JSON解析失败: %w\nJSON内容: %s", err, jsonContent)
-	//}
+	// 🔧 关键修复 (Critical Fix)：在正则匹配之前就先修复全角字符！
+	// 否则正则表达式 \[ 无法匹配全角的 ［
+	s = fixMissingQuotes(s)
 
-	output, err = ExtractAndParseDecisionObject(s)
-	if err != nil {
-		return output, err
+	// 方法1: 优先尝试从 <decision> 标签中提取
+	var jsonPart string
+	if match := reDecisionTag.FindStringSubmatch(s); match != nil && len(match) > 1 {
+		jsonPart = strings.TrimSpace(match[1])
+		log.Printf("✓ 使用 <decision> 标签提取JSON")
+	} else {
+		// 后备方案：使用整个响应
+		jsonPart = s
+		log.Printf("⚠️  未找到 <decision> 标签，使用全文搜索JSON")
 	}
 
-	return output, nil
+	// 修复 jsonPart 中的全角字符
+	jsonPart = fixMissingQuotes(jsonPart)
+
+	//var out Output
+	// 1) 优先从 ```json 代码块中提取
+	if m := reJSONFence.FindStringSubmatch(jsonPart); m != nil && len(m) > 1 {
+		jsonContent := strings.TrimSpace(m[1])
+		jsonContent = compactArrayOpen(jsonContent) // 把 "[ {" 规整为 "[{"
+		jsonContent = fixMissingQuotes(jsonContent) // 二次修复（防止 regex 提取后还有残留全角）
+		if err := validateJSONFormat(jsonContent); err != nil {
+			return nil, fmt.Errorf("JSON格式验证失败: %w\nJSON内容: %s\n完整响应:\n%s", err, jsonContent, response)
+		}
+		var decisions []Output
+		if err := json.Unmarshal([]byte(jsonContent), &decisions); err != nil {
+			return nil, fmt.Errorf("JSON解析失败: %w\nJSON内容: %s", err, jsonContent)
+		}
+		return decisions, nil
+	}
+
+	fmt.Printf("AI Decision json part %s", jsonPart)
+	// 2) 退而求其次 (Fallback)：全文寻找首个对象数组
+	// 注意：此时 jsonPart 已经过 fixMissingQuotes()，全角字符已转换为半角
+	jsonContent := strings.TrimSpace(reJSONArray.FindString(jsonPart))
+	if jsonContent == "" {
+		// 🔧 安全回退 (Safe Fallback)：当AI只输出思维链没有JSON时，生成保底决策（避免系统崩溃）
+		log.Printf("⚠️  [SafeFallback] AI未输出JSON决策，进入安全等待模式 (AI response without JSON, entering safe wait mode)")
+
+		// 提取思维链摘要（最多 240 字符）
+		cotSummary := jsonPart
+		if len(cotSummary) > 240 {
+			cotSummary = cotSummary[:240] + "..."
+		}
+
+		// 生成保底决策：所有币种进入 wait 状态
+		fallbackDecision := Output{
+			Decision: "WAIT",
+			Mode:     "NONE",
+		}
+
+		return []Output{fallbackDecision}, nil
+	}
+
+	// 🔧 规整格式（此时全角字符已在前面修复过）
+	jsonContent = compactArrayOpen(jsonContent)
+	jsonContent = fixMissingQuotes(jsonContent) // 二次修复（防止 regex 提取后还有残留全角）
+
+	// 🔧 验证 JSON 格式（检测常见错误）
+	if err := validateJSONFormat(jsonContent); err != nil {
+		return nil, fmt.Errorf("JSON格式验证失败: %w\nJSON内容: %s\n完整响应:\n%s", err, jsonContent, response)
+	}
+
+	// 解析JSON
+	var out []Output
+	if err := json.Unmarshal([]byte(jsonContent), &out); err != nil {
+		return nil, fmt.Errorf("JSON解析失败: %w\nJSON内容: %s", err, jsonContent)
+	}
+
+	//output, err = ExtractAndParseDecisionObject(s)
+	//if err != nil {
+	//	return output, err
+	//}
+
+	return out, nil
 }
 
 // fixMissingQuotes 替换中文引号和全角字符为英文引号和半角字符（避免AI输出全角JSON字符导致解析失败）

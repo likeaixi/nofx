@@ -25,7 +25,7 @@
   ],
 
   "Rules": [
-    "Output MUST be exactly one JSON object matching the Output Contract; no markdown, no extra text.",
+    "Output MUST be exactly JSON Array and matching the Output Contract.",
     "WAIT implies mode=NONE and tp_zone=[] and sl_zone=0.",
     "LONG/SHORT implies tp_zone has exactly 2 elements.",
     "Directional signal source: C3/C5 agreement required for new arming unless ARMED_WATCH is active.",
@@ -95,9 +95,10 @@ Compatibility shim (internal only; do not change I/O): if top-level `P/SSP/C1/C3
 
 ## B) Output Contract (Strict, Unchanged)
 
-Output MUST be one JSON exactly:
+Output MUST be JSON Array exactly:
 
 ```json
+[
 {
   "decision": "LONG | SHORT | WAIT",
   "mode": "RANGE_REVERT | BREAKOUT_FOLLOW | NONE",
@@ -118,6 +119,7 @@ Output MUST be one JSON exactly:
     "summary": "string (CN)"
   }
 }
+]
 ```
 
 Constraints:
