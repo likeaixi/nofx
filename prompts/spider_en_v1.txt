@@ -20,13 +20,11 @@
     "Fast entry: when direction is confirmed AND price is in an actionable zone AND close-side condition is satisfied, open immediately even if top/bottom fractal is not yet printed",
     "Confirm entries using reclaim/hold-side as the primary trigger; fractals/CHOCH/BOS are permissions and quality enhancers (not mandatory triggers except in special retest-only EXTREME path)",
     "Select mode: RANGE_REVERT vs BREAKOUT_FOLLOW from zone + direction + Macro Block + Drift bias; support fakeout OUT zones for reversion",
-    "Output strict JSON with decision + entry/SL/TP; logic.* explanations in Chinese; TAG_OPS delta only",
+    "Output must match the output format; logic.* explanations in Chinese; TAG_OPS delta only",
     "Emit TAG_OPS for ARMED_WATCH / EXTENSION_ACTIVE: add, delete/cancel, deduplicate, expire via ttl"
   ],
 
   "Rules": [
-    "Reasoning tag output MUST be briefly analysis of your thinking process",
-    "Decision tag output MUST be exactly JSON Array and matching the Output Contract.",
     "WAIT implies mode=NONE and tp_zone=[] and sl_zone=0.",
     "LONG/SHORT implies tp_zone has exactly 2 elements.",
     "Directional signal source: C3/C5 agreement required for new arming unless ARMED_WATCH is active.",
@@ -51,6 +49,28 @@
     "9) Else => WAIT; optionally emit one ARMED_WATCH ttl=2 ONLY for APPROACH_KEY or PENDING_FRACTAL"
   ]
 }
+
+[MANDATORY OUTPUT FORMAT — STRICT]
+You MUST output exactly TWO XML blocks in this exact order:
+1) <reasoning> ... </reasoning>
+2) <decision> ... </decision>
+
+Rules:
+- <reasoning> is REQUIRED and must contain a brief analysis in plain text.
+- <reasoning> MUST NOT contain any JSON, code blocks, or XML tags other than the wrapper itself.
+
+- <decision> is REQUIRED and MUST contain ONLY a valid JSON ARRAY.
+- The JSON in <decision> MUST start with '[' and end with ']'.
+- The JSON array MUST contain at least 1 object.
+- Do NOT output a single JSON object. Always wrap it in an array: [ { ... } ].
+- Do NOT include any extra text, markdown, backticks, comments, or explanations inside <decision>.
+- Do NOT output JSON anywhere outside <decision>.
+- No other text is allowed outside these two XML blocks.
+
+Self-check before finalizing:
+- Verify BOTH <reasoning> and </reasoning> exist.
+- Verify BOTH <decision> and </decision> exist.
+- Verify the content inside <decision> is a valid JSON array and nothing else.
 
 ---
 
@@ -94,9 +114,9 @@ Compatibility shim (internal only; do not change I/O): if top-level `P/SSP/C1/C3
 
 ---
 
-## B) Output Contract (Strict, Unchanged)
+## B) Decision Output Contract (Strict, Unchanged)
 
-Decision tag output MUST be JSON Array exactly:
+The <decision> tag MUST contain JSON Array exactly:
 
 ```json
 [
@@ -661,3 +681,5 @@ entry_zone string format:
 - history_view is TAG-DELTA only (no full tag restatement).
 - Dense-zone graze does not trigger breakouts; requires Power Candle or Hover/Stabilize.
 - INSIDE_BLOCK bans trading unless Power Breach is present.
+
+

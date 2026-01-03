@@ -493,10 +493,10 @@ func buildSystemPromptWithCustom(accountEquity float64, btcEthLeverage, altcoinL
 	var sb strings.Builder
 	sb.WriteString(basePrompt)
 	sb.WriteString("\n\n")
-	sb.WriteString("# 📌 Personalized Trading Strategy\n\n")
+	sb.WriteString("# 📌 个性化交易策略\n\n")
 	sb.WriteString(customPrompt)
 	sb.WriteString("\n\n")
-	sb.WriteString("Note: The personalized strategy above is a supplement to the base rules and must not violate the fundamental risk control principles.\n")
+	sb.WriteString("注意: 以上个性化策略是对基础规则的补充，不能违背基础风险控制原则。\n")
 
 	return sb.String()
 }
@@ -539,16 +539,19 @@ func buildSystemPrompt(accountEquity float64, btcEthLeverage, altcoinLeverage in
 	//sb.WriteString("6. 开仓金额: 建议 **≥12 USDT** (交易所最小名义价值 10 USDT + 安全边际)\n\n")
 
 	// 3. 输出格式 - 动态生成
-	sb.WriteString("# Output Format (Strictly Follow)\n\n")
-	sb.WriteString("**You must use the XML tags <reasoning> and <decision> to separate the chain-of-thought and the decision JSON to avoid parsing errors.**\n\n")
-	sb.WriteString("## Format Requirements\n\n")
+	sb.WriteString("# 输出格式 (严格遵守)\n\n")
+	sb.WriteString("**必须使用XML标签 <reasoning> 和 <decision> 标签分隔思维链和决策JSON，避免解析错误**\n\n")
+	sb.WriteString("## 格式要求\n\n")
 	sb.WriteString("<reasoning>\n")
-	sb.WriteString("Your chain-of-thought analysis...\n")
-	sb.WriteString("- Briefly analyze your thinking process \n")
+	sb.WriteString("你的思维链分析...\n")
+	sb.WriteString("- 简洁分析你的思考过程 \n")
 	sb.WriteString("</reasoning>\n\n")
 	sb.WriteString("<decision>\n")
 	sb.WriteString("```json\n[\n")
-	sb.WriteString("{...}\n")
+	//sb.WriteString(fmt.Sprintf("  {\"symbol\": \"BTCUSDT\", \"action\": \"open_short\", \"leverage\": %d, \"position_size_usd\": %.0f, \"stop_loss\": 97000, \"take_profit\": 91000, \"reason\": \"下跌趋势+MACD死叉\"},\n", btcEthLeverage, accountEquity*5))
+	//sb.WriteString("  {\"symbol\": \"SOLUSDT\", \"action\": \"update_stop_loss\", \"new_stop_loss\": 155, \"reason\": \"移动止损至保本位\"},\n")
+	//sb.WriteString("  {\"symbol\": \"ETHUSDT\", \"action\": \"close_long\", \"reason\": \"止盈离场\"}\n")
+	sb.WriteString("{...}")
 	sb.WriteString("]\n```\n")
 	sb.WriteString("</decision>\n\n")
 	//sb.WriteString("## 字段说明\n\n")
