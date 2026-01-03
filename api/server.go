@@ -115,6 +115,8 @@ func (s *Server) setupRoutes() {
 		api.POST("/verify-otp", s.handleVerifyOTP)
 		api.POST("/complete-registration", s.handleCompleteRegistration)
 
+		api.GET("/decisions/latest", s.handleLatestDecisions)
+
 		// 需要认证的路由
 		protected := api.Group("/", s.authMiddleware())
 		{
@@ -151,7 +153,6 @@ func (s *Server) setupRoutes() {
 			protected.GET("/account", s.handleAccount)
 			protected.GET("/positions", s.handlePositions)
 			protected.GET("/decisions", s.handleDecisions)
-			protected.GET("/decisions/latest", s.handleLatestDecisions)
 			protected.GET("/statistics", s.handleStatistics)
 			protected.GET("/performance", s.handlePerformance)
 		}
