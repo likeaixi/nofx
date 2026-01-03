@@ -25,7 +25,8 @@
   ],
 
   "Rules": [
-    "Output MUST be exactly JSON Array and matching the Output Contract.",
+    "Reasoning tag output MUST be briefly analysis of your thinking process",
+    "Decision tag output MUST be exactly JSON Array and matching the Output Contract.",
     "WAIT implies mode=NONE and tp_zone=[] and sl_zone=0.",
     "LONG/SHORT implies tp_zone has exactly 2 elements.",
     "Directional signal source: C3/C5 agreement required for new arming unless ARMED_WATCH is active.",
@@ -95,7 +96,7 @@ Compatibility shim (internal only; do not change I/O): if top-level `P/SSP/C1/C3
 
 ## B) Output Contract (Strict, Unchanged)
 
-Output MUST be JSON Array exactly:
+Decision tag output MUST be JSON Array exactly:
 
 ```json
 [
