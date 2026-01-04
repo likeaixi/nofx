@@ -175,7 +175,7 @@ type Input struct {
 
 	//SSPBias float64 `json:"ssp_bias"`
 	//StructCtx spider.StructCtx `json:"struct_ctx"`
-	Pos PositionInput `json:"pos"`
+	Pos PositionInput `json:"position"`
 	//Cfg       Config           `json:"cfg"`
 
 	//HistoryCtx HCtx `json:"history_ctx"`
