@@ -192,13 +192,13 @@ func BuildStructForBars(
 ) StructResult {
 	valid := make([]market.InputKline, 0, len(bars))
 	for _, b := range bars {
-		if !(b.TS == 0) {
+		if !(b.T == 0) {
 			valid = append(valid, b)
 		}
 	}
 
 	sort.Slice(valid, func(i, j int) bool {
-		return valid[i].TS < valid[j].TS
+		return valid[i].T < valid[j].T
 	})
 
 	if len(valid) < 3 {
@@ -221,7 +221,7 @@ func BuildStructForBars(
 		bar := valid[i]
 		nextBar := valid[i+1]
 
-		tsMS := bar.TS
+		tsMS := bar.T
 
 		high := bar.H
 		low := bar.L

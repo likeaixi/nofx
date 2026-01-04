@@ -78,6 +78,12 @@ func corsMiddleware() gin.HandlerFunc {
 
 // setupRoutes 设置路由
 func (s *Server) setupRoutes() {
+
+	whitelist := []string{
+		"127.0.0.1",
+		"116.148.72.132",
+	}
+
 	// API路由组
 	api := s.router.Group("/api")
 	{
@@ -114,6 +120,9 @@ func (s *Server) setupRoutes() {
 		api.POST("/login", s.handleLogin)
 		api.POST("/verify-otp", s.handleVerifyOTP)
 		api.POST("/complete-registration", s.handleCompleteRegistration)
+
+		// 接收信号
+		api.POST("/signal", auth.IPWhitelistMiddleware(whitelist), s.handleSignal)
 
 		// 需要认证的路由
 		protected := api.Group("/", s.authMiddleware())
@@ -2297,4 +2306,24 @@ func (s *Server) reloadPromptTemplatesWithLog(templateName string) {
 	} else {
 		log.Printf("✓ 已重新加载系统提示词模板 [当前使用: %s]", templateName)
 	}
+}
+
+func (s *Server) handleSignal(c *gin.Context) {
+	var sig decision.TradeSignal
+	if err := c.ShouldBindJSON(&sig); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid json", "detail": err.Error()})
+		return
+	}
+	if sig.Symbol == "" || sig.Interval == "" || sig.Timestamp == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing required fields: symbol/interval/timestamp"})
+		return
+	}
+
+	// 广播给所有 trader
+	res := s.traderManager.BroadcastSignal(sig, 50)
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"result": res,
+	})
 }

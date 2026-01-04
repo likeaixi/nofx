@@ -108,6 +108,7 @@ type AutoTrader struct {
 	lastResetTime         time.Time
 	stopUntil             time.Time
 	isRunning             bool
+	triggerCh             chan decision.TradeSignal
 	startTime             time.Time          // 系统启动时间
 	callCount             int                // AI调用次数
 	positionFirstSeenTime map[string]int64   // 持仓首次出现时间 (symbol_side -> timestamp毫秒)
@@ -301,6 +302,10 @@ func (at *AutoTrader) Run() error {
 	at.stopMonitorCh = make(chan struct{})
 	at.startTime = time.Now()
 
+	if at.triggerCh == nil {
+		at.triggerCh = make(chan decision.TradeSignal, 32)
+	}
+
 	log.Println("🚀 AI驱动自动交易系统启动")
 	log.Printf("💰 初始余额: %.2f USDT", at.initialBalance)
 	log.Printf("⚙️  扫描间隔: %v", at.config.ScanInterval)
@@ -311,18 +316,18 @@ func (at *AutoTrader) Run() error {
 	// 启动回撤监控
 	//at.startDrawdownMonitor()
 
-	ticker := time.NewTicker(at.config.ScanInterval)
-	defer ticker.Stop()
+	//ticker := time.NewTicker(at.config.ScanInterval)
+	//defer ticker.Stop()
 
 	// 首次立即执行
-	if err := at.runCycle(); err != nil {
-		log.Printf("❌ 执行失败: %v", err)
-	}
+	//if err := at.runCycle(); err != nil {
+	//	log.Printf("❌ 执行失败: %v", err)
+	//}
 
 	for at.isRunning {
 		select {
-		case <-ticker.C:
-			if err := at.runCycle(); err != nil {
+		case sig := <-at.triggerCh:
+			if err := at.runCycle(sig); err != nil {
 				log.Printf("❌ 执行失败: %v", err)
 			}
 		case <-at.stopMonitorCh:
@@ -345,8 +350,20 @@ func (at *AutoTrader) Stop() {
 	log.Println("⏹ 自动交易系统停止")
 }
 
+func (at *AutoTrader) Trigger(sig decision.TradeSignal) bool {
+	if at.triggerCh == nil {
+		return false
+	}
+	select {
+	case at.triggerCh <- sig:
+		return true
+	default:
+		return false // queue full
+	}
+}
+
 // runCycle 运行一个交易周期（使用AI全权决策）
-func (at *AutoTrader) runCycle() error {
+func (at *AutoTrader) runCycle(sig decision.TradeSignal) error {
 	at.callCount++
 
 	log.Print("\n" + strings.Repeat("=", 70) + "\n")
@@ -419,7 +436,7 @@ func (at *AutoTrader) runCycle() error {
 
 	// 5. 调用AI获取完整决策
 	log.Printf("🤖 正在请求AI分析并决策... [模板: %s]", at.systemPromptTemplate)
-	decision, err := decision.GetFullDecisionWithCustomPrompt(ctx, at.mcpClient, at.customPrompt, at.overrideBasePrompt, at.systemPromptTemplate)
+	decision, err := decision.GetFullDecisionWithCustomPrompt(ctx, at.mcpClient, at.customPrompt, at.overrideBasePrompt, at.systemPromptTemplate, sig)
 
 	if decision != nil && decision.AIRequestDurationMs > 0 {
 		record.AIRequestDurationMs = decision.AIRequestDurationMs
@@ -598,7 +615,7 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 		log.Printf("加载蜘蛛丝快照 snapsho: %v, stopLoss: %v, takeProfit: %v, historyTas: %v, historySSP: %v", snapshot, stopLoss, takeProfit, historyTags, historySSP)
 	}
 
-	input, T, SSP := buildInput(at.config.BTCETHLeverage, historySSP)
+	input, T, SSP := buildInput()
 
 	at.T = T
 	at.SSP = SSP
@@ -664,15 +681,13 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 		})
 
 		s := NormalizeSide(side, true)
-		input.Pos = decision.Position{
-			Side:      s,
-			Leverage:  leverage,
-			Entry:     entryPrice,
-			Qty:       quantity,
-			SL:        &stopLoss,
-			TP:        &takeProfit,
-			PnlPct:    pnlPct,
-			PnlPctMax: peakPnlPct,
+		input.Pos = decision.PositionInput{
+			Side:           s,
+			EntryPrice:     entryPrice,
+			Qty:            quantity,
+			EntryTS:        0,
+			CurrentSLPrice: &stopLoss,
+			CurrentTPPrice: &takeProfit,
 		}
 	}
 
@@ -711,7 +726,7 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 	}
 
 	// 6. 构建上下文
-	input.HistoryCtx.Tags = historyTags
+	//input.HistoryCtx.Tags = historyTags
 
 	ctx := &decision.Context{
 		CurrentTime:     time.Now().Format("2006-01-02 15:04:05"),
@@ -756,7 +771,7 @@ func (at *AutoTrader) executeDecisionWithRecord(decision *decision.Decision, act
 	case "partial_close":
 		return at.executePartialCloseWithRecord(decision, actionRecord)
 	case "wait":
-		return at.saveHistory(decision, actionRecord)
+		return nil
 	case "hold":
 		// 无需执行，仅记录
 		return nil
@@ -765,24 +780,24 @@ func (at *AutoTrader) executeDecisionWithRecord(decision *decision.Decision, act
 	}
 }
 
-func (at *AutoTrader) saveHistory(decision *decision.Decision, actionRecord *logger.DecisionAction) error {
-	log.Printf("保存History Tag, %s", decision.HistoryView)
-
-	// 保存蜘蛛丝快照
-	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
-
-	err := spider.UpdateHistoryTagsForSymbol(baseDir, decision.Symbol, decision.HistoryView)
-	if err != nil {
-		log.Printf("更新蜘蛛丝快照失败: %v", err)
-	}
-
-	err = spider.AppendHistorySSPForSymbol(baseDir, decision.Symbol, at.T, at.SSP)
-	if err != nil {
-		log.Printf("更新蜘蛛丝快照失败: %v", err)
-	}
-
-	return nil
-}
+//func (at *AutoTrader) saveHistory(decision *decision.Decision, actionRecord *logger.DecisionAction) error {
+//	log.Printf("保存History Tag, %s", decision.HistoryView)
+//
+//	// 保存蜘蛛丝快照
+//	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
+//
+//	err := spider.UpdateHistoryTagsForSymbol(baseDir, decision.Symbol, decision.HistoryView)
+//	if err != nil {
+//		log.Printf("更新蜘蛛丝快照失败: %v", err)
+//	}
+//
+//	err = spider.AppendHistorySSPForSymbol(baseDir, decision.Symbol, at.T, at.SSP)
+//	if err != nil {
+//		log.Printf("更新蜘蛛丝快照失败: %v", err)
+//	}
+//
+//	return nil
+//}
 
 // executeOpenLongWithRecord 执行开多仓并记录详细信息
 func (at *AutoTrader) executeOpenLongWithRecord(decision *decision.Decision, actionRecord *logger.DecisionAction) error {
@@ -853,7 +868,7 @@ func (at *AutoTrader) executeOpenLongWithRecord(decision *decision.Decision, act
 		},
 	}
 
-	err = spider.SaveSnapshotOnOpen(baseDir, decision.Symbol, "LONG", decision.StopLoss, decision.TakeProfit, timeNow, decision.HistoryView, historySSP)
+	err = spider.SaveSnapshotOnOpen(baseDir, decision.Symbol, "LONG", decision.StopLoss, decision.TakeProfit, timeNow, "", historySSP)
 	if err != nil {
 		log.Printf("保存蜘蛛丝快照失败: %v", err)
 	}
@@ -949,7 +964,7 @@ func (at *AutoTrader) executeOpenShortWithRecord(decision *decision.Decision, ac
 		},
 	}
 
-	err = spider.SaveSnapshotOnOpen(baseDir, decision.Symbol, "SHORT", decision.StopLoss, decision.TakeProfit, timeNow, decision.HistoryView, historySSP)
+	err = spider.SaveSnapshotOnOpen(baseDir, decision.Symbol, "SHORT", decision.StopLoss, decision.TakeProfit, timeNow, "", historySSP)
 	if err != nil {
 		log.Printf("保存蜘蛛丝快照失败: %v", err)
 	}
@@ -1122,8 +1137,8 @@ func (at *AutoTrader) executeUpdateStopLossWithRecord(decision *decision.Decisio
 		return fmt.Errorf("修改止损失败: %w", err)
 	}
 
-	// 更新蜘蛛丝快照
-	_ = at.saveHistory(decision, actionRecord)
+	//// 更新蜘蛛丝快照
+	//_ = at.saveHistory(decision, actionRecord)
 
 	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
 	err = spider.UpdateStopLossForSymbol(baseDir, decision.Symbol, decision.NewStopLoss)
@@ -1215,8 +1230,8 @@ func (at *AutoTrader) executeUpdateTakeProfitWithRecord(decision *decision.Decis
 		return fmt.Errorf("修改止盈失败: %w", err)
 	}
 
-	// 更新蜘蛛丝快照
-	_ = at.saveHistory(decision, actionRecord)
+	//// 更新蜘蛛丝快照
+	//_ = at.saveHistory(decision, actionRecord)
 
 	baseDir := fmt.Sprintf("decision_logs/%s", at.id)
 	err = spider.UpdateTakeProfitForSymbol(baseDir, decision.Symbol, decision.NewTakeProfit)
@@ -1854,76 +1869,65 @@ func (at *AutoTrader) ClearPeakPnLCache(symbol, side string) {
 	delete(at.peakPnLCache, posKey)
 }
 
-func buildInput(leverage int, historySSP []map[string]any) (decision.Input, int64, []float64) {
+func buildInput() (decision.Input, int64, []float64) {
 	symbol := "BTCUSDT"
 
 	input := decision.Input{
-		Symbol:     symbol,
-		Market:     decision.Market{},
-		Bars1m:     nil,
-		Bars5m:     nil,
-		Bars15m:    nil,
-		StructCtx:  spider.StructCtx{},
-		Pos:        decision.Position{},
-		Cfg:        decision.Config{},
-		HistoryCtx: decision.HCtx{},
+		Symbol: symbol,
+		Market: decision.MarketInput{},
+		Pos:    decision.PositionInput{},
 	}
 
-	_, c1, c3, c5 := spider.FetchCombo()
+	//_, c1, c3, c5 := spider.FetchCombo()
 	ssp, err := spider.FetchSpiderRaw()
 	//sspResult := spider.NewSSPResult(ssp)
-	if err != nil {
-		log.Printf("获取蜘蛛丝数据失败 %v", err)
-	}
+	//if err != nil {
+	//	log.Printf("获取蜘蛛丝数据失败 %v", err)
+	//}
 
-	box, err1 := spider.BuildSuperBox(ssp.P, ssp.SSP)
-	if err1 != nil {
-		log.Printf("创建Box失败 %v", err1)
-	}
+	//box, err1 := spider.BuildSuperBox(ssp.P, ssp.SSP)
+	//if err1 != nil {
+	//	log.Printf("创建Box失败 %v", err1)
+	//}
+	//
+	//if box.Zone != "" {
+	//	input.Market.SspZone = box.Zone
+	//}
+	//
+	//drift := spider.ComputeSSPBoxDrift(ssp.P, historySSP)
+	//if drift != "" {
+	//	input.Market.SspBoxDrift = drift
+	//}
 
-	if box.Zone != "" {
-		input.Market.SspZone = box.Zone
-	}
-
-	drift := spider.ComputeSSPBoxDrift(ssp.P, historySSP)
-	if drift != "" {
-		input.Market.SspBoxDrift = drift
-	}
-
-	klines1m, err := market.GetInputKlines(symbol, "1m")
-	if err != nil {
-		log.Printf("获取Input Klines失败 %v", err)
-	}
-
-	klines5m, err := market.GetInputKlines(symbol, "5m")
-	if err != nil {
-		log.Printf("获取Input Klines失败 %v", err)
-	}
+	//klines1m, err := market.GetInputKlines(symbol, "1m")
+	//if err != nil {
+	//	log.Printf("获取Input Klines失败 %v", err)
+	//}
+	//
+	//klines5m, err := market.GetInputKlines(symbol, "5m")
+	//if err != nil {
+	//	log.Printf("获取Input Klines失败 %v", err)
+	//}
 
 	klines15m, err := market.GetInputKlines(symbol, "15m")
 	if err != nil {
 		log.Printf("获取Input Klines失败 %v", err)
 	}
 
-	structCtx := spider.BuildStructCtx(klines1m, klines5m, klines15m, 10, 3, 4, 5)
+	//structCtx := spider.BuildStructCtx(klines1m, klines5m, klines15m, 10, 3, 4, 5)
 
 	input.Market.P = ssp.P
-	input.Market.SSP = ssp.SSP
-	input.Market.Leverage = leverage
+	//input.Market.Bars15 = klines15m
 
-	input.Market.C1 = c1
-	input.Market.C3 = c3
-	input.Market.C5 = c5
-
-	last1m := min(len(klines1m), 5)
-	input.Bars1m = klines1m[(len(klines1m) - last1m):]
-	last5m := min(len(klines5m), 3)
-	input.Bars5m = klines5m[(len(klines5m) - last5m):]
-	last15m := min(len(klines15m), 3)
-	input.Bars15m = klines15m[(len(klines15m) - last15m):]
+	//last1m := min(len(klines1m), 5)
+	//input.Bars1m = klines1m[(len(klines1m) - last1m):]
+	//last5m := min(len(klines5m), 3)
+	//input.Bars5m = klines5m[(len(klines5m) - last5m):]
+	last15m := min(len(klines15m), 15)
+	input.Market.Bars15 = klines15m[(len(klines15m) - last15m):]
 	//input.SSPBias = sspResult.Bias
 
-	input.StructCtx = structCtx
+	//input.StructCtx = structCtx
 
 	//input.HistoryCtx.Tags = tags
 

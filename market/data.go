@@ -40,11 +40,11 @@ func GetInputKlines(symbol, interval string) ([]InputKline, error) {
 
 	for _, l := range klines {
 		var k = InputKline{
-			TS: l.OpenTime,
-			O:  l.Open,
-			H:  l.High,
-			C:  l.Close,
-			L:  l.Low,
+			T: l.OpenTime,
+			O: l.Open,
+			H: l.High,
+			C: l.Close,
+			L: l.Low,
 		}
 
 		klinesxm = append(klinesxm, k)

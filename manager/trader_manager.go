@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"nofx/config"
+	"nofx/decision"
 	"nofx/trader"
 	"sort"
 	"strconv"
@@ -19,6 +20,13 @@ type CompetitionCache struct {
 	data      map[string]interface{}
 	timestamp time.Time
 	mu        sync.RWMutex
+}
+
+type BroadcastResult struct {
+	Total      int      `json:"total"`
+	Queued     int      `json:"queued"`
+	Dropped    int      `json:"dropped"`
+	DroppedIDs []string `json:"dropped_ids,omitempty"` // 可选：只回传部分用于排查
 }
 
 // TraderManager 管理多个trader实例
@@ -1130,4 +1138,41 @@ func (tm *TraderManager) RemoveTrader(traderID string) {
 		delete(tm.traders, traderID)
 		log.Printf("✓ Trader %s 已从内存中移除", traderID)
 	}
+}
+
+func (tm *TraderManager) BroadcastSignal(sig decision.TradeSignal, maxDroppedIDs int) BroadcastResult {
+	// 1) 快照：复制 trader 列表，避免持锁发送
+	tm.mu.RLock()
+	snapshot := make([]struct {
+		id string
+		at *trader.AutoTrader
+	}, 0, len(tm.traders))
+	for id, at := range tm.traders {
+		snapshot = append(snapshot, struct {
+			id string
+			at *trader.AutoTrader
+		}{id: id, at: at})
+	}
+	tm.mu.RUnlock()
+
+	// 2) 逐个触发（非阻塞），队列满则丢弃
+	res := BroadcastResult{Total: len(snapshot)}
+	for _, item := range snapshot {
+		if item.at == nil {
+			res.Dropped++
+			if len(res.DroppedIDs) < maxDroppedIDs {
+				res.DroppedIDs = append(res.DroppedIDs, item.id)
+			}
+			continue
+		}
+		if ok := item.at.Trigger(sig); ok {
+			res.Queued++
+		} else {
+			res.Dropped++
+			if len(res.DroppedIDs) < maxDroppedIDs {
+				res.DroppedIDs = append(res.DroppedIDs, item.id)
+			}
+		}
+	}
+	return res
 }

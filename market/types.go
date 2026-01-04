@@ -62,11 +62,11 @@ type SymbolInfo struct {
 }
 
 type InputKline struct {
-	TS int64   `json:"ts"`
-	O  float64 `json:"o"`
-	H  float64 `json:"h"`
-	C  float64 `json:"c"`
-	L  float64 `json:"l"`
+	T int64   `json:"t"`
+	O float64 `json:"o"`
+	H float64 `json:"h"`
+	C float64 `json:"c"`
+	L float64 `json:"l"`
 }
 
 type Kline struct {

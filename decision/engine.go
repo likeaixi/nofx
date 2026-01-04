@@ -8,7 +8,6 @@ import (
 	"nofx/market"
 	"nofx/mcp"
 	"nofx/pool"
-	"nofx/spider"
 	"regexp"
 	"strings"
 	"time"
@@ -91,6 +90,15 @@ type Context struct {
 	Input           `json:"input"`
 }
 
+type TradeSignal struct {
+	Symbol       string          `json:"symbol"`
+	Interval     string          `json:"interval"`
+	Timestamp    int64           `json:"timestamp"`
+	Status       bool            `json:"status"`
+	Agents       json.RawMessage `json:"agents"` // any: 原样保留
+	RuleDecision string          `json:"rule_decision"`
+}
+
 // Decision AI的交易决策
 type Decision struct {
 	Symbol string `json:"symbol"`
@@ -111,8 +119,6 @@ type Decision struct {
 	Confidence int     `json:"confidence,omitempty"` // 信心度 (0-100)
 	RiskUSD    float64 `json:"risk_usd,omitempty"`   // 最大美元风险
 	Reasoning  string  `json:"reason"`
-
-	HistoryView string `json:"history_view,omitempty"`
 }
 
 // 输入信号的结构
@@ -161,18 +167,18 @@ type Market struct {
 type Input struct {
 	Symbol string `json:"symbol"`
 
-	Market `json:"market"`
+	Market MarketInput `json:"market"`
 
-	Bars1m  []market.InputKline `json:"bars_1m"`
-	Bars5m  []market.InputKline `json:"bars_5m"`
-	Bars15m []market.InputKline `json:"bars_15m"`
+	//Bars1m  []market.InputKline `json:"bars_1m"`
+	//Bars5m  []market.InputKline `json:"bars_5m"`
+	//Bars15m []market.InputKline `json:"bars_15m"`
 
 	//SSPBias float64 `json:"ssp_bias"`
-	StructCtx spider.StructCtx `json:"struct_ctx"`
-	Pos       Position         `json:"pos"`
-	Cfg       Config           `json:"cfg"`
+	//StructCtx spider.StructCtx `json:"struct_ctx"`
+	Pos PositionInput `json:"pos"`
+	//Cfg       Config           `json:"cfg"`
 
-	HistoryCtx HCtx `json:"history_ctx"`
+	//HistoryCtx HCtx `json:"history_ctx"`
 }
 
 // FullDecision AI的完整决策（包含思维链）
@@ -188,11 +194,11 @@ type FullDecision struct {
 
 // GetFullDecision 获取AI的完整交易决策（批量分析所有币种和持仓）
 func GetFullDecision(ctx *Context, mcpClient mcp.AIClient) (*FullDecision, error) {
-	return GetFullDecisionWithCustomPrompt(ctx, mcpClient, "", false, "")
+	return GetFullDecisionWithCustomPrompt(ctx, mcpClient, "", false, "", TradeSignal{})
 }
 
 // GetFullDecisionWithCustomPrompt 获取AI的完整交易决策（支持自定义prompt和模板选择）
-func GetFullDecisionWithCustomPrompt(ctx *Context, mcpClient mcp.AIClient, customPrompt string, overrideBase bool, templateName string) (*FullDecision, error) {
+func GetFullDecisionWithCustomPrompt(ctx *Context, mcpClient mcp.AIClient, customPrompt string, overrideBase bool, templateName string, sig TradeSignal) (*FullDecision, error) {
 	// 1. 为所有币种获取市场数据
 	if err := fetchMarketDataForContext(ctx); err != nil {
 		return nil, fmt.Errorf("获取市场数据失败: %w", err)
@@ -204,14 +210,16 @@ func GetFullDecisionWithCustomPrompt(ctx *Context, mcpClient mcp.AIClient, custo
 
 	// 3. 调用AI API（使用 system + user prompt）
 	aiCallStart := time.Now()
-	aiResponse, err := mcpClient.CallWithMessages(systemPrompt, userPrompt)
+	//aiResponse, err := mcpClient.CallWithMessages(systemPrompt, userPrompt)
+	d, err2 := BuildDecision(sig.Symbol, sig.RuleDecision, &ctx.Input.Pos, ctx.Input.Market, ctx.BTCETHLeverage, ctx.Account.TotalEquity*5)
 	aiCallDuration := time.Since(aiCallStart)
-	if err != nil {
-		return nil, fmt.Errorf("调用AI API失败: %w", err)
+	if err2 != nil {
+		return nil, fmt.Errorf("调用AI API失败: %w", err2)
 	}
 
 	// 4. 解析AI响应
-	decision, err := parseFullDecisionResponse(aiResponse, ctx.Account.TotalEquity, ctx.BTCETHLeverage, ctx.AltcoinLeverage)
+	//decision, err := parseFullDecisionResponse(aiResponse, ctx.Account.TotalEquity, ctx.BTCETHLeverage, ctx.AltcoinLeverage)
+	decision := &FullDecision{CoTTrace: d.Reasoning, Decisions: []Decision{d}}
 
 	// 无论是否有错误，都要保存 SystemPrompt 和 UserPrompt（用于调试和决策未执行后的问题定位）
 	if decision != nil {
@@ -221,9 +229,9 @@ func GetFullDecisionWithCustomPrompt(ctx *Context, mcpClient mcp.AIClient, custo
 		decision.AIRequestDurationMs = aiCallDuration.Milliseconds()
 	}
 
-	if err != nil {
-		return decision, fmt.Errorf("解析AI响应失败: %w", err)
-	}
+	//if err != nil {
+	//	return decision, fmt.Errorf("解析AI响应失败: %w", err)
+	//}
 
 	decision.Timestamp = time.Now()
 	decision.SystemPrompt = systemPrompt // 保存系统prompt

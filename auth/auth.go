@@ -3,7 +3,11 @@ package auth
 import (
 	"crypto/rand"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"log"
+	"net"
+	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -151,4 +155,49 @@ func ValidateJWT(tokenString string) (*Claims, error) {
 // GetOTPQRCodeURL 获取OTP二维码URL
 func GetOTPQRCodeURL(secret, email string) string {
 	return fmt.Sprintf("otpauth://totp/%s:%s?secret=%s&issuer=%s", OTPIssuer, email, secret, OTPIssuer)
+}
+
+func IPWhitelistMiddleware(whitelist []string) gin.HandlerFunc {
+	allowedIP := map[string]struct{}{}
+	var allowedCIDR []*net.IPNet
+
+	for _, item := range whitelist {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if strings.Contains(item, "/") {
+			_, ipnet, err := net.ParseCIDR(item)
+			if err == nil && ipnet != nil {
+				allowedCIDR = append(allowedCIDR, ipnet)
+			}
+			continue
+		}
+		ip := net.ParseIP(item)
+		if ip != nil {
+			allowedIP[ip.String()] = struct{}{}
+		}
+	}
+
+	return func(c *gin.Context) {
+		ipStr := c.ClientIP() // 依赖 TrustedProxies，见下方 Gin 初始化
+		ip := net.ParseIP(ipStr)
+		if ip == nil {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "invalid client ip"})
+			return
+		}
+
+		if _, ok := allowedIP[ip.String()]; ok {
+			c.Next()
+			return
+		}
+		for _, ipnet := range allowedCIDR {
+			if ipnet.Contains(ip) {
+				c.Next()
+				return
+			}
+		}
+
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "ip not allowed", "client_ip": ipStr})
+	}
 }
