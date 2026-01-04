@@ -680,9 +680,9 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 			UpdateTime:       updateTime,
 		})
 
-		s := NormalizeSide(side, true)
+		//s := NormalizeSide(side, true)
 		input.Pos = decision.PositionInput{
-			Side:           s,
+			Side:           side,
 			EntryPrice:     entryPrice,
 			Qty:            quantity,
 			EntryTS:        0,
