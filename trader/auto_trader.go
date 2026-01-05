@@ -13,6 +13,7 @@ import (
 	"nofx/spider"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -109,6 +110,7 @@ type AutoTrader struct {
 	stopUntil             time.Time
 	isRunning             bool
 	triggerCh             chan decision.TradeSignal
+	running               int32
 	startTime             time.Time          // 系统启动时间
 	callCount             int                // AI调用次数
 	positionFirstSeenTime map[string]int64   // 持仓首次出现时间 (symbol_side -> timestamp毫秒)
@@ -303,7 +305,7 @@ func (at *AutoTrader) Run() error {
 	at.startTime = time.Now()
 
 	if at.triggerCh == nil {
-		at.triggerCh = make(chan decision.TradeSignal, 32)
+		at.triggerCh = make(chan decision.TradeSignal, 1)
 	}
 
 	log.Println("🚀 AI驱动自动交易系统启动")
@@ -316,8 +318,8 @@ func (at *AutoTrader) Run() error {
 	// 启动回撤监控
 	//at.startDrawdownMonitor()
 
-	//ticker := time.NewTicker(at.config.ScanInterval)
-	//defer ticker.Stop()
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
 
 	// 首次立即执行
 	//if err := at.runCycle(); err != nil {
@@ -325,15 +327,52 @@ func (at *AutoTrader) Run() error {
 	//}
 
 	for at.isRunning {
+		// 1) 优先：先把已到的 HTTP 信号处理完
+		for {
+			select {
+			case sig := <-at.triggerCh:
+				if err := at.runCycle(sig); err != nil {
+					log.Printf("❌ 执行失败: %v", err)
+				}
+				continue
+			default:
+			}
+
+			break
+		}
+
+		// 2) 没有待处理 HTTP 时，再阻塞等待“HTTP 或 tick 或 stop”
 		select {
 		case sig := <-at.triggerCh:
+			// HTTP 永远优先（因为上面已 drain，这里是新来的）
 			if err := at.runCycle(sig); err != nil {
-				log.Printf("❌ 执行失败: %v", err)
+				log.Printf("❌ Trigger 执行失败: %v", err)
 			}
 		case <-at.stopMonitorCh:
 			log.Printf("[%s] ⏹ 收到停止信号，退出自动交易主循环", at.name)
 			return nil
+		case <-ticker.C:
+			// tick 到了，但仍然再检查一次：如果此刻 HTTP 同时到达，HTTP 仍优先
+			select {
+			case sig := <-at.triggerCh:
+				if err := at.runCycle(sig); err != nil {
+					log.Printf("❌ Trigger 执行失败: %v", err)
+				}
+			default:
+				sig := decision.TradeSignal{
+					Symbol:       "BTCUSDT",
+					Interval:     "15m",
+					Timestamp:    0,
+					Status:       false,
+					Agents:       nil,
+					RuleDecision: "",
+				}
+				if err := at.runCycle(sig); err != nil {
+					log.Printf("❌ Ticker 执行失败: %v", err)
+				}
+			}
 		}
+
 	}
 
 	return nil
@@ -364,6 +403,11 @@ func (at *AutoTrader) Trigger(sig decision.TradeSignal) bool {
 
 // runCycle 运行一个交易周期（使用AI全权决策）
 func (at *AutoTrader) runCycle(sig decision.TradeSignal) error {
+	if !atomic.CompareAndSwapInt32(&at.running, 0, 1) {
+		return nil
+	}
+	defer atomic.StoreInt32(&at.running, 0)
+
 	at.callCount++
 
 	log.Print("\n" + strings.Repeat("=", 70) + "\n")
@@ -685,7 +729,7 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 			Side:           side,
 			EntryPrice:     entryPrice,
 			Qty:            quantity,
-			EntryTS:        0,
+			EntryTS:        time.Now().UnixMilli(),
 			CurrentSLPrice: &stopLoss,
 			CurrentTPPrice: &takeProfit,
 		}
@@ -888,9 +932,9 @@ func (at *AutoTrader) executeOpenLongWithRecord(decision *decision.Decision, act
 	if err := at.trader.SetStopLoss(decision.Symbol, "LONG", quantity, decision.StopLoss); err != nil {
 		log.Printf("  ⚠ 设置止损失败: %v", err)
 	}
-	if err := at.trader.SetTakeProfit(decision.Symbol, "LONG", quantity, decision.TakeProfit); err != nil {
-		log.Printf("  ⚠ 设置止盈失败: %v", err)
-	}
+	//if err := at.trader.SetTakeProfit(decision.Symbol, "LONG", quantity, decision.TakeProfit); err != nil {
+	//	log.Printf("  ⚠ 设置止盈失败: %v", err)
+	//}
 
 	return nil
 }
@@ -984,9 +1028,9 @@ func (at *AutoTrader) executeOpenShortWithRecord(decision *decision.Decision, ac
 	if err := at.trader.SetStopLoss(decision.Symbol, "SHORT", quantity, decision.StopLoss); err != nil {
 		log.Printf("  ⚠ 设置止损失败: %v", err)
 	}
-	if err := at.trader.SetTakeProfit(decision.Symbol, "SHORT", quantity, decision.TakeProfit); err != nil {
-		log.Printf("  ⚠ 设置止盈失败: %v", err)
-	}
+	//if err := at.trader.SetTakeProfit(decision.Symbol, "SHORT", quantity, decision.TakeProfit); err != nil {
+	//	log.Printf("  ⚠ 设置止盈失败: %v", err)
+	//}
 
 	return nil
 }
