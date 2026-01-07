@@ -243,12 +243,23 @@ func buildOpenDecisionFromSignal(symbol string, side string, market MarketInput,
 		CurrentTPPrice: nil,
 	}
 
-	decide, err := getPav4Decide(symbol, side, market, input)
-	if err != nil {
-		return Decision{
-			Symbol:    symbol,
-			Action:    "wait",
-			Reasoning: fmt.Sprintf("pav4 decide error: %v", err),
+	decide := &DecideResponse{
+		Action:        "",
+		NewSLPrice:    nil,
+		Reason:        "",
+		State:         DecideState{},
+		InvalidReason: nil,
+	}
+
+	if side != "" {
+		d, err := getPav4Decide(symbol, side, market, input)
+		if err != nil {
+			decide = d
+			return Decision{
+				Symbol:    symbol,
+				Action:    "wait",
+				Reasoning: fmt.Sprintf("pav4 decide error: %v", err),
+			}
 		}
 	}
 
