@@ -167,18 +167,37 @@ func BuildDecision(
 
 	// 1) 无仓位：不调用 Decide，按规则返回
 	if !HasPosition(pos) {
-		return buildOpenDecisionFromSignal(symbol, side, market.P, leverage, positionSizeUSD), nil
+		return buildOpenDecisionFromSignal(symbol, side, market, leverage, positionSizeUSD), nil
 	}
 
+	// 2) 有仓位：忽略 sig，调用 pav4
+	decideRes, err := getPav4Decide(symbol, side, market, pos)
+
+	fmt.Printf("Decide response %v", decideRes)
+	if err != nil {
+		// pav4 失败：返回 hold + 错误原因（同时把 err 抛给上层）
+		return Decision{
+			Symbol:    symbol,
+			Action:    "hold",
+			Reasoning: fmt.Sprintf("pav4 decide error: %v", err),
+		}, err
+	}
+
+	return convertPav4ToDecision(symbol, *pos, decideRes, market.P, leverage), nil
+}
+
+func getPav4Decide(symbol string, side string, market MarketInput, pos *PositionInput) (*DecideResponse, error) {
 	pav4 := NewClient("http://127.0.0.1:8085")
 
 	// 2) 有仓位：忽略 sig，调用 pav4
 	if pav4 == nil {
-		return Decision{
-			Symbol:    symbol,
-			Action:    "hold",
-			Reasoning: "has position but pav4 client is nil",
-		}, fmt.Errorf("has position but pav4 client is nil")
+		return &DecideResponse{
+			Action:        "HOLD",
+			NewSLPrice:    nil,
+			Reason:        "pav4 client is nil",
+			State:         DecideState{},
+			InvalidReason: nil,
+		}, fmt.Errorf("pav4 client is nil")
 	}
 
 	req := DecideRequest{
@@ -192,24 +211,45 @@ func BuildDecision(
 	fmt.Printf("Decide response %v", resp)
 	if err != nil {
 		// pav4 失败：返回 hold + 错误原因（同时把 err 抛给上层）
-		return Decision{
-			Symbol:    symbol,
-			Action:    "hold",
-			Reasoning: fmt.Sprintf("pav4 decide error: %v", err),
+		return &DecideResponse{
+			Action:        "HOLD",
+			NewSLPrice:    nil,
+			Reason:        fmt.Sprintf("pav4 decide error: %v", err),
+			State:         DecideState{},
+			InvalidReason: nil,
 		}, err
 	}
 
-	return convertPav4ToDecision(symbol, *pos, resp, market.P, leverage), nil
+	return resp, nil
 }
 
-func buildOpenDecisionFromSignal(symbol string, side string, price float64, leverage int, positionSizeUSD float64) Decision {
+func buildOpenDecisionFromSignal(symbol string, side string, market MarketInput, leverage int, positionSizeUSD float64) Decision {
 	rd := strings.ToUpper(strings.TrimSpace(side))
+	price := market.P
 
 	if leverage <= 0 || price <= 0 {
 		return Decision{
 			Symbol:    symbol,
 			Action:    "wait",
 			Reasoning: fmt.Sprintf("invalid leverage/price; leverage=%d price=%.8f rule_decision=%s", leverage, price, rd),
+		}
+	}
+
+	input := &PositionInput{
+		Side:           rd,
+		EntryPrice:     market.P,
+		Qty:            positionSizeUSD / price,
+		EntryTS:        time.Now().UnixMilli(),
+		CurrentSLPrice: nil,
+		CurrentTPPrice: nil,
+	}
+
+	decide, err := getPav4Decide(symbol, side, market, input)
+	if err != nil {
+		return Decision{
+			Symbol:    symbol,
+			Action:    "wait",
+			Reasoning: fmt.Sprintf("pav4 decide error: %v", err),
 		}
 	}
 
@@ -222,6 +262,10 @@ func buildOpenDecisionFromSignal(symbol string, side string, price float64, leve
 	case "LONG":
 		tp := price * (1.0 + tpMove)
 		sl := price * (1.0 - slMove)
+
+		if decide.State.HardSL != 0 && decide.State.HardSL < price {
+			sl = decide.State.HardSL
+		}
 		return Decision{
 			Symbol:          symbol,
 			Action:          "open_long",
@@ -235,6 +279,11 @@ func buildOpenDecisionFromSignal(symbol string, side string, price float64, leve
 	case "SHORT":
 		tp := price * (1.0 - tpMove)
 		sl := price * (1.0 + slMove)
+
+		if decide.State.HardSL != 0 && decide.State.HardSL > price {
+			sl = decide.State.HardSL
+		}
+
 		return Decision{
 			Symbol:          symbol,
 			Action:          "open_short",
