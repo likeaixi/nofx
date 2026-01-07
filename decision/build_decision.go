@@ -173,7 +173,6 @@ func BuildDecision(
 	// 2) 有仓位：忽略 sig，调用 pav4
 	decideRes, err := getPav4Decide(symbol, side, market, pos)
 
-	fmt.Printf("Decide response %v", decideRes)
 	if err != nil {
 		// pav4 失败：返回 hold + 错误原因（同时把 err 抛给上层）
 		return Decision{
@@ -208,7 +207,7 @@ func getPav4Decide(symbol string, side string, market MarketInput, pos *Position
 	}
 
 	resp, err := pav4.Decide(req)
-	fmt.Printf("Decide response %v", resp)
+	fmt.Printf("Decide response %v\n", resp)
 	if err != nil {
 		// pav4 失败：返回 hold + 错误原因（同时把 err 抛给上层）
 		return &DecideResponse{
