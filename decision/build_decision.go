@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"nofx/market"
 	"strings"
@@ -321,6 +322,8 @@ func buildOpenDecisionFromSignal(symbol string, side string, market MarketInput,
 }
 
 func convertPav4ToDecision(symbol string, pos PositionInput, resp *DecideResponse, price float64, leverage int) Decision {
+	const minMove = 10.0 // 止盈/止损最小移动价差阈值
+
 	side := strings.ToUpper(strings.TrimSpace(pos.Side))
 
 	switch resp.Action {
@@ -350,6 +353,18 @@ func convertPav4ToDecision(symbol string, pos PositionInput, resp *DecideRespons
 		}
 		newSL := *resp.NewSLPrice
 		curSL := pos.CurrentSLPrice
+
+		// 价差阈值：新旧SL价差 < 10 不移动（curSL为空则允许设置）
+		if curSL != nil {
+			delta := math.Abs(newSL - *curSL)
+			if delta < minMove {
+				return Decision{
+					Symbol:    symbol,
+					Action:    "hold",
+					Reasoning: fmt.Sprintf("reject MOVE_SL: |new_sl-current_sl|=%.8f < %.2f; %s", delta, minMove, resp.Reason),
+				}
+			}
+		}
 
 		if side == "LONG" {
 			if curSL != nil && newSL <= *curSL {
@@ -392,10 +407,22 @@ func convertPav4ToDecision(symbol string, pos PositionInput, resp *DecideRespons
 		// 2) TP=100%ROE -> price move = 1.00/leverage
 		tpMove := 1.00 / float64(leverage)
 
-		var newTP float64
 		if side == "LONG" {
-			newTP = price * (1.0 + tpMove)
+			newTP := price * (1.0 + tpMove)
 			curTP := pos.CurrentTPPrice
+
+			// 价差阈值：新旧TP价差 < 10 不移动（curTP为空则允许设置）
+			if curTP != nil {
+				delta := math.Abs(newTP - *curTP)
+				if delta < minMove {
+					return Decision{
+						Symbol:    symbol,
+						Action:    "hold",
+						Reasoning: fmt.Sprintf("reject MOVE_TP: |new_tp-current_tp|=%.8f < %.2f; %s", delta, minMove, resp.Reason),
+					}
+				}
+			}
+
 			if curTP != nil && newTP <= *curTP { // 相同或更低不更新
 				return Decision{
 					Symbol:    symbol,
@@ -403,6 +430,7 @@ func convertPav4ToDecision(symbol string, pos PositionInput, resp *DecideRespons
 					Reasoning: fmt.Sprintf("reject MOVE_TP for LONG: new_tp=%.8f <= current_tp=%.8f; %s", newTP, *curTP, resp.Reason),
 				}
 			}
+
 			return Decision{
 				Symbol:        symbol,
 				Action:        "update_take_profit",
@@ -412,8 +440,21 @@ func convertPav4ToDecision(symbol string, pos PositionInput, resp *DecideRespons
 		}
 
 		if side == "SHORT" {
-			newTP = price * (1.0 - tpMove)
+			newTP := price * (1.0 - tpMove)
 			curTP := pos.CurrentTPPrice
+
+			// 价差阈值：新旧TP价差 < 10 不移动（curTP为空则允许设置）
+			if curTP != nil {
+				delta := math.Abs(newTP - *curTP)
+				if delta < minMove {
+					return Decision{
+						Symbol:    symbol,
+						Action:    "hold",
+						Reasoning: fmt.Sprintf("reject MOVE_TP: |new_tp-current_tp|=%.8f < %.2f; %s", delta, minMove, resp.Reason),
+					}
+				}
+			}
+
 			if curTP != nil && newTP >= *curTP { // 相同或更高不更新
 				return Decision{
 					Symbol:    symbol,
@@ -421,6 +462,7 @@ func convertPav4ToDecision(symbol string, pos PositionInput, resp *DecideRespons
 					Reasoning: fmt.Sprintf("reject MOVE_TP for SHORT: new_tp=%.8f >= current_tp=%.8f; %s", newTP, *curTP, resp.Reason),
 				}
 			}
+
 			return Decision{
 				Symbol:        symbol,
 				Action:        "update_take_profit",
