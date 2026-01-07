@@ -491,7 +491,7 @@ func (at *AutoTrader) runCycle(sig decision.TradeSignal) error {
 
 	// 即使有错误，也保存思维链、决策和输入prompt（用于debug）
 	if decision != nil {
-		record.SystemPrompt = decision.SystemPrompt // 保存系统提示词
+		record.SystemPrompt = "System Prompt" // 保存系统提示词
 		record.InputPrompt = decision.UserPrompt
 		record.CoTTrace = decision.CoTTrace
 		if len(decision.Decisions) > 0 {
@@ -505,21 +505,21 @@ func (at *AutoTrader) runCycle(sig decision.TradeSignal) error {
 		record.ErrorMessage = fmt.Sprintf("获取AI决策失败: %v", err)
 
 		// 打印系统提示词和AI思维链（即使有错误，也要输出以便调试）
-		if decision != nil {
-			log.Print("\n" + strings.Repeat("=", 70) + "\n")
-			log.Printf("📋 系统提示词 [模板: %s] (错误情况)", at.systemPromptTemplate)
-			log.Println(strings.Repeat("=", 70))
-			log.Println(decision.SystemPrompt)
-			log.Println(strings.Repeat("=", 70))
-
-			if decision.CoTTrace != "" {
-				log.Print("\n" + strings.Repeat("-", 70) + "\n")
-				log.Println("💭 AI思维链分析（错误情况）:")
-				log.Println(strings.Repeat("-", 70))
-				log.Println(decision.CoTTrace)
-				log.Println(strings.Repeat("-", 70))
-			}
-		}
+		//if decision != nil {
+		//	log.Print("\n" + strings.Repeat("=", 70) + "\n")
+		//	log.Printf("📋 系统提示词 [模板: %s] (错误情况)", at.systemPromptTemplate)
+		//	log.Println(strings.Repeat("=", 70))
+		//	log.Println(decision.SystemPrompt)
+		//	log.Println(strings.Repeat("=", 70))
+		//
+		//	if decision.CoTTrace != "" {
+		//		log.Print("\n" + strings.Repeat("-", 70) + "\n")
+		//		log.Println("💭 AI思维链分析（错误情况）:")
+		//		log.Println(strings.Repeat("-", 70))
+		//		log.Println(decision.CoTTrace)
+		//		log.Println(strings.Repeat("-", 70))
+		//	}
+		//}
 
 		at.decisionLogger.LogDecision(record)
 		return fmt.Errorf("获取AI决策失败: %w", err)
@@ -564,6 +564,7 @@ func (at *AutoTrader) runCycle(sig decision.TradeSignal) error {
 	log.Println()
 
 	// 执行决策并记录结果
+	saveDecision := true
 	for _, d := range sortedDecisions {
 		actionRecord := logger.DecisionAction{
 			Action:    d.Action,
@@ -573,6 +574,10 @@ func (at *AutoTrader) runCycle(sig decision.TradeSignal) error {
 			Price:     0,
 			Timestamp: time.Now(),
 			Success:   false,
+		}
+
+		if d.Action == "wait" || d.Action == "hold" {
+			saveDecision = false
 		}
 
 		if err := at.executeDecisionWithRecord(&d, &actionRecord); err != nil {
@@ -590,8 +595,11 @@ func (at *AutoTrader) runCycle(sig decision.TradeSignal) error {
 	}
 
 	// 9. 保存决策记录
-	if err := at.decisionLogger.LogDecision(record); err != nil {
-		log.Printf("⚠ 保存决策记录失败: %v", err)
+	// 如果是wait/hold就不保存
+	if saveDecision {
+		if err := at.decisionLogger.LogDecision(record); err != nil {
+			log.Printf("⚠ 保存决策记录失败: %v", err)
+		}
 	}
 
 	return nil
