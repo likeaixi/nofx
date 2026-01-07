@@ -213,10 +213,10 @@ func buildOpenDecisionFromSignal(symbol string, side string, price float64, leve
 		}
 	}
 
-	// 初始 TP=100%（ROE），SL=20%（ROE）
+	// 初始 TP=100%（ROE），SL=5%（ROE）
 	// 转成“价格变化比例” = roe / leverage
 	tpMove := 1.00 / float64(leverage)
-	slMove := 0.20 / float64(leverage)
+	slMove := 0.05 / float64(leverage)
 
 	switch rd {
 	case "LONG":
