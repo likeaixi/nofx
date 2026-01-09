@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"net/http"
 	"nofx/market"
@@ -227,23 +228,25 @@ func buildOpenDecisionFromSignal(symbol string, side string, market MarketInput,
 	rd := strings.ToUpper(strings.TrimSpace(side))
 	price := market.P
 
-	if leverage <= 0 || price <= 0 {
+	// 基础参数校验
+	if leverage <= 0 || price <= 0 || positionSizeUSD <= 0 {
 		return Decision{
 			Symbol:    symbol,
 			Action:    "wait",
-			Reasoning: fmt.Sprintf("invalid leverage/price; leverage=%d price=%.8f rule_decision=%s", leverage, price, rd),
+			Reasoning: fmt.Sprintf("invalid params; leverage=%d price=%.2f position_size_usd=%.2f rule_decision=%s", leverage, price, positionSizeUSD, rd),
 		}
 	}
 
 	input := &PositionInput{
 		Side:           rd,
-		EntryPrice:     market.P,
+		EntryPrice:     price,
 		Qty:            positionSizeUSD / price,
 		EntryTS:        time.Now().UnixMilli(),
 		CurrentSLPrice: nil,
 		CurrentTPPrice: nil,
 	}
 
+	// 默认空 decide：PAV4 不可用时也能继续走 fallback
 	decide := &DecideResponse{
 		Action:        "",
 		NewSLPrice:    nil,
@@ -252,19 +255,28 @@ func buildOpenDecisionFromSignal(symbol string, side string, market MarketInput,
 		InvalidReason: nil,
 	}
 
-	if side != "" {
-		d, err := getPav4Decide(symbol, side, market, input)
+	pav4OK := false
+	pav4ErrMsg := ""
+
+	// 调 PAV4（注意：传 rd）
+	if rd != "" {
+		d, err := getPav4Decide(symbol, rd, market, input)
 		if err != nil {
-			decide = d
-			return Decision{
-				Symbol:    symbol,
-				Action:    "wait",
-				Reasoning: fmt.Sprintf("pav4 decide error: %v", err),
+			// 你要求：打印错误日志
+			log.Printf("[buildOpenDecisionFromSignal] getPav4Decide error symbol=%s side=%s leverage=%d price=%.2f err=%v",
+				symbol, rd, leverage, price, err)
+
+			// 报错也照常开仓：记录错误信息，继续 fallback
+			pav4ErrMsg = err.Error()
+		} else {
+			if d != nil {
+				decide = d
 			}
+			pav4OK = true
 		}
 	}
 
-	// 初始 TP=100%（ROE），SL=5%（ROE）
+	// 初始 TP=+100% ROE，SL=-5% ROE
 	// 转成“价格变化比例” = roe / leverage
 	tpMove := 1.00 / float64(leverage)
 	slMove := 0.05 / float64(leverage)
@@ -274,9 +286,21 @@ func buildOpenDecisionFromSignal(symbol string, side string, market MarketInput,
 		tp := price * (1.0 + tpMove)
 		sl := price * (1.0 - slMove)
 
-		if decide.State.HardSL != 0 && decide.State.HardSL < price {
-			sl = decide.State.HardSL
+		hardApplied := false
+		hardSL := decide.State.HardSL
+		if pav4OK && hardSL != 0 && hardSL < price {
+			sl = hardSL
+			hardApplied = true
 		}
+
+		reason := fmt.Sprintf("no position; rule_decision=LONG; entry=%.2f tp=%.2f sl=%.2f", price, tp, sl)
+		if !pav4OK && pav4ErrMsg != "" {
+			reason += fmt.Sprintf(" PAV4_FALLBACK err=%s", pav4ErrMsg)
+		}
+		if hardApplied {
+			reason += fmt.Sprintf(" HARD_SL_APPLIED hard_sl=%.8f", hardSL)
+		}
+
 		return Decision{
 			Symbol:          symbol,
 			Action:          "open_long",
@@ -284,15 +308,26 @@ func buildOpenDecisionFromSignal(symbol string, side string, market MarketInput,
 			PositionSizeUSD: positionSizeUSD,
 			StopLoss:        sl,
 			TakeProfit:      tp,
-			Reasoning:       fmt.Sprintf("no position; rule_decision=LONG; TP=+100%%ROE SL=-20%%ROE => tp_move=%.6f sl_move=%.6f", tpMove, slMove),
+			Reasoning:       reason,
 		}
 
 	case "SHORT":
 		tp := price * (1.0 - tpMove)
 		sl := price * (1.0 + slMove)
 
-		if decide.State.HardSL != 0 && decide.State.HardSL > price {
-			sl = decide.State.HardSL
+		hardApplied := false
+		hardSL := decide.State.HardSL
+		if pav4OK && hardSL != 0 && hardSL > price {
+			sl = hardSL
+			hardApplied = true
+		}
+
+		reason := fmt.Sprintf("no position; rule_decision=SHORT; entry=%.2f tp=%.2f sl=%.2f", price, tp, sl)
+		if !pav4OK && pav4ErrMsg != "" {
+			reason += fmt.Sprintf(" PAV4_FALLBACK err=%s", pav4ErrMsg)
+		}
+		if hardApplied {
+			reason += fmt.Sprintf(" HARD_SL_APPLIED hard_sl=%.2f", hardSL)
 		}
 
 		return Decision{
@@ -302,7 +337,7 @@ func buildOpenDecisionFromSignal(symbol string, side string, market MarketInput,
 			PositionSizeUSD: positionSizeUSD,
 			StopLoss:        sl,
 			TakeProfit:      tp,
-			Reasoning:       fmt.Sprintf("no position; rule_decision=SHORT; TP=+100%%ROE SL=-20%%ROE => tp_move=%.6f sl_move=%.6f", tpMove, slMove),
+			Reasoning:       reason,
 		}
 
 	case "WAIT", "":
