@@ -740,6 +740,7 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 			EntryTS:        time.Now().UnixMilli(),
 			CurrentSLPrice: &stopLoss,
 			CurrentTPPrice: &takeProfit,
+			PnlPct:         pnlPct,
 		}
 	}
 

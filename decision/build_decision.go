@@ -8,57 +8,9 @@ import (
 	"log"
 	"math"
 	"net/http"
-	"nofx/market"
 	"strings"
 	"time"
 )
-
-//
-// --------------------
-// Types (PAV4 Request/Response)
-// --------------------
-//
-
-// ✅ 按你的要求：EntryPrice/Qty/P/OHLC 改为 float64，SL/TP 为 *float64，新增 CurrentTPPrice
-type DecideRequest struct {
-	Symbol   string        `json:"symbol"`
-	NowTS    int64         `json:"now_ts"` // ms
-	Position PositionInput `json:"position"`
-	Market   MarketInput   `json:"market"`
-}
-
-type PositionInput struct {
-	Side           string   `json:"side"` // "LONG" | "SHORT"
-	EntryPrice     float64  `json:"entry_price"`
-	Qty            float64  `json:"qty"`
-	EntryTS        int64    `json:"entry_ts"` // ms
-	CurrentSLPrice *float64 `json:"current_sl_price"`
-	CurrentTPPrice *float64 `json:"current_tp_price"`
-}
-
-type MarketInput struct {
-	P      float64             `json:"P"`
-	Bars15 []market.InputKline `json:"bars_15m"`
-}
-
-type DecideResponse struct {
-	Action        string      `json:"action"` // "HOLD" | "MOVE_SL" | "CLOSE_ALL"
-	NewSLPrice    *float64    `json:"new_sl_price"`
-	Reason        string      `json:"reason"`
-	State         DecideState `json:"state"`
-	InvalidReason *string     `json:"invalid_reason"`
-}
-
-type DecideState struct {
-	PEval         float64 `json:"P_eval"`
-	ATR14         float64 `json:"atr14"`
-	R             float64 `json:"R"`
-	HardSL        float64 `json:"hard_sl"`
-	PeakOrTrough  float64 `json:"peak_or_trough"`
-	TrailSL       float64 `json:"trail_sl"`
-	RRTargetPrice float64 `json:"rr_target_price"`
-	PnLR          float64 `json:"pnl_R"`
-}
 
 //
 // --------------------
