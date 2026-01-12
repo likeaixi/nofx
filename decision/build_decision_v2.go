@@ -120,6 +120,8 @@ func buildTrailingStopDecision(symbol string, pos PositionInput, market MarketIn
 		}
 	}
 
+	pos.PnlPct = pos.PnlPct / 100
+
 	lockedROE, ok := lockedRoeByPnlPct(pos.PnlPct)
 	if !ok || lockedROE <= 0 {
 		return Decision{
