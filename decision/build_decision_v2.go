@@ -43,6 +43,21 @@ func BuildDecisionV2(
 	}
 
 	// 2) 有仓位：按 pnl_pct 计算移动止损
+	if pos.PnlPct < 0 {
+		decideRes, err := getPav4Decide(symbol, side, market, pos)
+
+		if err != nil {
+			// pav4 失败：返回 hold + 错误原因（同时把 err 抛给上层）
+			return Decision{
+				Symbol:    symbol,
+				Action:    "hold",
+				Reasoning: fmt.Sprintf("pav4 decide error: %v", err),
+			}, err
+		}
+
+		return convertPav4ToDecision(symbol, *pos, decideRes, market.P, leverage), nil
+	}
+
 	return buildTrailingStopDecision(symbol, *pos, market, leverage), nil
 }
 
