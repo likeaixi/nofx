@@ -211,7 +211,7 @@ func GetFullDecisionWithCustomPrompt(ctx *Context, mcpClient mcp.AIClient, custo
 	// 3. 调用AI API（使用 system + user prompt）
 	aiCallStart := time.Now()
 	//aiResponse, err := mcpClient.CallWithMessages(systemPrompt, userPrompt)
-	d, err2 := BuildDecisionV2(sig.Symbol, sig.RuleDecision, &ctx.Input.Pos, ctx.Input.Market, ctx.BTCETHLeverage, ctx.Account.TotalEquity*5)
+	d, err2 := BuildDecision(sig.Symbol, sig.RuleDecision, &ctx.Input.Pos, ctx.Input.Market, ctx.BTCETHLeverage, ctx.Account.TotalEquity*5)
 	aiCallDuration := time.Since(aiCallStart)
 	if err2 != nil {
 		return nil, fmt.Errorf("调用AI API失败: %w", err2)
