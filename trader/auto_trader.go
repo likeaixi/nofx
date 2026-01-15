@@ -1952,32 +1952,33 @@ func buildInput() (decision.Input, int64, []float64) {
 	//	input.Market.SspBoxDrift = drift
 	//}
 
-	//klines1m, err := market.GetInputKlines(symbol, "1m")
-	//if err != nil {
-	//	log.Printf("获取Input Klines失败 %v", err)
-	//}
-	//
+	klines1m, err := market.GetInputKlines(symbol, "1m")
+	if err != nil {
+		log.Printf("获取Input Klines失败 %v", err)
+	}
+
 	//klines5m, err := market.GetInputKlines(symbol, "5m")
 	//if err != nil {
 	//	log.Printf("获取Input Klines失败 %v", err)
 	//}
 
-	klines15m, err := market.GetInputKlines(symbol, "15m")
-	if err != nil {
-		log.Printf("获取Input Klines失败 %v", err)
-	}
+	//klines15m, err := market.GetInputKlines(symbol, "15m")
+	//if err != nil {
+	//	log.Printf("获取Input Klines失败 %v", err)
+	//}
 
 	//structCtx := spider.BuildStructCtx(klines1m, klines5m, klines15m, 10, 3, 4, 5)
 
 	input.Market.P = ssp.P
 	//input.Market.Bars15 = klines15m
 
-	//last1m := min(len(klines1m), 5)
+	last1m := min(len(klines1m), 15)
 	//input.Bars1m = klines1m[(len(klines1m) - last1m):]
 	//last5m := min(len(klines5m), 3)
 	//input.Bars5m = klines5m[(len(klines5m) - last5m):]
-	last15m := min(len(klines15m), 15)
-	input.Market.Bars15 = klines15m[(len(klines15m) - last15m):]
+	//last15m := min(len(klines15m), 15)
+	//input.Market.Bars15 = klines15m[(len(klines15m) - last15m):]
+	input.Market.Bars15 = klines1m[(len(klines1m) - last1m):]
 	//input.SSPBias = sspResult.Bias
 
 	//input.StructCtx = structCtx
