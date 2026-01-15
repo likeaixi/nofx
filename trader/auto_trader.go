@@ -667,7 +667,7 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 		log.Printf("加载蜘蛛丝快照 snapsho: %v, stopLoss: %v, takeProfit: %v, historyTas: %v, historySSP: %v", snapshot, stopLoss, takeProfit, historyTags, historySSP)
 	}
 
-	input, T, SSP := buildInput()
+	input, T, SSP, bars1, bars3, bars5, bars15 := buildInput()
 
 	at.T = T
 	at.SSP = SSP
@@ -741,6 +741,22 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 			CurrentSLPrice: &stopLoss,
 			CurrentTPPrice: &takeProfit,
 			PnlPct:         pnlPct,
+		}
+
+		if pnlPct <= 0 {
+			input.Market.Bars15 = bars15
+		}
+
+		if pnlPct > 0 && pnlPct <= 10 {
+			input.Market.Bars15 = bars5
+		}
+
+		if pnlPct > 10 && pnlPct <= 20 {
+			input.Market.Bars15 = bars3
+		}
+
+		if pnlPct > 20 {
+			input.Market.Bars15 = bars1
 		}
 	}
 
@@ -1922,7 +1938,7 @@ func (at *AutoTrader) ClearPeakPnLCache(symbol, side string) {
 	delete(at.peakPnLCache, posKey)
 }
 
-func buildInput() (decision.Input, int64, []float64) {
+func buildInput() (decision.Input, int64, []float64, []market.InputKline, []market.InputKline, []market.InputKline, []market.InputKline) {
 	symbol := "BTCUSDT"
 
 	input := decision.Input{
@@ -1957,15 +1973,20 @@ func buildInput() (decision.Input, int64, []float64) {
 		log.Printf("获取Input Klines失败 %v", err)
 	}
 
-	//klines5m, err := market.GetInputKlines(symbol, "5m")
-	//if err != nil {
-	//	log.Printf("获取Input Klines失败 %v", err)
-	//}
+	klines3m, err := market.GetInputKlines(symbol, "3m")
+	if err != nil {
+		log.Printf("获取Input Klines失败 %v", err)
+	}
 
-	//klines15m, err := market.GetInputKlines(symbol, "15m")
-	//if err != nil {
-	//	log.Printf("获取Input Klines失败 %v", err)
-	//}
+	klines5m, err := market.GetInputKlines(symbol, "5m")
+	if err != nil {
+		log.Printf("获取Input Klines失败 %v", err)
+	}
+
+	klines15m, err := market.GetInputKlines(symbol, "15m")
+	if err != nil {
+		log.Printf("获取Input Klines失败 %v", err)
+	}
 
 	//structCtx := spider.BuildStructCtx(klines1m, klines5m, klines15m, 10, 3, 4, 5)
 
@@ -1974,11 +1995,18 @@ func buildInput() (decision.Input, int64, []float64) {
 
 	last1m := min(len(klines1m), 15)
 	//input.Bars1m = klines1m[(len(klines1m) - last1m):]
-	//last5m := min(len(klines5m), 3)
+	last3m := min(len(klines3m), 15)
+	last5m := min(len(klines5m), 15)
 	//input.Bars5m = klines5m[(len(klines5m) - last5m):]
-	//last15m := min(len(klines15m), 15)
+	last15m := min(len(klines15m), 15)
+
+	bars1 := klines1m[(len(klines1m) - last1m):]
+	bars3 := klines3m[(len(klines1m) - last3m):]
+	bars5 := klines5m[(len(klines1m) - last5m):]
+	bars15 := klines15m[(len(klines1m) - last15m):]
+
 	//input.Market.Bars15 = klines15m[(len(klines15m) - last15m):]
-	input.Market.Bars15 = klines1m[(len(klines1m) - last1m):]
+	//input.Market.Bars15 = klines1m[(len(klines1m) - last1m):]
 	//input.SSPBias = sspResult.Bias
 
 	//input.StructCtx = structCtx
@@ -1989,7 +2017,7 @@ func buildInput() (decision.Input, int64, []float64) {
 	//input.Cfg.TrailGap = 0.02
 	//input.Cfg.UseSspEdges = true
 
-	return input, ssp.T, ssp.SSP
+	return input, ssp.T, ssp.SSP, bars1, bars3, bars5, bars15
 }
 
 func NormalizeSide(raw string, hasPosition bool) string {
