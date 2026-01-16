@@ -743,19 +743,19 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 			PnlPct:         pnlPct,
 		}
 
-		if pnlPct <= 5 {
+		if pnlPct <= 0 {
 			input.Market.Bars15 = bars15
 		}
 
-		if pnlPct > 5 && pnlPct <= 15 {
-			input.Market.Bars15 = bars5
-		}
+		//if pnlPct > 5 && pnlPct <= 15 {
+		//	input.Market.Bars15 = bars5
+		//}
+		//
+		//if pnlPct > 15 && pnlPct <= 25 {
+		//	input.Market.Bars15 = bars3
+		//}
 
-		if pnlPct > 15 && pnlPct <= 25 {
-			input.Market.Bars15 = bars3
-		}
-
-		if pnlPct > 25 {
+		if pnlPct > 0 {
 			input.Market.Bars15 = bars1
 		}
 	}
