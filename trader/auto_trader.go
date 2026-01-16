@@ -667,7 +667,7 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 		log.Printf("加载蜘蛛丝快照 snapsho: %v, stopLoss: %v, takeProfit: %v, historyTas: %v, historySSP: %v", snapshot, stopLoss, takeProfit, historyTags, historySSP)
 	}
 
-	input, T, SSP, bars1, bars3, bars5, bars15 := buildInput()
+	input, T, SSP, bars1, _, _, bars15 := buildInput()
 
 	at.T = T
 	at.SSP = SSP
