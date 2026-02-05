@@ -737,7 +737,7 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 			Side:           side,
 			EntryPrice:     entryPrice,
 			Qty:            quantity,
-			EntryTS:        time.Now().UnixMilli(),
+			EntryTS:        updateTime,
 			CurrentSLPrice: &stopLoss,
 			CurrentTPPrice: &takeProfit,
 			PnlPct:         pnlPct,
