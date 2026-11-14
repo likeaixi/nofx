@@ -217,9 +217,30 @@ func (s *Server) handleUpdateModelConfigs(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Model configuration updated"})
 }
 
-// handleGetSupportedModels Get list of AI models supported by the system.
-// The static claw402 advertisement was removed with wallet onboarding; custom
-// OpenAI-compatible models are configured directly via PUT /api/models.
+// SupportedModel is one entry of the GET /api/supported-models catalog. It
+// mirrors the frontend AIModel shape (web/src/types/config.ts): a provider
+// template that ModelSelectionStep renders as a tile. The user's configured
+// rows (with real keys and custom URLs) come from GET /api/models instead.
+type SupportedModel struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Provider string `json:"provider"`
+	Enabled  bool   `json:"enabled"`
+}
+
+// handleGetSupportedModels Get list of AI model providers supported by the system.
+// The static claw402 advertisement was removed with wallet onboarding; the
+// catalog now exposes the single bring-your-own provider: a custom
+// OpenAI-compatible endpoint the user configures (API key + base URL + model
+// name) via PUT /api/models. Without this entry ModelSelectionStep renders no
+// tile and a fresh user can never reach the config form.
 func (s *Server) handleGetSupportedModels(c *gin.Context) {
-	c.JSON(http.StatusOK, []map[string]interface{}{})
+	c.JSON(http.StatusOK, []SupportedModel{
+		{
+			ID:       "custom",
+			Name:     "Custom (OpenAI-compatible)",
+			Provider: "custom",
+			Enabled:  false, // template only; configured rows are enabled via PUT /api/models
+		},
+	})
 }

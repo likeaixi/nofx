@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -80,6 +81,44 @@ func TestModelCatalogHasNoClaw402(t *testing.T) {
 		if strings.Contains(strings.ToLower(w.Body.String()), "claw402") {
 			t.Fatalf("%s %s still advertises claw402: %s", tc.method, tc.path, w.Body.String())
 		}
+	}
+}
+
+// The supported-models catalog must expose the custom (OpenAI-compatible)
+// provider entry so ModelSelectionStep renders a tile and a fresh user can
+// reach the config form. The user's own model list starts empty.
+func TestSupportedModelsCatalogHasCustomEntry(t *testing.T) {
+	securityJWTSecret(t)
+	st := securityStore(t)
+	s := NewServer(nil, st, nil, 0)
+	token, _ := authGenerateToken(t, st)
+
+	w := securityRequest(s.router, "GET", "/api/supported-models", ``, token)
+	if w.Code != 200 {
+		t.Fatalf("GET /api/supported-models = %d %s", w.Code, w.Body.String())
+	}
+	var catalog []map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &catalog); err != nil {
+		t.Fatalf("supported-models is not a JSON list: %v (%s)", err, w.Body.String())
+	}
+	if len(catalog) != 1 {
+		t.Fatalf("supported-models len = %d, want 1: %s", len(catalog), w.Body.String())
+	}
+	entry := catalog[0]
+	if entry["id"] != "custom" || entry["provider"] != "custom" {
+		t.Fatalf("supported-models entry is not the custom provider: %s", w.Body.String())
+	}
+	if name, _ := entry["name"].(string); name == "" {
+		t.Fatalf("supported-models entry has no display name: %s", w.Body.String())
+	}
+	if strings.Contains(strings.ToLower(w.Body.String()), "claw402") {
+		t.Fatalf("supported-models still advertises claw402: %s", w.Body.String())
+	}
+
+	// A logged-in user with nothing configured sees an empty model list.
+	w = securityRequest(s.router, "GET", "/api/models", ``, token)
+	if w.Code != 200 || strings.TrimSpace(w.Body.String()) != "[]" {
+		t.Fatalf("GET /api/models = %d %s, want 200 []", w.Code, w.Body.String())
 	}
 }
 
