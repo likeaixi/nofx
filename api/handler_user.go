@@ -281,12 +281,18 @@ func (s *Server) handleLogin(c *gin.Context) {
 	})
 }
 
-// handleBindTotp re-issues an authenticator secret for an unbound account
-// after password verification. Repeat calls replace the pending secret.
+// handleBindTotp re-issues an authenticator secret after password
+// verification. For unbound accounts (pending registrations, pre-upgrade
+// accounts, CLI reset-totp) the password alone is sufficient and repeat calls
+// replace the pending secret. An account that already has TOTP enabled must
+// additionally prove a valid current second factor — a current TOTP code or an
+// unused recovery code (consumed on use) — so a password alone can never strip
+// an existing second factor and swap in an attacker's authenticator.
 func (s *Server) handleBindTotp(c *gin.Context) {
 	var req struct {
-		Email    string `json:"email" binding:"required,email"`
-		Password string `json:"password" binding:"required"`
+		Email           string `json:"email" binding:"required,email"`
+		Password        string `json:"password" binding:"required"`
+		CurrentTotpCode string `json:"current_totp_code"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		SafeBadRequest(c, "Invalid request parameters")
@@ -306,6 +312,14 @@ func (s *Server) handleBindTotp(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "account_disabled"})
 		return
 	}
+	if user.TotpEnabled {
+		code := strings.TrimSpace(req.CurrentTotpCode)
+		if code == "" || (!auth.ValidateTOTP(code, user.TotpSecret.String()) &&
+			!s.store.User().ConsumeRecoveryCode(user.ID, code)) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Current verification code required"})
+			return
+		}
+	}
 	secret, url, err := auth.GenerateTOTP(user.Email)
 	if err != nil {
 		SafeInternalError(c, "Failed to generate authenticator secret", err)
@@ -318,7 +332,10 @@ func (s *Server) handleBindTotp(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"totp_secret": secret, "otpauth_url": url})
 }
 
-// handleBindTotpConfirm enables TOTP and issues fresh recovery codes.
+// handleBindTotpConfirm enables TOTP and issues fresh recovery codes. A
+// pending registration completed through this flow claims its sponsor invite
+// server-side exactly like register/confirm, so skipping the register step-2
+// endpoint can never leave a valid invite reusable forever.
 func (s *Server) handleBindTotpConfirm(c *gin.Context) {
 	var req struct {
 		Email    string `json:"email" binding:"required,email"`
@@ -347,6 +364,20 @@ func (s *Server) handleBindTotpConfirm(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid verification code"})
 		return
 	}
+	// Server-derived invite claim, mirroring handleRegisterConfirm: the code
+	// comes from the pending row, never from the client. MarkUsed is atomic,
+	// so of the pending registrations sharing one code exactly one completes.
+	// The single tolerated failure is a code this same account already claimed
+	// at its original activation (registration_invite stays on the row), which
+	// keeps CLI reset-totp re-binds from dead-ending.
+	if !user.TotpEnabled && user.RegistrationInvite != "" {
+		if err := s.store.Invite().MarkUsed(user.RegistrationInvite, user.ID); err != nil {
+			if !errors.Is(err, store.ErrInviteUnavailable) || !s.inviteClaimedBy(user.RegistrationInvite, user.ID) {
+				c.JSON(http.StatusForbidden, gin.H{"error": "Invalid invite code"})
+				return
+			}
+		}
+	}
 	codes, err := auth.GenerateRecoveryCodes(8)
 	if err != nil {
 		SafeInternalError(c, "Failed to generate recovery codes", err)
@@ -370,6 +401,24 @@ func (s *Server) handleBindTotpConfirm(c *gin.Context) {
 		"token": token, "user_id": user.ID, "email": user.Email,
 		"role": user.Role, "recovery_codes": codes,
 	})
+}
+
+// inviteClaimedBy reports whether the invite code exists and was already
+// claimed by exactly this user. It backs the bind-totp confirm flow: a failed
+// MarkUsed is fatal unless this same account spent the code at its original
+// activation (the registration_invite column is kept after activation, so a
+// CLI reset-totp re-bind must not be rejected on its own spent code).
+func (s *Server) inviteClaimedBy(code, userID string) bool {
+	invites, err := s.store.Invite().List()
+	if err != nil {
+		return false
+	}
+	for _, inv := range invites {
+		if inv.Code == code {
+			return inv.UsedBy != nil && *inv.UsedBy == userID
+		}
+	}
+	return false
 }
 
 // handleChangePassword changes the password for the currently authenticated user.

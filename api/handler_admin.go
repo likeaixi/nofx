@@ -34,7 +34,13 @@ func (s *Server) handleCreateInvite(c *gin.Context) {
 		SafeInternalError(c, "Failed to store invite code", err)
 		return
 	}
-	logger.Infof("✉️  Invite %s created by owner %s", code, c.GetString("email"))
+	// The invite code is a capability; logs only ever carry a masked prefix
+	// so log aggregation cannot leak usable codes.
+	masked := code
+	if len(masked) > 4 {
+		masked = masked[:4] + "******"
+	}
+	logger.Infof("✉️  Invite %s created by owner %s", masked, c.GetString("email"))
 	c.JSON(http.StatusOK, gin.H{"code": code})
 }
 

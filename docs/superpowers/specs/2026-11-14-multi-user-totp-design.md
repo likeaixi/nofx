@@ -56,6 +56,8 @@
 - `POST /api/auth/bind-totp` `{email, password}`：密码验证后重置 `totp_secret`，返回新二维码（同注册第一步语义，可重复调用重置）
 - `POST /api/auth/bind-totp/confirm` `{email, password, totp_code}`：启用 + 发新恢复码
 - 密码即临时身份证明，无需已失效的旧会话
+- （2026-11-15 修订）`bind-totp/confirm` 对待激活注册执行与 `register/confirm` 相同的服务端邀请码认领：`!totp_enabled && registration_invite != ''` 时原子 `MarkUsed`，绕过注册 confirm 完成激活同样消耗邀请码（仅该账号此前已自行认领过的码放行，避免 CLI reset 后锁死）
+- （2026-11-15 修订）已启用 TOTP 的账号重绑必须随密码提供当前验证码（有效 TOTP 码，或任一未用恢复码、命中即作废，字段 `current_totp_code`）；仅密码重绑只适用于未绑定账号，CLI `reset-totp` 仍为兜底通道
 
 ### 3.4 停用与恢复
 
