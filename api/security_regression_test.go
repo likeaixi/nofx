@@ -12,10 +12,12 @@ import (
 	"time"
 
 	"nofx/auth"
+	"nofx/crypto"
 	"nofx/manager"
 	"nofx/store"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pquerna/otp/totp"
 )
 
 func TestSecurityPublicCompetitionRechecksCachedVisibility(t *testing.T) {
@@ -293,9 +295,18 @@ func TestSecurityConcurrentFirstRegistration(t *testing.T) {
 	}
 }
 
+// securityLoginTOTPSecret is the fixed authenticator secret bound to the
+// session-lifecycle fixture user; login now requires a live TOTP code.
+const securityLoginTOTPSecret = "JBSXG5DSMVRXEZLU"
+
 func securityLogin(t *testing.T, s *Server, password string) string {
 	t.Helper()
-	w := securityRequest(s.router, "POST", "/api/login", `{"email":"owner@example.test","password":"`+password+`"}`, "")
+	code, err := totp.GenerateCode(securityLoginTOTPSecret, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := `{"email":"owner@example.test","password":"` + password + `","totp_code":"` + code + `"}`
+	w := securityRequest(s.router, "POST", "/api/login", body, "")
 	if w.Code != 200 {
 		t.Fatalf("login: %d %s", w.Code, w.Body.String())
 	}
@@ -326,7 +337,8 @@ func TestSecuritySessionLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := st.User().Create(&store.User{ID: "owner", Email: "owner@example.test", PasswordHash: hash}); err != nil {
+	if err := st.User().Create(&store.User{ID: "owner", Email: "owner@example.test", PasswordHash: hash,
+		TotpEnabled: true, TotpSecret: crypto.EncryptedString(securityLoginTOTPSecret)}); err != nil {
 		t.Fatal(err)
 	}
 	s := securityProtectedServer(st)

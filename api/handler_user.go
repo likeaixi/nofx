@@ -214,11 +214,15 @@ func (s *Server) handleRegisterConfirm(c *gin.Context) {
 // "no such user" vs. a slow bcrypt compare). It is not a secret.
 const dummyPasswordHash = "$2a$10$0iF0bCoQLJ6Ph1bF.MXwHOW.IMTxQjeEW.w38dctRQAB2kwB6ga1q"
 
-// handleLogin Handle user login request
+// handleLogin verifies password and then a TOTP code (or a single-use
+// recovery code) before issuing a session token. Accounts that were never
+// bound to an authenticator (pending registrations, pre-upgrade accounts,
+// CLI reset-totp) are told to complete the bind-totp flow instead.
 func (s *Server) handleLogin(c *gin.Context) {
 	var req struct {
 		Email    string `json:"email" binding:"required,email"`
 		Password string `json:"password" binding:"required"`
+		TotpCode string `json:"totp_code"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -242,7 +246,27 @@ func (s *Server) handleLogin(c *gin.Context) {
 		return
 	}
 
-	// Issue token directly after password verification.
+	// Account state is only revealed after the password is proven correct.
+	if user.Disabled {
+		c.JSON(http.StatusForbidden, gin.H{"error": "account_disabled"})
+		return
+	}
+	if !user.TotpEnabled {
+		// Pending registrations and pre-upgrade accounts must (re)bind an
+		// authenticator before they can hold a session.
+		c.JSON(http.StatusForbidden, gin.H{"error": "totp_binding_required"})
+		return
+	}
+	if req.TotpCode == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Verification code required"})
+		return
+	}
+	if !auth.ValidateTOTP(req.TotpCode, user.TotpSecret.String()) &&
+		!s.store.User().ConsumeRecoveryCode(user.ID, req.TotpCode) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid verification code"})
+		return
+	}
+
 	token, err := auth.GenerateJWT(user.ID, user.Email, user.AuthVersion)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
@@ -253,7 +277,98 @@ func (s *Server) handleLogin(c *gin.Context) {
 		"token":   token,
 		"user_id": user.ID,
 		"email":   user.Email,
-		"message": "Login successful",
+		"role":    user.Role,
+	})
+}
+
+// handleBindTotp re-issues an authenticator secret for an unbound account
+// after password verification. Repeat calls replace the pending secret.
+func (s *Server) handleBindTotp(c *gin.Context) {
+	var req struct {
+		Email    string `json:"email" binding:"required,email"`
+		Password string `json:"password" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		SafeBadRequest(c, "Invalid request parameters")
+		return
+	}
+	user, err := s.store.User().GetByEmail(req.Email)
+	if err != nil {
+		auth.CheckPassword(req.Password, dummyPasswordHash)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Email or password incorrect"})
+		return
+	}
+	if !auth.CheckPassword(req.Password, user.PasswordHash) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Email or password incorrect"})
+		return
+	}
+	if user.Disabled {
+		c.JSON(http.StatusForbidden, gin.H{"error": "account_disabled"})
+		return
+	}
+	secret, url, err := auth.GenerateTOTP(user.Email)
+	if err != nil {
+		SafeInternalError(c, "Failed to generate authenticator secret", err)
+		return
+	}
+	if err := s.store.User().UpdateTOTP(user.ID, crypto.EncryptedString(secret), false); err != nil {
+		SafeInternalError(c, "Failed to store authenticator secret", err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"totp_secret": secret, "otpauth_url": url})
+}
+
+// handleBindTotpConfirm enables TOTP and issues fresh recovery codes.
+func (s *Server) handleBindTotpConfirm(c *gin.Context) {
+	var req struct {
+		Email    string `json:"email" binding:"required,email"`
+		Password string `json:"password" binding:"required"`
+		TotpCode string `json:"totp_code" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		SafeBadRequest(c, "Invalid request parameters")
+		return
+	}
+	user, err := s.store.User().GetByEmail(req.Email)
+	if err != nil {
+		auth.CheckPassword(req.Password, dummyPasswordHash)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Email or password incorrect"})
+		return
+	}
+	if !auth.CheckPassword(req.Password, user.PasswordHash) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Email or password incorrect"})
+		return
+	}
+	if user.Disabled {
+		c.JSON(http.StatusForbidden, gin.H{"error": "account_disabled"})
+		return
+	}
+	if !auth.ValidateTOTP(req.TotpCode, user.TotpSecret.String()) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid verification code"})
+		return
+	}
+	codes, err := auth.GenerateRecoveryCodes(8)
+	if err != nil {
+		SafeInternalError(c, "Failed to generate recovery codes", err)
+		return
+	}
+	hashes := make([]string, len(codes))
+	for i, code := range codes {
+		hashes[i] = auth.HashRecoveryCode(code)
+	}
+	if err := s.store.User().UpdateTOTP(user.ID, user.TotpSecret, true); err != nil ||
+		s.store.User().SetRecoveryCodes(user.ID, hashes) != nil {
+		SafeInternalError(c, "Failed to enable authenticator", err)
+		return
+	}
+	token, err := auth.GenerateJWT(user.ID, user.Email, user.AuthVersion)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"token": token, "user_id": user.ID, "email": user.Email,
+		"role": user.Role, "recovery_codes": codes,
 	})
 }
 

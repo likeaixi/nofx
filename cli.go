@@ -44,6 +44,9 @@ func runCLISubcommand(args []string) bool {
 	case "reset-password":
 		runResetPassword(args[1:])
 		return true
+	case "reset-totp":
+		runResetTOTP(args[1:])
+		return true
 	case "reset-account":
 		runResetAccount(args[1:])
 		return true
@@ -138,6 +141,37 @@ func runResetPassword(args []string) {
 	}
 
 	fmt.Printf("✓ Password reset for %s. Log in with the new password.\n", user.Email)
+}
+
+// runResetTOTP clears the authenticator binding for a single account from the
+// command line. The account must re-bind an authenticator on next login via
+// the bind-totp flow (password + new TOTP code). Like reset-password, this is
+// local-only: it is not reachable over the network.
+func runResetTOTP(args []string) {
+	fs := flag.NewFlagSet("reset-totp", flag.ExitOnError)
+	email := fs.String("email", "", "account email")
+	dbPath := fs.String("db", "", "override SQLite DB path")
+	_ = fs.Parse(args)
+	if *email == "" {
+		fmt.Fprintln(os.Stderr, "usage: nofx reset-totp --email you@example.com")
+		os.Exit(1)
+	}
+	st, err := openStoreForCLI(*dbPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+	defer st.Close()
+	user, err := st.User().GetByEmail(*email)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: account not found\n")
+		os.Exit(1)
+	}
+	if err := st.User().UpdateTOTP(user.ID, crypto.EncryptedString(""), false); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("✓ TOTP reset for %s. The account must re-bind an authenticator on next login (bind-totp flow).\n", user.Email)
 }
 
 // runResetAccount wipes the database back to an uninitialized state. This is the

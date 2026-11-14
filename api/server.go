@@ -199,6 +199,8 @@ func (s *Server) setupRoutes() {
 		s.route(authRoutes, "POST", "/register", "Register new user", s.handleRegister)
 		s.route(authRoutes, "POST", "/register/confirm", "Confirm registration with authenticator code", s.handleRegisterConfirm)
 		s.route(authRoutes, "POST", "/login", "User login, returns JWT token", s.handleLogin)
+		s.route(authRoutes, "POST", "/auth/bind-totp", "Re-issue authenticator secret (password required)", s.handleBindTotp)
+		s.route(authRoutes, "POST", "/auth/bind-totp/confirm", "Confirm authenticator binding", s.handleBindTotpConfirm)
 		// SECURITY: password/account recovery is NOT exposed over HTTP. An
 		// unauthenticated recovery endpoint is a remote auth-bypass on any
 		// public-facing deployment (the confirm phrase is in the frontend and
