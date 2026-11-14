@@ -5,8 +5,6 @@ import type {
   UpdateModelConfigRequest,
   UpdateExchangeConfigRequest,
   CreateExchangeRequest,
-  BeginnerOnboardingResponse,
-  CurrentBeginnerWalletResponse,
 } from '../../types'
 import { API_BASE, httpClient, CryptoService } from './helpers'
 
@@ -15,12 +13,7 @@ export const configApi = {
     const result = await httpClient.get<AIModel[]>(`${API_BASE}/models`)
     if (!result.success) throw new Error('Failed to fetch model configs')
     if (!Array.isArray(result.data)) return []
-    // Normalize the legacy provider label wherever saved models are displayed.
-    return result.data.map((model) =>
-      model.provider === 'claw402'
-        ? { ...model, name: model.name.replace(/^claw402\b/i, 'Claw402') }
-        : model
-    )
+    return result.data
   },
 
   async getSupportedModels(): Promise<AIModel[]> {
@@ -201,25 +194,5 @@ export const configApi = {
     }>(`${API_BASE}/server-ip`)
     if (!result.success) throw new Error('Failed to fetch server IP')
     return result.data!
-  },
-
-  async prepareBeginnerOnboarding(): Promise<BeginnerOnboardingResponse> {
-    const result = await httpClient.post<BeginnerOnboardingResponse>(
-      `${API_BASE}/onboarding/beginner`
-    )
-    if (!result.success || !result.data) {
-      throw new Error(result.message || 'Failed to prepare beginner onboarding')
-    }
-    return result.data
-  },
-
-  async getCurrentBeginnerWallet(): Promise<CurrentBeginnerWalletResponse> {
-    const result = await httpClient.get<CurrentBeginnerWalletResponse>(
-      `${API_BASE}/onboarding/beginner/current`
-    )
-    if (!result.success || !result.data) {
-      throw new Error(result.message || 'Failed to fetch current beginner wallet')
-    }
-    return result.data
   },
 }

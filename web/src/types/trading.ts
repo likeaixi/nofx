@@ -19,10 +19,6 @@ export interface SystemStatus {
   trading_blocked?: boolean
   trading_error?: string
   trading_checked_at?: string
-  /** Claw402 AI fee wallet health, observed by the run loop. */
-  ai_wallet_status?: 'ok' | 'low' | 'empty' | 'unknown'
-  ai_wallet_balance_usdc?: number
-  ai_wallet_checked_at?: string
 }
 
 export interface AccountInfo {

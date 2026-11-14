@@ -155,9 +155,9 @@ func (s *Server) setupRoutes() {
 		// System config (no authentication required, for frontend to determine admin mode/registration status)
 		s.route(api, "GET", "/config", "Get system configuration", s.handleGetSystemConfig)
 
-		// Wallet utilities (no authentication required — used by frontend config form)
+		// EVM keypair generation for the Hyperliquid NOFX agent wallet (the
+		// exchange connect flow asks the server to prepare the agent key).
 		api.POST("/wallet/generate", s.handleWalletGenerate)
-		api.GET("/wallet/balance", s.handleWalletBalance)
 		s.route(api, "GET", "/hyperliquid/connect-config", "Get NOFX Hyperliquid builder authorization config", s.handleHyperliquidConnectConfig)
 		s.route(api, "GET", "/hyperliquid/account", "Get Hyperliquid account balance summary", s.handleHyperliquidAccount)
 		s.route(api, "GET", "/hyperliquid/agent", "Get Hyperliquid approved agent wallets and authorization expiry", s.handleHyperliquidAgent)

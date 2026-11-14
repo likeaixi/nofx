@@ -60,7 +60,7 @@ export const faqCategories: FAQCategory[] = [
         blocks: [
           {
             type: 'p',
-            text: 'NOFX is an open-source, self-hosted AI trading terminal. Its flagship mode is the NOFX Autopilot: an AI agent that reads the Claw402.ai signal board, verifies candidates with Signal Lab and liquidation structure, confirms timing with raw candles, and executes on Hyperliquid — all on your own machine, with your keys never leaving your server.',
+            text: 'NOFX is an open-source, self-hosted AI trading terminal. Its flagship mode is the NOFX Autopilot: an AI agent that scans the top open-interest markets, verifies candidates with market structure, confirms timing with raw candles, and executes on Hyperliquid — all on your own machine, with your keys never leaving your server.',
           },
           {
             type: 'p',
@@ -74,12 +74,12 @@ export const faqCategories: FAQCategory[] = [
         blocks: [
           {
             type: 'p',
-            text: 'Two funded accounts — the guided launch on the Config page walks you through both:',
+            text: 'Two things — the guided launch on the Config page walks you through both:',
           },
           {
             type: 'list',
             items: [
-              'An AI fee wallet: a Base-chain USDC wallet that pays for AI model and market-data calls. Minimum `1 USDC` to launch.',
+              'An AI model provider API key saved under Config → Models.',
               'A Hyperliquid account with trading authorization and at least `12 USDC` available as margin.',
             ],
           },
@@ -109,7 +109,7 @@ export const faqCategories: FAQCategory[] = [
         blocks: [
           {
             type: 'p',
-            text: 'No API keys are required. NOFX routes inference through Claw402 pay-as-you-go infrastructure: your AI fee wallet pays per call with Base USDC, and the terminal accesses supported models (DeepSeek and other frontier models) on demand.',
+            text: 'Each user brings their own provider API key (OpenAI, Claude, Gemini, DeepSeek, Qwen, Grok, Kimi, or any OpenAI-compatible endpoint) under Config → Models. Calls are billed directly by your provider, so model spend stays under your own account.',
           },
           {
             type: 'p',
@@ -145,39 +145,6 @@ export const faqCategories: FAQCategory[] = [
     icon: Zap,
     items: [
       {
-        id: 'ai-fee-wallet',
-        question: 'What is the AI fee wallet?',
-        blocks: [
-          {
-            type: 'p',
-            text: 'A dedicated EVM wallet on Base that pays for AI model calls and paid market data (x402 micropayments). It is completely separate from your trading collateral — it never touches Hyperliquid.',
-          },
-          {
-            type: 'list',
-            items: [
-              'The guided setup creates it for you (or reuses an existing one).',
-              'Deposit only USDC on the Base network to its address.',
-              'Launch requires at least `1 USDC`; the balance display refreshes automatically after a deposit.',
-              'A typical cycle costs a fraction of a cent to a few cents depending on the model.',
-            ],
-          },
-        ],
-      },
-      {
-        id: 'fee-wallet-private-key',
-        question: 'Where is the AI fee wallet private key kept?',
-        blocks: [
-          {
-            type: 'p',
-            text: 'The key is generated locally on your server, stored encrypted (AES-256) in your own database, and shown to you once in the onboarding screen. Back it up — it cannot be recovered if you lose your database.',
-          },
-          {
-            type: 'note',
-            text: 'Keep only fee money in this wallet. It exists to pay for AI calls, not to hold savings.',
-          },
-        ],
-      },
-      {
         id: 'hyperliquid-authorization',
         question: 'How does the Hyperliquid authorization work? Is it safe?',
         blocks: [
@@ -212,7 +179,6 @@ export const faqCategories: FAQCategory[] = [
             type: 'list',
             items: [
               'AI model is enabled and has a credential.',
-              'AI fee wallet key is valid and the Base USDC balance is at least `1 USDC` (queried on-chain).',
               'Hyperliquid account is authorized (agent + builder fee) and reachable.',
               'Trading funds: at least `12 USDC` counting equity in open positions.',
             ],
@@ -240,9 +206,7 @@ export const faqCategories: FAQCategory[] = [
           {
             type: 'list',
             items: [
-              'AI fee wallet: make sure you sent USDC on the Base network to the exact address shown. Balances are cached for ~30 seconds, and the setup panel re-checks automatically every few seconds.',
               'Hyperliquid: deposits land in your own Hyperliquid account; the balance step polls the live account state. Use Refresh in the guided panel if in doubt.',
-              'If the on-chain RPC is temporarily unreachable, the panel marks the balance as unknown instead of zero — retry in a minute.',
             ],
           },
         ],
@@ -267,7 +231,7 @@ export const faqCategories: FAQCategory[] = [
           {
             type: 'steps',
             items: [
-              'Build the universe — pull the live Claw402.ai ranking and take the top candidates (default 10) across crypto majors and the xyz synthetic markets (US stocks, indices, commodities, FX), each with a direction bias and signal z-score.',
+              'Build the universe — take the top open-interest candidates (default 10) across crypto majors and the xyz synthetic markets (US stocks, indices, commodities, FX), each with its market structure.',
               'Verify each candidate — fetch its Signal Lab deep signal plus the cost/liquidation structure around price: liquidation clusters and cost bases show whether a move has fuel ahead of it or walls against it.',
               'Confirm timing — read the raw 15-minute OHLCV candles (30 bars) to check the entry is riding structure, not chasing an extended move.',
               'Decide and size — only setups clearing the confidence threshold (default `78/100`) with roughly `3:1` risk/reward get positions at 10x; closes always execute before opens, and both long and short books are considered every cycle.',
@@ -286,8 +250,6 @@ export const faqCategories: FAQCategory[] = [
           {
             type: 'list',
             items: [
-              'Claw402.ai signal data — the ranking board, per-symbol Signal Lab deep signals, and market net-flow. These are paid endpoints, billed per call in USDC from your AI fee wallet (x402 micropayments).',
-              'Cost/liquidation heatmaps — aggregated position-cost and liquidation-cluster structure for each market.',
               'Hyperliquid market data — raw OHLCV candles and the live L2 order book (free public data).',
               'Your account via the agent wallet — equity, available margin, open positions with PnL.',
               'Its own history — closed trades feed win rate, profit factor and drawdown back into the next prompt, so the AI knows its recent form.',
@@ -295,7 +257,7 @@ export const faqCategories: FAQCategory[] = [
           },
           {
             type: 'note',
-            text: 'The dashboard polls the paid Claw402 endpoints slowly (every few minutes) to conserve your fee wallet — market-data panels stay live from the free feeds.',
+            text: 'Market-data panels run on free public feeds; AI model calls are billed by your own provider key.',
           },
         ],
       },
@@ -317,8 +279,7 @@ export const faqCategories: FAQCategory[] = [
             type: 'list',
             items: [
               'Your account: equity, available margin, open positions with PnL.',
-              'The Claw402 ranking board: candidate universe with direction bias.',
-              'Signal Lab deep signals and cost/liquidation structure per candidate.',
+              'The top open-interest candidate universe for this cycle.',
               'Raw OHLCV candles for timing confirmation.',
               'Its own track record: win rate, profit factor, drawdown, recent trades.',
             ],
@@ -354,21 +315,11 @@ export const faqCategories: FAQCategory[] = [
         blocks: [
           {
             type: 'p',
-            text: 'If the AI fails 3 cycles in a row (provider outage, empty fee wallet, bad responses), the trader enters safe mode: no new positions are opened, existing positions keep their protection, and the loop keeps retrying. It exits safe mode automatically on the next successful AI call.',
+            text: 'If the AI fails 3 cycles in a row (provider outage, bad responses), the trader enters safe mode: no new positions are opened, existing positions keep their protection, and the loop keeps retrying. It exits safe mode automatically on the next successful AI call.',
           },
           {
             type: 'p',
             text: 'Safe mode is shown as a banner on the dashboard together with the reason, so it never happens silently.',
-          },
-        ],
-      },
-      {
-        id: 'fee-wallet-empty-mid-run',
-        question: 'What happens if the AI fee wallet runs out mid-run?',
-        blocks: [
-          {
-            type: 'p',
-            text: 'AI calls start failing with a clear "out of funds" status. The dashboard shows a persistent red banner with the wallet balance, and after three failed cycles the bot enters safe mode. Top up Base USDC to the fee wallet and the trader recovers on its own — no restart needed.',
           },
         ],
       },
@@ -380,7 +331,7 @@ export const faqCategories: FAQCategory[] = [
             type: 'list',
             items: [
               'Hyperliquid trading fees on every order, plus the approved builder fee.',
-              'AI/data costs paid per call from the fee wallet (cents per cycle).',
+              'AI model calls billed by your own provider API key.',
             ],
           },
           {
@@ -474,7 +425,7 @@ export const faqCategories: FAQCategory[] = [
           {
             type: 'list',
             items: [
-              'All secrets (agent keys, fee wallet key, exchange API keys) are AES-256 encrypted at rest in your own database.',
+              'All secrets (agent keys, model API keys, exchange API keys) are AES-256 encrypted at rest in your own database.',
               'Optional RSA transport encryption protects secrets in flight between browser and server.',
               'NOFX is self-hosted: nothing is sent to any third-party server. The code is open source and auditable.',
             ],
@@ -497,11 +448,11 @@ export const faqCategories: FAQCategory[] = [
       },
       {
         id: 'registration-model',
-        question: 'Why can’t anyone else register on my instance?',
+        question: 'Who can register on my instance?',
         blocks: [
           {
             type: 'p',
-            text: 'By design, an instance is single-operator: the first account registered becomes the operator and registration closes ("System already initialized"). This prevents strangers from creating accounts on an exposed deployment. Run one instance per operator.',
+            text: 'The instance is operated by its owner, and registration requires an invite code: the owner creates invites from the user-management tab, and each new member also binds an authenticator (TOTP) at sign-up. Every user’s data — model keys, exchange accounts and traders — is isolated from other members.',
           },
         ],
       },

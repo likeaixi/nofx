@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { formatRequestError, isPaymentOutcomeUnknown } from './requestErrors'
 
+// Legacy paid-gateway failures stored in historical decision logs carried the
+// full upstream URL, secrets and a binary protocol dump. The gateway itself is
+// gone; the redaction contract still matters for any stored error text.
 const legacyProtocolError =
-  'failed to build trading context: vergex request failed: paid request outcome unknown; refusing automatic replay: Get "https://claw402.ai/api/v1/vergex/holder-winrate-map?secret=hidden": net/http: HTTP/1.x transport connection broken: malformed HTTP response "\\x00\\x00\\x12\\x04"'
+  'failed to build trading context: paid data request failed: paid request outcome unknown; refusing automatic replay: Get "https://paid-gateway.example/api/v1/data?secret=hidden": net/http: HTTP/1.x transport connection broken: malformed HTTP response "\\x00\\x00\\x12\\x04"'
 
 describe('readable payment errors', () => {
   it('replaces historical binary dumps without claiming success or no charge', () => {

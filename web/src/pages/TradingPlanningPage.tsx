@@ -37,10 +37,7 @@ import {
 import { FrontierOrderBlocker } from '../components/planning/FrontierOrderBlocker'
 import { PlanFunding } from '../components/planning/PlanFunding'
 import { FrontierAccount } from '../components/planning/FrontierAccount'
-import {
-  FrontierSetup,
-  type FeeWalletState,
-} from '../components/planning/FrontierSetup'
+import { FrontierSetup } from '../components/planning/FrontierSetup'
 import {
   accountLabel,
   preferredAccount as preferredTradingAccount,
@@ -98,22 +95,23 @@ export function TradingPlanningPage() {
     plan?: Plan
   } | null>(null)
   const [setupOpen, setSetupOpen] = useState<'ai' | 'exchange' | null>(null)
-  const [walletState, setWalletState] = useState<FeeWalletState>('checking')
   const [configsLoaded, setConfigsLoaded] = useState(false)
   const [accounts, setAccounts] = useState<Exchange[]>([]),
     [models, setModels] = useState<AIModel[]>([]),
     [exchangeID, setExchangeID] = useState(''),
     [modelID, setModelID] = useState('')
   const [venue, setVenue] = useState('binance')
-  const [ai500Symbols, setAI500Symbols] = useState<string[]>([])
   const requestedVenue = useRef('binance')
+  // The paid AI500 board selector was removed; the long-only entry policy
+  // only applies to plans already saved with it.
+  const marketGroup = undefined as string | undefined
+  const entryPolicy = marketGroup
+    ? ('ai500_trend_long' as const)
+    : undefined
   const marketChosen = useRef(false)
   const [symbol, setSymbol] = useState('BTCUSDT'),
     [symbolInput, setSymbolInput] = useState('BTCUSDT'),
     [limits, setLimits] = useState<Constraints>(defaultLimits)
-  const marketGroup =
-    venue === 'binance' && ai500Symbols.includes(symbol) ? 'ai500' : undefined
-  const entryPolicy = marketGroup ? 'ai500_trend_long' : undefined
   const [data, setData] = useState<PlanningState>({
       records: {},
       accounts: {},
@@ -539,11 +537,7 @@ export function TradingPlanningPage() {
   }
   async function send(text = instruction, compareStructures = false) {
     if (busy || !text.trim()) return
-    if (
-      !modelID ||
-      (models.find((m) => m.id === modelID)?.provider === 'claw402' &&
-        walletState !== 'ready')
-    ) {
+    if (!modelID) {
       setInstruction(text)
       pendingIntent.current = {
         venue,
@@ -930,8 +924,7 @@ export function TradingPlanningPage() {
     setOrderNotice('')
   }
   const outsideEntryPolicy = (plan: Plan) =>
-    (entryPolicy === 'ai500_trend_long' ||
-      plan.constraints.entry_policy === 'ai500_trend_long') &&
+    plan.constraints.entry_policy === 'ai500_trend_long' &&
     plan.idea.side !== 'long'
   const deckPlans = batchPlans(records, currentBatch).filter(
     (plan) => !outsideEntryPolicy(plan)
@@ -1102,7 +1095,6 @@ export function TradingPlanningPage() {
         open={setupOpen}
         onOpen={openSetup}
         onRefresh={refreshSetup}
-        onWalletState={setWalletState}
         onComplete={completeSetup}
       />
       {
@@ -1110,11 +1102,7 @@ export function TradingPlanningPage() {
           venue={venue}
           disabled={busy}
           selected={symbol}
-          walletReady={walletState === 'ready'}
-          walletChecking={walletState === 'checking'}
-          onSetup={() => setSetupOpen('ai')}
           onSelect={openMarket}
-          onAI500Markets={setAI500Symbols}
         />
       }
       {blockingRun && (

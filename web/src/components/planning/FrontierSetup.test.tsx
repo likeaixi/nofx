@@ -8,14 +8,14 @@ import {
 } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { FrontierSetup, feeWalletState } from './FrontierSetup'
+import { FrontierSetup } from './FrontierSetup'
 const mocks = vi.hoisted(() => ({ api: vi.fn(), create: vi.fn() }))
 vi.mock('../../lib/planning', () => ({ planningAPI: mocks.api }))
 vi.mock('../../lib/api', () => ({
   api: {
     createExchangeEncrypted: mocks.create,
     getExchangeConfigs: async () => [],
-    getSupportedModels: async () => [{ id: 'claw402', provider: 'claw402' }],
+    getSupportedModels: async () => [{ id: 'deepseek', provider: 'deepseek' }],
   },
 }))
 vi.mock('../common/HyperliquidWalletConnect', () => ({
@@ -54,7 +54,6 @@ vi.mock('../trader/ExchangeConfigModal', () => ({
     </button>
   ),
 }))
-const address = '0x1111111111111111111111111111111111111111'
 const missing = {
   found: false,
   enabled: false,
@@ -63,13 +62,11 @@ const missing = {
   balance_status: 'unknown',
 }
 const refresh = vi.fn().mockResolvedValue(undefined),
-  open = vi.fn(),
-  state = vi.fn()
+  open = vi.fn()
 beforeEach(() => {
   mocks.api.mockReset()
   refresh.mockClear()
   open.mockClear()
-  state.mockClear()
   mocks.api.mockResolvedValue(missing)
 })
 afterEach(cleanup)
@@ -99,56 +96,30 @@ function show(step: 'ai' | 'exchange' | null = 'ai', direct = false) {
           open={step}
           onOpen={open}
           onRefresh={refresh}
-          onWalletState={state}
         />
       </MemoryRouter>
     </StrictMode>
   )
 }
-it('opens the shared backup flow instead of creating and funding a wallet silently', async () => {
+it('points unconfigured users at provider setup without touching the removed wallet flow', async () => {
   show()
-  const button = await screen.findByRole('button', { name: 'Create AI wallet' })
-  await waitFor(() => expect(button).toBeEnabled())
-  fireEvent.click(button)
   expect(
-    await screen.findByRole('button', { name: 'Create my AI wallet' })
+    await screen.findByText(/No AI provider is connected yet/i)
   ).toBeVisible()
-  expect(mocks.api.mock.calls.every((call) => call.length === 1)).toBe(true)
+  // The AI-wallet onboarding endpoints were removed with wallet onboarding;
+  // the dialog must not call them.
+  expect(mocks.api).not.toHaveBeenCalled()
   expect(refresh).not.toHaveBeenCalled()
   expect(
     screen.queryByRole('button', { name: /execute|place live order/i })
   ).toBeNull()
-})
-it('never retries an unconfirmed setup mutation automatically', async () => {
-  mocks.api.mockImplementation(async (_path: string, body: unknown) => {
-    if (body) throw new Error('request interrupted')
-    return {
-      ...missing,
-      found: true,
-      address,
-      model_id: 'saved',
-      enabled: false,
-    }
-  })
-  show()
-  const button = await screen.findByRole('button', {
-    name: 'Enable existing AI wallet',
-  })
-  await waitFor(() => expect(button).toBeEnabled())
-  fireEvent.click(button)
-  expect(await screen.findByRole('alert')).toHaveTextContent(
-    'could not be confirmed'
-  )
-  expect(mocks.api.mock.calls.filter((call) => call.length === 2)).toHaveLength(
-    1
-  )
 })
 it('lets an existing direct AI provider continue without a fee-wallet deposit', async () => {
   show('ai', true)
   expect(screen.getByText('Your AI is configured')).toBeVisible()
   fireEvent.click(screen.getByRole('button', { name: 'Continue with this AI' }))
   expect(open).toHaveBeenCalledWith(null)
-  expect(mocks.api.mock.calls.every((call) => call.length === 1)).toBe(true)
+  expect(mocks.api).not.toHaveBeenCalled()
 })
 it('refreshes a saved exchange in place without starting trading or the model', async () => {
   show('exchange', true)
@@ -160,27 +131,6 @@ it('refreshes a saved exchange in place without starting trading or the model', 
   )
   expect(open).not.toHaveBeenCalled()
   expect(mocks.create).not.toHaveBeenCalled()
-})
-it('does not treat an unknown or malformed balance as funded', () => {
-  for (const balance of [undefined, '', 'NaN', '-1'])
-    expect(
-      feeWalletState({
-        ...missing,
-        found: true,
-        enabled: true,
-        balance_usdc: balance,
-        balance_status: 'ok',
-      })
-    ).toBe('unknown')
-  expect(
-    feeWalletState({
-      ...missing,
-      found: true,
-      enabled: true,
-      balance_usdc: '0.000001',
-      balance_status: 'ok',
-    })
-  ).toBe('ready')
 })
 
 it('does not mark saved credentials as verified until the live account check succeeds', async () => {
@@ -210,7 +160,6 @@ it('does not mark saved credentials as verified until the live account check suc
       open="exchange"
       onOpen={open}
       onRefresh={refresh}
-      onWalletState={state}
       onComplete={complete}
     />
   )
@@ -238,9 +187,7 @@ it('does not mark saved credentials as verified until the live account check suc
   fireEvent.click(screen.getByRole('button', { name: 'Return to my plan' }))
   expect(complete).toHaveBeenCalledWith('exchange')
   expect(
-    mocks.api.mock.calls.every(
-      ([path]) => path.startsWith('account?') || path.startsWith('setup-wallet')
-    )
+    mocks.api.mock.calls.every(([path]) => path.startsWith('account?'))
   ).toBe(true)
 })
 it('keeps invalid exchange credentials actionable instead of showing a ready account', async () => {
@@ -267,7 +214,6 @@ it('keeps invalid exchange credentials actionable instead of showing a ready acc
       open="exchange"
       onOpen={open}
       onRefresh={refresh}
-      onWalletState={state}
     />
   )
   expect(
@@ -277,14 +223,6 @@ it('keeps invalid exchange credentials actionable instead of showing a ready acc
     screen.getByRole('button', { name: 'Return to my plan' })
   ).toBeDisabled()
   expect(screen.getByRole('button', { name: 'Verify account' })).toBeEnabled()
-})
-
-it('does not offer an empty provider picker when the deployment supports Claw402 only', async () => {
-  show()
-  await screen.findByRole('button', { name: 'Create AI wallet' })
-  expect(
-    screen.queryByRole('button', { name: 'Use my own API key instead →' })
-  ).toBeNull()
 })
 
 it.each(['okx', 'bitget'])(
@@ -302,7 +240,6 @@ it.each(['okx', 'bitget'])(
         open="exchange"
         onOpen={open}
         onRefresh={refresh}
-        onWalletState={state}
       />
     )
     fireEvent.click(

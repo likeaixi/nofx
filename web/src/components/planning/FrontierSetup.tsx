@@ -5,48 +5,22 @@ import {
 } from '../../lib/frontierAccounts'
 import { accountLabel } from '../../lib/frontierAccounts'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { QRCodeSVG } from 'qrcode.react'
-import { AIWalletBackup } from '../common/AIWalletBackup'
+import { Link } from 'react-router-dom'
 import type { AIModel, Exchange } from '../../types'
 import { api } from '../../lib/api'
 import { planningAPI } from '../../lib/planning'
 import type { AccountCheck } from '../../lib/frontierWorkspace'
+import { ROUTES } from '../../router/paths'
 import { HyperliquidWalletConnect } from '../common/HyperliquidWalletConnect'
 import { ExchangeConfigModal } from '../trader/ExchangeConfigModal'
 import { ModelConfigModal } from '../trader/ModelConfigModal'
 
-export type FeeWalletState =
-  | 'checking'
-  | 'missing'
-  | 'empty'
-  | 'unknown'
-  | 'ready'
-type Wallet = {
-  found: boolean
-  enabled: boolean
-  address?: string
-  model_id?: string
-  chain: string
-  asset: string
-  balance_usdc?: string
-  balance_status: string
-}
 const formatBalance = (value: string | undefined) =>
   Number(value).toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
-export function feeWalletState(wallet: Wallet): FeeWalletState {
-  if (!wallet.found || !wallet.enabled) return 'missing'
-  if (
-    wallet.balance_status !== 'ok' ||
-    !wallet.balance_usdc?.trim() ||
-    !Number.isFinite(Number(wallet.balance_usdc)) ||
-    Number(wallet.balance_usdc) < 0
-  )
-    return 'unknown'
-  return Number(wallet.balance_usdc) > 0 ? 'ready' : 'empty'
-}
+
 export function FrontierSetup({
   models,
   modelID,
@@ -57,7 +31,6 @@ export function FrontierSetup({
   open,
   onOpen,
   onRefresh,
-  onWalletState,
   onComplete,
 }: {
   models: AIModel[]
@@ -73,13 +46,9 @@ export function FrontierSetup({
     venue?: string,
     accountID?: string
   ) => Promise<void>
-  onWalletState: (state: FeeWalletState) => void
   onComplete?: (step: 'ai' | 'exchange') => void
 }) {
-  const [wallet, setWallet] = useState<Wallet | null>(null)
-  const [working, setWorking] = useState(false)
   const [error, setError] = useState('')
-  const [copied, setCopied] = useState(false)
   const [cex, setCex] = useState(false)
   const [addingAccount, setAddingAccount] = useState(false)
   const [choice, setChoice] = useState(venue)
@@ -88,45 +57,12 @@ export function FrontierSetup({
   const [check, setCheck] = useState<AccountCheck | null>(null)
   const dialog = useRef<HTMLElement>(null)
   const mounted = useRef(true),
-    request = useRef(0),
-    pending = useRef(false),
     accountRequest = useRef(0)
   const selectedModel = models.find((m) => m.id === modelID)
-  const status = wallet ? feeWalletState(wallet) : 'checking'
-  const aiReady =
-    !!selectedModel &&
-    (selectedModel.provider !== 'claw402' || status === 'ready')
+  const aiReady = !!selectedModel
   const checked = check?.accountID === accountID ? check : null
   const exchangeReady = checked?.status === 'verified'
   const currentAccount = accounts.find((a) => a.id === accountID)
-  const refreshWallet = useCallback(async () => {
-    if (pending.current) return
-    pending.current = true
-    const revision = ++request.current
-    try {
-      const next = await planningAPI<Wallet>(
-        'setup-wallet' +
-          (selectedModel?.provider === 'claw402'
-            ? '?model_id=' + encodeURIComponent(modelID)
-            : '')
-      )
-      if (mounted.current && revision === request.current) {
-        setWallet(next)
-        onWalletState(feeWalletState(next))
-        setError('')
-      }
-    } catch {
-      if (mounted.current && revision === request.current) {
-        onWalletState('unknown')
-        setWallet(null)
-        setError(
-          'Could not check your AI balance. Retry the balance check before creating another wallet.'
-        )
-      }
-    } finally {
-      if (revision === request.current) pending.current = false
-    }
-  }, [onWalletState, selectedModel?.provider, modelID])
   const verifyAccount = useCallback(
     async (background = false) => {
       const revision = ++accountRequest.current
@@ -182,16 +118,11 @@ export function FrontierSetup({
   )
   useEffect(() => {
     mounted.current = true
-    setWallet(null)
-    setCopied(false)
-    onWalletState('checking')
-    void refreshWallet()
     return () => {
       mounted.current = false
-      request.current++
-      pending.current = false
+      accountRequest.current++
     }
-  }, [refreshWallet, onWalletState])
+  }, [])
   useEffect(() => {
     let cancelled = false
     let timer: ReturnType<typeof setTimeout>
@@ -216,10 +147,7 @@ export function FrontierSetup({
         if (!cancelled)
           setDirectProviders(
             supported.filter(
-              (model) =>
-                model.provider !== 'claw402' &&
-                model.id !== 'claw402' &&
-                !model.provider?.startsWith('blockrun')
+              (model) => !model.provider?.startsWith('blockrun')
             )
           )
       } catch {
@@ -230,13 +158,6 @@ export function FrontierSetup({
       cancelled = true
     }
   }, [open])
-  useEffect(() => {
-    if (!open || !wallet?.found || status === 'ready') return
-    const timer = window.setInterval(() => {
-      if (!document.hidden) void refreshWallet()
-    }, 15000)
-    return () => clearInterval(timer)
-  }, [open, wallet?.found, status, refreshWallet])
   useEffect(() => {
     if (open === 'exchange') {
       setChoice(venue)
@@ -274,36 +195,6 @@ export function FrontierSetup({
       previous?.focus()
     }
   }, [open, cex, ownAI, onOpen])
-  async function createWallet() {
-    if (working || pending.current) return
-    if (!wallet?.found) {
-      setOwnAI([
-        { id: 'claw402', name: 'Claw402', provider: 'claw402', enabled: false },
-      ])
-      return
-    }
-    setWorking(true)
-    setError('')
-    try {
-      const next = await planningAPI<Wallet>('setup-wallet', {
-        model_id:
-          wallet?.model_id ||
-          (selectedModel?.provider === 'claw402' ? modelID : ''),
-      })
-      if (!mounted.current) return
-      setWallet(next)
-      onWalletState(feeWalletState(next))
-      await onRefresh(selectedModel?.id || next.model_id)
-      await refreshWallet()
-    } catch {
-      if (mounted.current)
-        setError(
-          'AI setup could not be confirmed. Check the wallet status before retrying.'
-        )
-    } finally {
-      if (mounted.current) setWorking(false)
-    }
-  }
   async function savedExchange(id?: string) {
     const latest = await api.getExchangeConfigs()
     const saved =
@@ -327,15 +218,9 @@ export function FrontierSetup({
           <button onClick={() => onOpen('ai')}>
             <span>AI & data</span>
             <b>
-              {selectedModel?.provider !== 'claw402' && selectedModel
+              {selectedModel
                 ? 'Your API provider'
-                : status === 'ready'
-                  ? `${Number(wallet?.balance_usdc).toFixed(2)} USDC`
-                  : status === 'empty'
-                    ? 'Add AI funds'
-                    : status === 'checking'
-                      ? 'Checking balance…'
-                      : 'Set up AI'}
+                : 'Set up AI'}
             </b>
           </button>
           <button
@@ -419,115 +304,44 @@ export function FrontierSetup({
                   Generate plans first. You only need a trading account when you
                   want to place an order.
                 </p>
-                {selectedModel && selectedModel.provider !== 'claw402' && (
+                {selectedModel ? (
                   <div className="frontier-setup-success">
                     <b>Your AI is configured</b>
                     <p>
-                      {selectedModel.name} bills through your provider. The
-                      separate AI balance below is only needed for paid data
-                      such as AI500.
+                      {selectedModel.name} bills through your provider. You pay
+                      the provider directly for AI requests.
                     </p>
-                  </div>
-                )}
-                <div className="frontier-ai-options">
-                  <b>Pay as you go</b>
-                  <p>
-                    AI requests and premium data are charged to a dedicated USDC
-                    wallet. Your trading balance is never used for these fees.
-                  </p>
-                </div>
-                {wallet?.found ? (
-                  <div className="frontier-wallet-card">
-                    <QRCodeSVG value={wallet.address || ''} size={130} />
-                    <div>
-                      <b>USDC on Base</b>
-                      <p>
-                        Send only USDC on the Base network to this AI payment
-                        address.
-                      </p>
-                      <code>{wallet.address}</code>
-                      <button
-                        onClick={async () => {
-                          try {
-                            await navigator.clipboard.writeText(
-                              wallet.address || ''
-                            )
-                            setCopied(true)
-                          } catch {
-                            setError(
-                              'Copy failed. Select and copy the address instead.'
-                            )
-                          }
-                        }}
-                      >
-                        {copied ? 'Address copied' : 'Copy AI payment address'}
-                      </button>
-                      <p role="status">
-                        <strong>
-                          {wallet.balance_status === 'ok'
-                            ? `${Number(wallet.balance_usdc).toFixed(2)} USDC`
-                            : 'Balance not verified'}
-                        </strong>{' '}
-                        ·{' '}
-                        {status === 'ready'
-                          ? 'Funds received'
-                          : status === 'empty'
-                            ? 'Waiting for your deposit · checks every 15 seconds'
-                            : 'Verification needed'}
-                      </p>
-                      <button
-                        disabled={working}
-                        onClick={() => void refreshWallet()}
-                      >
-                        Check balance
-                      </button>
-                      {!wallet.enabled && (
-                        <button
-                          disabled={working}
-                          onClick={() => void createWallet()}
-                        >
-                          Enable existing AI wallet
-                        </button>
-                      )}
-                    </div>
                   </div>
                 ) : (
                   <div className="frontier-setup-start">
                     <p>
-                      Create your AI payment wallet, then fund it with Base
-                      USDC. Creating it does not charge you.
+                      No AI provider is connected yet. Save a provider API key
+                      to generate plans.
                     </p>
-                    <button
-                      className="planning-primary"
-                      disabled={working || !!error || status === 'checking'}
-                      onClick={() => void createWallet()}
-                    >
-                      {working ? 'Setting up…' : 'Create AI wallet'}
-                    </button>
-                    {error && (
-                      <button onClick={() => void refreshWallet()}>
-                        Check wallet status
+                    {directProviders.length > 0 ? (
+                      <button
+                        className="planning-primary"
+                        onClick={() => setOwnAI(directProviders)}
+                      >
+                        Connect an AI provider
                       </button>
+                    ) : (
+                      <p>
+                        Add one from the{' '}
+                        <Link to={`${ROUTES.traders}?setup=models`}>
+                          Config page
+                        </Link>{' '}
+                        on Traders, then return here.
+                      </p>
                     )}
                   </div>
                 )}
-                {wallet?.found && wallet.address && wallet.model_id && (
-                  <AIWalletBackup
-                    key={wallet.model_id + wallet.address}
-                    modelID={wallet.model_id}
-                    address={wallet.address}
-                  />
-                )}
                 <p className="frontier-setup-note">
-                  Pay per request; the gateway checks the price before payment.
-                  A positive balance does not guarantee enough funds for every
-                  request. This wallet is encrypted on your NOFX server, not in
-                  your browser. Use Private key backup above to save your key.
-                  Keep a backup of your deployment too.
+                  AI requests are billed by your provider. Your trading balance
+                  is never used for these fees.
                 </p>
                 {directProviders.length > 0 && (
                   <button
-                    disabled={working}
                     className="frontier-own-ai"
                     onClick={() => setOwnAI(directProviders)}
                   >
@@ -538,7 +352,7 @@ export function FrontierSetup({
                   <button onClick={() => onOpen(null)}>Keep exploring</button>
                   <button
                     className="planning-primary"
-                    disabled={!aiReady || working}
+                    disabled={!aiReady}
                     onClick={() => finish('ai')}
                   >
                     Continue with this AI
@@ -770,7 +584,6 @@ export function FrontierSetup({
                 configured.find((m) => m.id === id) ||
                 configured.find((m) => m.provider === id && m.enabled)
               await onRefresh(match?.id)
-              await refreshWallet()
               setOwnAI(null)
               setError('')
             } catch {

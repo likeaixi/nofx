@@ -234,10 +234,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       )
 
       if (ok) {
-        // Clear stale onboarding state so new users always see the welcome flow
-        localStorage.removeItem('nofx_beginner_onboarding_completed')
-        localStorage.removeItem('nofx_beginner_wallet_address')
-
         return { success: true, data }
       }
 

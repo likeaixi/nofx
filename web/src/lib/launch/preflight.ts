@@ -67,7 +67,7 @@ export function setupTargetForCheck(check: LaunchCheck): SetupTarget | null {
     case 'ai_model':
     case 'ai_wallet':
     case 'ai_wallet_funds':
-      return 'claw402'
+      return 'models'
     case 'exchange_config':
     case 'exchange_account':
       return 'hyperliquid'

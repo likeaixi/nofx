@@ -22,13 +22,13 @@ const setupSteps = [
     to: ROUTES.register,
   },
   {
-    title: 'Fund the AI fee wallet',
+    title: 'Connect an AI model',
     detail:
-      'NOFX prepares a Base USDC wallet for Claw402.ai data and model calls. This wallet is separate from trading collateral.',
+      'Add a supported model provider and save its API key. You pay the provider directly for the calls your trader makes.',
     icon: CircleDollarSign,
-    action: 'Open deposit QR',
+    action: 'Open model config',
     to: ROUTES.login,
-    returnUrl: `${ROUTES.traders}?setup=claw402`,
+    returnUrl: `${ROUTES.traders}?setup=models`,
   },
   {
     title: 'Authorize Hyperliquid',
@@ -50,8 +50,8 @@ const setupSteps = [
 ]
 
 const pipeline = [
-  'Read the live Claw402.ai board, with US stocks prioritized before crypto.',
-  'Load current direction, direction history, and cost/liquidation structure for each candidate.',
+  'Scan the OI-top market ranking every cycle, with US stocks prioritized before crypto.',
+  'Load per-symbol market structure and cost/liquidation context for each candidate.',
   'Confirm with raw OHLCV candles, then trade full-size 10x only when the setup is strong enough.',
 ]
 
@@ -69,7 +69,7 @@ export function TraderLaunchGuestPage() {
               One strategy. Four setup steps. Then it trades.
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-nofx-text-muted">
-              NOFX runs a single Claw402-driven strategy: board, per-market
+              NOFX runs a single built-in strategy: market scan, per-symbol
               details, liquidation structure, candles, execution. No strategy
               picker, no manual symbol picking required.
             </p>
@@ -79,7 +79,7 @@ export function TraderLaunchGuestPage() {
                 onClick={() =>
                   sessionStorage.setItem(
                     'returnUrl',
-                    `${ROUTES.traders}?setup=claw402`
+                    `${ROUTES.traders}?setup=models`
                   )
                 }
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-nofx-gold px-5 py-3 text-sm font-bold text-white transition hover:bg-nofx-gold/90"

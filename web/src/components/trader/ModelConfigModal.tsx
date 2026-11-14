@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Trash2, Brain, ExternalLink } from 'lucide-react'
+import { Trash2, Brain } from 'lucide-react'
 import type { AIModel } from '../../types'
 import type { Language } from '../../i18n/translations'
 import { t } from '../../i18n/translations'
 import { getModelIcon } from '../common/ModelIcons'
 import { ModelStepIndicator } from './ModelStepIndicator'
 import { ModelCard } from './ModelCard'
-import { Claw402ConfigForm } from './Claw402ConfigForm'
-import { AI_PROVIDER_CONFIG, getShortName } from './model-constants'
+import { getShortName } from './model-constants'
 
 interface ModelConfigModalProps {
   allModels: AIModel[]
@@ -35,11 +34,7 @@ export function ModelConfigModal({
   onClose,
   language,
 }: ModelConfigModalProps) {
-  const defaultModelId =
-    editingModelId ||
-    initialModelId ||
-    allModels.find((model) => model.provider === 'claw402')?.id ||
-    ''
+  const defaultModelId = editingModelId || initialModelId || ''
   const [currentStep, setCurrentStep] = useState(defaultModelId ? 1 : 0)
   const [selectedModelId, setSelectedModelId] = useState(defaultModelId)
   const [saving, setSaving] = useState(false)
@@ -49,14 +44,12 @@ export function ModelConfigModal({
   const [baseUrl, setBaseUrl] = useState('')
   const [modelName, setModelName] = useState('')
 
-  // The configured entry carries the saved details (wallet address, custom
-  // model name, has_api_key); the template from supportedModels only describes
-  // the provider. When editing, the configured entry must win — both can share
-  // the same id (e.g. "claw402").
+  // The configured entry carries the saved details (custom model name,
+  // has_api_key); the template from supportedModels only describes the
+  // provider. When editing, the configured entry must win — both can share
+  // the same id.
   const configuredModel = configuredModels?.find(
-    (m) =>
-      m.id === selectedModelId ||
-      (m.provider === 'claw402' && selectedModelId === 'claw402')
+    (m) => m.id === selectedModelId
   )
   const templateModel = allModels?.find((m) => m.id === selectedModelId)
   const selectedModel = configuredModel || templateModel
@@ -197,7 +190,7 @@ export function ModelConfigModal({
           </div>
 
           {/* Step Indicator */}
-          {!editingModelId && selectedModel?.provider !== 'claw402' && (
+          {!editingModelId && (
             <div className="px-6">
               <ModelStepIndicator
                 currentStep={currentStep}
@@ -222,44 +215,22 @@ export function ModelConfigModal({
               />
             )}
 
-            {/* Step 1: Configure — Claw402 Dedicated UI */}
-            {(currentStep === 1 || editingModelId) &&
-              selectedModel &&
-              (selectedModel.provider === 'claw402' ||
-                selectedModel.id === 'claw402') && (
-                <Claw402ConfigForm
-                  apiKey={apiKey}
-                  modelName={modelName}
-                  editingModelId={editingModelId}
-                  hasExistingKey={hasExistingKey}
-                  walletModelID={configuredModel?.id}
-                  initialWalletAddress={selectedModel.walletAddress}
-                  onApiKeyChange={setApiKey}
-                  onModelNameChange={setModelName}
-                  onBack={handleBack}
-                  onSubmit={handleSubmit}
-                />
-              )}
-
-            {/* Step 1: Configure — Standard Providers (non-claw402) */}
-            {(currentStep === 1 || editingModelId) &&
-              selectedModel &&
-              selectedModel.provider !== 'claw402' &&
-              selectedModel.id !== 'claw402' && (
-                <StandardProviderConfigForm
-                  selectedModel={selectedModel}
-                  apiKey={apiKey}
-                  baseUrl={baseUrl}
-                  modelName={modelName}
-                  editingModelId={editingModelId}
-                  onApiKeyChange={setApiKey}
-                  onBaseUrlChange={setBaseUrl}
-                  onModelNameChange={setModelName}
-                  onBack={handleBack}
-                  onSubmit={handleSubmit}
-                  language={language}
-                />
-              )}
+            {/* Step 1: Configure */}
+            {(currentStep === 1 || editingModelId) && selectedModel && (
+              <StandardProviderConfigForm
+                selectedModel={selectedModel}
+                apiKey={apiKey}
+                baseUrl={baseUrl}
+                modelName={modelName}
+                editingModelId={editingModelId}
+                onApiKeyChange={setApiKey}
+                onBaseUrlChange={setBaseUrl}
+                onModelNameChange={setModelName}
+                onBack={handleBack}
+                onSubmit={handleSubmit}
+                language={language}
+              />
+            )}
           </div>
         </fieldset>
       </div>
@@ -288,91 +259,9 @@ function ModelSelectionStep({
         {t('modelConfig.chooseProvider', language)}
       </div>
 
-      {/* Claw402 Featured Card */}
-      {availableModels.some((m) => m.provider === 'claw402') && (
-        <button
-          type="button"
-          onClick={() => {
-            const claw = availableModels.find((m) => m.provider === 'claw402')
-            if (claw) onSelectModel(claw.id)
-          }}
-          className="w-full p-5 rounded-xl text-left transition-all hover:scale-[1.01]"
-          style={{
-            background: 'rgba(41,91,232, 0.10)',
-            border: '1.5px solid rgba(41,91,232, 0.4)',
-          }}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden">
-                {getModelIcon('claw402', { width: 40, height: 40 })}
-              </div>
-              <div>
-                <div
-                  className="font-bold text-base"
-                  style={{ color: '#192434' }}
-                >
-                  Claw402
-                  <a
-                    href="https://claw402.ai"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="ml-1.5 text-[10px] font-normal px-1.5 py-0.5 rounded-sm"
-                    style={{
-                      color: '#295be8',
-                      background: 'rgba(41,91,232, 0.1)',
-                    }}
-                  >
-                    ↗ claw402.ai
-                  </a>
-                </div>
-                <div className="text-xs mt-0.5" style={{ color: '#707e92' }}>
-                  {t('modelConfig.payPerCall', language)}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {configuredIds.has(
-                availableModels.find((m) => m.provider === 'claw402')?.id || ''
-              ) && (
-                <div
-                  className="w-2 h-2 rounded-full"
-                  style={{ background: '#2E8B57' }}
-                />
-              )}
-              <div
-                className="px-3 py-1.5 rounded-full text-xs font-bold"
-                style={{
-                  background: '#295be8',
-                  color: '#fff',
-                }}
-              >
-                {'🔥 ' + t('modelConfig.recommended', language)}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 mt-3 ml-[52px]">
-            <span
-              className="text-[11px] px-2 py-0.5 rounded-full"
-              style={{
-                background: 'rgba(46, 139, 87, 0.1)',
-                color: '#2E8B57',
-                border: '1px solid rgba(46, 139, 87, 0.2)',
-              }}
-            >
-              GPT · Claude · DeepSeek · GLM
-            </span>
-          </div>
-        </button>
-      )}
-
       <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
         {availableModels
-          .filter(
-            (m) =>
-              !m.provider?.startsWith('blockrun') && m.provider !== 'claw402'
-          )
+          .filter((m) => !m.provider?.startsWith('blockrun'))
           .map((model) => (
             <ModelCard
               key={model.id}
@@ -440,28 +329,9 @@ function StandardProviderConfigForm({
             {getShortName(selectedModel.name)}
           </div>
           <div className="text-xs" style={{ color: '#707e92' }}>
-            {selectedModel.provider} •{' '}
-            {AI_PROVIDER_CONFIG[selectedModel.provider]?.defaultModel ||
-              selectedModel.id}
+            {selectedModel.provider} • {selectedModel.id}
           </div>
         </div>
-        {AI_PROVIDER_CONFIG[selectedModel.provider] && (
-          <a
-            href={AI_PROVIDER_CONFIG[selectedModel.provider].apiUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 px-4 py-2 rounded-lg transition-all hover:scale-105"
-            style={{
-              background: 'rgba(41,91,232, 0.1)',
-              border: '1px solid rgba(41,91,232, 0.3)',
-            }}
-          >
-            <ExternalLink className="w-4 h-4" style={{ color: '#295be8' }} />
-            <span className="text-sm font-medium" style={{ color: '#295be8' }}>
-              {t('modelConfig.getApiKey', language)}
-            </span>
-          </a>
-        )}
       </div>
 
       {/* Kimi Warning */}

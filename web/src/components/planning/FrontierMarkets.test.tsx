@@ -3,9 +3,6 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { FrontierMarkets } from './FrontierMarkets'
 const mocks = vi.hoisted(() => ({ api: vi.fn() }))
 vi.mock('../../lib/planning', () => ({ planningAPI: mocks.api }))
-vi.mock('./PlanningAI500', () => ({
-  PlanningAI500: () => <div>AI500 shortcuts</div>,
-}))
 afterEach(() => {
   cleanup()
   mocks.api.mockReset()
@@ -23,7 +20,7 @@ const market = (
   price: '100',
   execution_supported: execution,
 })
-it('keeps AI500 visible and offers ranked public stock shortcuts without a fee wallet', async () => {
+it('offers ranked public stock shortcuts alongside crypto markets', async () => {
   mocks.api.mockResolvedValue({
     venue: 'binance',
     markets: [market('BTCUSDT', 100), market('TSLAUSDT', 500, 'stocks')],
@@ -36,13 +33,9 @@ it('keeps AI500 visible and offers ranked public stock shortcuts without a fee w
       venue="binance"
       selected="BTCUSDT"
       disabled={false}
-      walletReady={false}
-      walletChecking={false}
-      onSetup={() => {}}
       onSelect={select}
     />
   )
-  expect(screen.getByText('AI500 shortcuts')).toBeVisible()
   fireEvent.click(screen.getByRole('button', { name: 'Stocks' }))
   const stock = await screen.findByRole('button', { name: /TSLAUSDT/ })
   fireEvent.click(stock)
@@ -66,9 +59,6 @@ it('retains native HIP-3 prefixes and does not claim all builders support execut
       venue="hyperliquid"
       selected="xyz:GOOGL"
       disabled={false}
-      walletReady={false}
-      walletChecking={false}
-      onSetup={() => {}}
       onSelect={select}
     />
   )

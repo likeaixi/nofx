@@ -30,6 +30,7 @@ func TestClaw402UserFacingRoutesRemoved(t *testing.T) {
 		"/api/onboarding/beginner/current",
 		"/api/wallet/export",
 		"/api/wallet/validate",
+		"/api/wallet/balance",
 		"/api/vergex/direction-change/leaderboard",
 		"/api/vergex/cost-liquidation-heatmap",
 	} {

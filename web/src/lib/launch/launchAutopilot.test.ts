@@ -79,7 +79,7 @@ describe('launchAutopilot', () => {
     if (outcome.ok || outcome.kind !== 'preflight') {
       throw new Error('expected a preflight failure outcome')
     }
-    expect(outcome.setupTarget).toBe('claw402')
+    expect(outcome.setupTarget).toBe('models')
     expect(outcome.message).toContain('AI wallet needs 1 USDC.')
   })
 
@@ -176,7 +176,7 @@ describe('launchAutopilot', () => {
     if (outcome.ok || outcome.kind !== 'preflight') {
       throw new Error('expected a preflight failure outcome')
     }
-    expect(outcome.setupTarget).toBe('claw402')
+    expect(outcome.setupTarget).toBe('models')
   })
 
   it('routes missing exchange setup to the hyperliquid anchor', async () => {

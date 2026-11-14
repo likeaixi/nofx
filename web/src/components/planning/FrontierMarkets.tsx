@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { planningAPI } from '../../lib/planning'
-import { PlanningAI500 } from './PlanningAI500'
 
 type Market = {
   symbol: string
@@ -26,22 +25,14 @@ export function FrontierMarkets({
   venue,
   selected,
   disabled,
-  walletReady,
-  walletChecking,
-  onSetup,
   onSelect,
-  onAI500Markets,
 }: {
   venue: string
   selected: string
   disabled: boolean
-  walletReady: boolean
-  walletChecking: boolean
-  onSetup: () => void
   onSelect: (symbol: string) => void
-  onAI500Markets?: (symbols: string[]) => void
 }) {
-  const [mode, setMode] = useState(venue === 'binance' ? 'ai500' : 'volume')
+  const [mode, setMode] = useState('volume')
   const [board, setBoard] = useState<Board | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -49,7 +40,7 @@ export function FrontierMarkets({
   const [limit, setLimit] = useState(12)
   const [revision, setRevision] = useState(0)
   useEffect(() => {
-    setMode(venue === 'binance' ? 'ai500' : 'volume')
+    setMode('volume')
     setSearch('')
     setLimit(12)
   }, [venue])
@@ -104,15 +95,10 @@ export function FrontierMarkets({
       <div className="frontier-market-filters">
         <b>Markets</b>
         {[
-          [
-            ...(venue === 'binance' ? [['ai500', 'AI500']] : []),
-            ['volume', 'Top volume'],
-            ['stocks', 'Stocks'],
-            ['all', 'All markets'],
-          ],
-        ]
-          .flat()
-          .map(([id, label]) => (
+          ['volume', 'Top volume'],
+          ['stocks', 'Stocks'],
+          ['all', 'All markets'],
+        ].map(([id, label]) => (
             <button
               key={id}
               aria-pressed={mode === id}
@@ -125,7 +111,7 @@ export function FrontierMarkets({
               {label}
             </button>
           ))}
-        {mode !== 'ai500' && (
+        {(
           <>
             <input
               aria-label="Search exchange markets"
@@ -146,18 +132,7 @@ export function FrontierMarkets({
           </>
         )}
       </div>
-      {mode === 'ai500' ? (
-        <PlanningAI500
-          venue={venue}
-          selected={selected}
-          disabled={disabled}
-          walletReady={walletReady}
-          walletChecking={walletChecking}
-          onSetup={onSetup}
-          onSelect={onSelect}
-          onMarkets={onAI500Markets}
-        />
-      ) : (
+      {(
         <>
           {loading && <small role="status">Loading exchange markets…</small>}
           {error && <p role="alert">{error}</p>}

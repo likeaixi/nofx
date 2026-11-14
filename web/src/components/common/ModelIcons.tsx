@@ -14,7 +14,6 @@ const MODEL_COLORS: Record<string, string> = {
   grok: '#000000',
   openai: '#10A37F',
   minimax: '#E45735',
-  claw402: '#0B2459',
   zhipu: '#3859F3',
 }
 
@@ -49,9 +48,6 @@ export const getModelIcon = (modelType: string, props: IconProps = {}) => {
       break
     case 'minimax':
       iconPath = '/icons/minimax.svg'
-      break
-    case 'claw402':
-      iconPath = '/icons/claw402-mark-color.svg'
       break
     default:
       return null

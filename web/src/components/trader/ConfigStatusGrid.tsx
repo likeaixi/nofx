@@ -12,7 +12,7 @@ import type { AIModel, Exchange, ExchangeAccountState } from '../../types'
 import type { Language } from '../../i18n/translations'
 import { getModelIcon } from '../common/ModelIcons'
 import { getExchangeIcon } from '../common/ExchangeIcons'
-import { AI_PROVIDER_CONFIG, truncateAddress } from './model-constants'
+import { truncateAddress } from './model-constants'
 
 interface UsageInfo {
   runningCount: number
@@ -135,9 +135,7 @@ export function ConfigStatusGrid({
                   <span className="config-connection-name">
                     <strong>{model.name}</strong>
                     <span>
-                      {model.customModelName ||
-                        AI_PROVIDER_CONFIG[model.provider]?.defaultModel ||
-                        model.provider}
+                      {model.customModelName || model.provider}
                     </span>
                   </span>
                   <span
@@ -149,26 +147,10 @@ export function ConfigStatusGrid({
                   </span>
                   <ArrowUpRight size={14} />
                 </button>
-                {model.provider === 'claw402' && (
-                  <div className="config-wallet-info">
-                    <span>AI fee wallet · Base USDC</span>
-                    <strong>
-                      {model.balanceUsdc !== undefined &&
-                      model.balanceUsdc !== ''
-                        ? `${displayFunds(model.balanceUsdc)} USDC`
-                        : 'Balance not available'}
-                    </strong>
-                    {model.walletAddress && (
-                      <code>{truncateAddress(model.walletAddress)}</code>
-                    )}
-                  </div>
-                )}
                 <div className="config-connection-foot">
                   <span>{usage(getModelUsageInfo(model.id))}</span>
                   <button onClick={() => onModelClick(model.id)}>
-                    {model.provider === 'claw402'
-                      ? 'Manage wallet & backup'
-                      : 'Manage connection'}
+                    Manage connection
                   </button>
                 </div>
               </article>
@@ -179,8 +161,8 @@ export function ConfigStatusGrid({
               <Brain size={28} />
               <h3>Add your first AI connection</h3>
               <p>
-                Connect a supported AI provider or a Claw402 fee wallet. Trading
-                funds stay separate.
+                Connect a supported AI provider with its API key. Trading funds
+                stay separate.
               </p>
               <button onClick={onAddModel}>
                 Connect AI <ArrowUpRight size={14} />

@@ -21,7 +21,6 @@ import { AITradersPage } from '../components/trader/AITradersPage'
 import { TraderLaunchGuestPage } from '../components/trader/TraderLaunchGuestPage'
 import { FAQPage } from '../pages/FAQPage'
 import { LandingPage } from '../pages/LandingPage'
-import { BeginnerOnboardingPage } from '../pages/BeginnerOnboardingPage'
 import { DataPage } from '../pages/DataPage'
 import { SettingsPage } from '../pages/SettingsPage'
 import { StrategyStudioPage } from '../pages/StrategyStudioPage'
@@ -196,11 +195,7 @@ function AppChrome({
   )
 }
 
-function TradersRoute({
-  showBeginnerOnboarding = false,
-}: {
-  showBeginnerOnboarding?: boolean
-}) {
+function TradersRoute() {
   const navigate = useNavigate()
   const { user, token } = useAuth()
   const { data: traders } = useSWR<TraderInfo[]>(
@@ -213,11 +208,7 @@ function TradersRoute({
   )
 
   return (
-    <AppChrome
-      currentPage="traders"
-      animateContent
-      extraContent={showBeginnerOnboarding ? <BeginnerOnboardingPage /> : null}
-    >
+    <AppChrome currentPage="traders" animateContent>
       <AITradersPage
         onTraderSelect={(traderId) => {
           const trader = traders?.find((item) => item.trader_id === traderId)
@@ -477,11 +468,11 @@ export function AppRoutes() {
         <Route
           path={ROUTES.welcome}
           element={
-            // The welcome overlay is the AI-wallet deposit page (QR +
-            // auto-refreshing balance) — useful to every signed-in user, so
-            // no legacy "beginner mode" gate here.
+            // Post-registration landing page for the first owner (the guided
+            // AI-wallet deposit overlay was removed with wallet onboarding;
+            // the traders page itself is the welcome screen).
             isAuthenticated ? (
-              <TradersRoute showBeginnerOnboarding />
+              <TradersRoute />
             ) : (
               <Navigate to={ROUTES.login} replace />
             )

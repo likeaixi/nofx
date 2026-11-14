@@ -148,21 +148,20 @@ beforeEach(() => {
       }
     if (path.startsWith('account?'))
       return { equity: '1000', available: '1000', fee_bps: '5' }
-    if (path.startsWith('setup-wallet'))
+    if (path.startsWith('markets?'))
       return {
-        found: true,
-        enabled: true,
-        address: '0x1111111111111111111111111111111111111111',
-        model_id: 'model',
-        chain: 'base',
-        asset: 'USDC',
-        balance_usdc: '1',
-        balance_status: 'ok',
-      }
-    if (path === 'ai500')
-      return {
-        coins: [{ pair: 'ETHUSDT', score: 85 }],
-        source: 'Claw402 fixture',
+        venue: 'binance',
+        markets: [
+          {
+            symbol: 'ETHUSDT',
+            base: 'ETH',
+            category: 'crypto',
+            volume_24h: 900,
+            price: '3000',
+            execution_supported: true,
+          },
+        ],
+        sources: ['fixture'],
         fetched_at: new Date().toISOString(),
       }
     if (path === 'preferences') return { text: '' }
@@ -259,7 +258,7 @@ describe('NOFX live planning', () => {
   })
 })
 
-it('opens the only connected account by default and keeps Binance AI500 reachable', async () => {
+it('opens the only connected account by default and keeps Binance markets reachable', async () => {
   mocks.exchanges = [
     {
       id: 'hl',
@@ -277,20 +276,19 @@ it('opens the only connected account by default and keeps Binance AI500 reachabl
     target: { value: 'binance' },
   })
   expect(screen.getByLabelText('Quick market selection')).toBeVisible()
-  await screen.findByRole('button', { name: /ETH/ })
+  const eth = await screen.findByRole('button', { name: /ETHUSDT/ })
   expect(screen.getByLabelText('Market venue')).toHaveValue('binance')
   expect(screen.getByLabelText('Trading account')).toHaveValue('')
   expect(
     screen.getByRole('region', { name: 'Your connections' })
   ).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: /ETH/ }))
+  fireEvent.click(eth)
   expect(screen.getByLabelText('Symbol')).toHaveValue('ETHUSDT')
   fireEvent.change(screen.getByLabelText('Market venue'), {
     target: { value: 'hyperliquid' },
   })
   expect(screen.getByLabelText('Trading account')).toHaveValue('hl')
   expect(screen.getByLabelText('Symbol')).toHaveValue('BTC')
-  expect(screen.queryByLabelText('Binance AI500 markets')).toBeNull()
 })
 
 it('clears a chart failure after recovery without clearing unrelated errors', async () => {
@@ -407,47 +405,7 @@ it.each([true, false])(
   }
 )
 
-it('includes the AI500 policy only when the current Binance market is on the board', async () => {
-  const base = mocks.api.getMockImplementation()!
-  mocks.api.mockImplementation((path: string) =>
-    path === 'ai500'
-      ? Promise.resolve({
-          coins: [{ pair: 'BTCUSDT', score: 85 }],
-          fetched_at: new Date().toISOString(),
-        })
-      : base(path)
-  )
-  open()
-  await screen.findByRole('button', { name: /BTC 85/ })
-  fireEvent.click(screen.getByRole('button', { name: 'Generate plans' }))
-  await waitFor(() => expect(mocks.stream).toHaveBeenCalledTimes(1))
-  expect(mocks.stream.mock.calls[0][0]).toMatchObject({
-    market_group: 'ai500',
-    constraints: { entry_policy: 'ai500_trend_long' },
-  })
-})
 
-it('moves older AI500 short drafts to history without offering review', async () => {
-  const base = mocks.api.getMockImplementation()!
-  mocks.api.mockImplementation(async (path: string) => {
-    if (path === 'ai500')
-      return {
-        coins: [{ pair: 'BTCUSDT', score: 85 }],
-        fetched_at: new Date().toISOString(),
-      }
-    const result = await base(path)
-    if (path === 'state') result.records.one.plan.idea.side = 'short'
-    return result
-  })
-  open()
-  await screen.findByRole('button', { name: /BTC 85/ })
-  expect(screen.getByRole('button', { name: /Test plan one/ })).toBeDisabled()
-  expect(
-    screen.getByText('Outside AI500 long-only policy · generate a new plan')
-  ).toBeInTheDocument()
-  expect(screen.getByText('Plan history · 1')).toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: 'Review Market' })).toBeNull()
-})
 
 it('restores the reasons for waiting after the page is reloaded', async () => {
   const deferred = ['market', 'limit', 'ladder', 'twap'].map((kind) => ({

@@ -37,8 +37,8 @@ export async function launchAutopilot(
         ok: false,
         kind: 'setup',
         message:
-          'No enabled AI model is ready. Create or fund the Claw402 wallet first.',
-        setupTarget: 'claw402',
+          'No enabled AI model is ready. Configure a model API key first.',
+        setupTarget: 'models',
       }
     }
 
@@ -90,11 +90,7 @@ export async function launchAutopilot(
     const existing =
       existingTraders.find(
         (trader) => trader.trader_name === AUTOPILOT_TRADER_NAME
-      ) ||
-      existingTraders.find((trader) =>
-        (trader.strategy_name || '').toLowerCase().includes('claw402')
-      ) ||
-      null
+      ) || null
 
     const autopilot = existing
       ? await api.updateTrader(existing.trader_id, traderRequest)
@@ -144,32 +140,18 @@ export async function launchAutopilot(
 
 /**
  * Default strategy provisioning for the guided panel: reuse the active
- * Claw402 strategy, otherwise create and activate it.
+ * strategy, otherwise create and activate the built-in one.
  */
-export async function ensureClaw402Strategy(): Promise<string> {
+export async function ensureAutopilotStrategy(): Promise<string> {
   const strategies = await api.getStrategies()
-  const existing =
-    strategies.find(
-      (strategy) =>
-        strategy.is_active &&
-        strategy.config?.ai_config?.coin_source?.source_type === 'vergex_signal'
-    ) ||
-    strategies.find((strategy) =>
-      strategy.name.toLowerCase().includes('claw402')
-    )
-
-  if (existing) {
-    if (!existing.is_active) {
-      await api.activateStrategy(existing.id)
-    }
-    return existing.id
-  }
+  const active = strategies.find((strategy) => strategy.is_active)
+  if (active) return active.id
 
   const config = await api.getDefaultStrategyConfig()
   const created = await api.createStrategy({
-    name: 'NOFX Claw402 Auto Strategy',
+    name: 'NOFX Auto Strategy',
     description:
-      'Single built-in strategy: Claw402 board, per-symbol details, raw candles, then execution.',
+      'Single built-in strategy: OI-top candidates, per-symbol details, raw candles, then execution.',
     config,
   })
   if (created?.id) {
@@ -178,10 +160,8 @@ export async function ensureClaw402Strategy(): Promise<string> {
   }
 
   const refreshed = await api.getStrategies()
-  const fallback = refreshed.find((strategy) =>
-    strategy.name.toLowerCase().includes('claw402')
-  )
-  if (!fallback) throw new Error('Failed to create Claw402 strategy')
+  const fallback = refreshed.find((strategy) => strategy.is_active)
+  if (!fallback) throw new Error('Failed to create the auto strategy')
   await api.activateStrategy(fallback.id)
   return fallback.id
 }

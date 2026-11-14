@@ -4,10 +4,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
-	"nofx/wallet"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gin-gonic/gin"
 )
@@ -17,9 +15,12 @@ type walletGenerateResponse struct {
 	PrivateKey string `json:"private_key"`
 }
 
+// handleWalletGenerate mints a fresh EVM keypair for the Hyperliquid NOFX
+// agent wallet (the exchange connect flow prepares its agent key here). The
+// claw402 onboarding/export/validate routes and the generic balance route were
+// removed with the claw402 wallet UI.
 func (s *Server) handleWalletGenerate(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
-	// Generate new EVM wallet
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate wallet"})
@@ -33,27 +34,6 @@ func (s *Server) handleWalletGenerate(c *gin.Context) {
 		Address:    address.Hex(),
 		PrivateKey: privKeyHex,
 	})
-}
-
-// handleWalletBalance checks funding using only the public address. Private
-// keys must not accompany periodic balance requests.
-func (s *Server) handleWalletBalance(c *gin.Context) {
-	writeWalletBalance(c, wallet.QueryUSDCBalanceCached)
-}
-
-func writeWalletBalance(c *gin.Context, query func(string) (float64, error)) {
-	c.Header("Cache-Control", "no-store")
-	address := strings.TrimSpace(c.Query("address"))
-	if !common.IsHexAddress(address) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid wallet address"})
-		return
-	}
-	balance, err := query(address)
-	if err != nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Balance is temporarily unavailable"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"address": common.HexToAddress(address).Hex(), "balance_usdc": fmt.Sprintf("%.6f", balance)})
 }
 
 // walletAddressFromPrivateKey derives the EVM address for a 0x-prefixed

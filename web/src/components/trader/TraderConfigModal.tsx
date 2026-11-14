@@ -413,8 +413,8 @@ export function TraderConfigModal({
                                 : aiConfig.coin_source.source_type ===
                                     'hyper_rank'
                                   ? language === 'zh'
-                                    ? 'Claw402 board'
-                                    : 'Claw402 board'
+                                    ? 'Hyperliquid board'
+                                    : 'Hyperliquid board'
                                   : aiConfig.coin_source.source_type ===
                                       'hyper_all'
                                     ? language === 'zh'

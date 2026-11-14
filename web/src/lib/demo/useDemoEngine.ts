@@ -9,12 +9,6 @@ import type {
   HistoricalPosition,
   SymbolStats,
 } from '../../types'
-import type {
-  FlowMarketsResponse,
-  FlowMarketItem,
-  SignalRankingResponse,
-  SignalRankItem,
-} from '../api/data'
 import {
   DEMO_UNIVERSE,
   DEMO_ACTIVE_SYMBOL,
@@ -47,8 +41,6 @@ export interface DemoDataset {
     btc_eth_leverage: number
     altcoin_leverage: number
   }
-  flow: FlowMarketsResponse
-  signalRank: SignalRankingResponse
   activeSymbol: string
 }
 
@@ -85,9 +77,6 @@ interface SimState {
   decisionTs: number
   positions: PosState[]
   trades: TradeState[]
-  // per-symbol flow noise so the bars jiggle independently
-  flowNet: Record<string, number>
-  signalScore: Record<string, number>
 }
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a)
@@ -146,13 +135,6 @@ function initState(): SimState {
     p.mark = p.side === 'long' ? p.entry * (1 + fav) : p.entry * (1 - fav)
     return p
   })
-  const flowNet: Record<string, number> = {}
-  const signalScore: Record<string, number> = {}
-  DEMO_UNIVERSE.forEach((s, i) => {
-    flowNet[s] = rnd(120_000, 2_400_000) * (1 - i / (DEMO_UNIVERSE.length + 4))
-    // short book scores negative (bearish), everything else positive (bullish)
-    signalScore[s] = SHORT_SET.has(s) ? rnd(-1.6, -0.4) : rnd(0.4, 2.0)
-  })
   return {
     frame: 0,
     cycle: 1,
@@ -166,8 +148,6 @@ function initState(): SimState {
     decisionTs: Date.now(),
     positions,
     trades: [],
-    flowNet,
-    signalScore,
   }
 }
 
@@ -243,16 +223,6 @@ function step(S: SimState) {
   if (S.frame % 24 === 0) {
     S.cycle++
     S.decisionTs = Date.now()
-  }
-
-  // jiggle flow + signal noise so those panels stay alive (short book stays
-  // bearish, longs stay bullish — keeps signal/topology directions consistent)
-  for (const s of DEMO_UNIVERSE) {
-    S.flowNet[s] = Math.max(20_000, S.flowNet[s] * rnd(0.97, 1.035))
-    const next = S.signalScore[s] + rnd(-0.08, 0.09)
-    S.signalScore[s] = SHORT_SET.has(s)
-      ? Math.max(-2, Math.min(-0.1, next))
-      : Math.max(0.1, Math.min(2.4, next))
   }
 }
 
@@ -370,52 +340,9 @@ function build(S: SimState): DemoDataset {
     direction_stats: [],
   } as unknown as PositionHistoryResponse
 
-  // flow markets — long names show net BUYING (inflow), the short book shows net
-  // SELLING (outflow) so the topology's FLOW layer feeds the short row too.
-  const mkItem = (s: string, net: number): FlowMarketItem => {
-    const buyShare = net >= 0 ? 0.56 + Math.min(0.3, net / 6_000_000) : 0.4
-    const gross = Math.abs(net)
-    return {
-      key: `xyz:${s}`,
-      marketType: 'hip3_perp',
-      symbol: s,
-      netFlow: String(Math.round(net)),
-      buyNotional: String(Math.round(gross * buyShare)),
-      sellNotional: String(Math.round(gross * (1 - buyShare))),
-      trades: Math.round(rnd(150, 9000)),
-      latestPrice: String(demoSeedPrice(s)),
-    }
-  }
-  const inflow: FlowMarketItem[] = LONG_POOL.slice()
-    .sort((a, b) => S.flowNet[b] - S.flowNet[a])
-    .map((s) => mkItem(s, S.flowNet[s]))
-  const outflow: FlowMarketItem[] = [...SHORT_SET].map((s) =>
-    mkItem(s, -Math.abs(S.flowNet[s]) * 0.6)
-  )
-  const flow: FlowMarketsResponse = {
-    data: { by: 'netFlow', window: '1h', inflow, outflow },
-  }
-
-  // direction board — mostly bullish US equities
-  const ranked = [...DEMO_UNIVERSE].sort(
-    (a, b) => S.signalScore[b] - S.signalScore[a]
-  )
-  const items: SignalRankItem[] = ranked.map((s, i) => {
-    const score = S.signalScore[s]
-    return {
-      rank: i + 1,
-      symbol: s,
-      market_type: 'hip3_perp',
-      bias: SHORT_SET.has(s) ? 'bearish' : 'bullish',
-      score: Math.round(score * 100) / 100,
-      category: 'us_equity',
-    }
-  })
-  const signalRank: SignalRankingResponse = { items }
-
-  // decision candidates — top longs plus the short book, so the DECISION layer
-  // (and execution log) carries shorts through to EXECUTE/HOLD.
-  const candidates = [...new Set([...ranked.slice(0, 8), ...SHORT_SET])]
+  // decision candidates — the long universe plus the short book, so the
+  // DECISION layer (and execution log) carries shorts through to EXECUTE/HOLD.
+  const candidates = [...new Set([...LONG_POOL.slice(0, 8), ...SHORT_SET])]
   const decisions: DecisionRecord[] = Array.from({ length: 4 }).map((_, k) => {
     const cyc = S.cycle - k
     const acts = S.positions.slice(0, 6).map((p) => ({
@@ -452,7 +379,7 @@ function build(S: SimState): DemoDataset {
     is_running: true,
     call_count: S.cycle,
     scan_interval: '5m',
-    ai_model: 'claw402',
+    ai_model: 'demo-model',
     strategy_type: 'ai_trading',
   } as unknown as SystemStatus
 
@@ -465,13 +392,11 @@ function build(S: SimState): DemoDataset {
     history,
     config: {
       scan_interval_minutes: 5,
-      ai_model: 'claw402',
-      strategy_name: 'NOFX Claw402 Auto Strategy',
+      ai_model: 'demo-model',
+      strategy_name: 'NOFX Auto Strategy',
       btc_eth_leverage: 10,
       altcoin_leverage: 10,
     },
-    flow,
-    signalRank,
     activeSymbol: DEMO_ACTIVE_SYMBOL,
   }
 }

@@ -1,85 +1,31 @@
 package api
 
 import (
-	"encoding/json"
-	"errors"
-	"net/http"
-	"net/http/httptest"
+	"encoding/hex"
 	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/gin-gonic/gin"
 )
 
-func TestWalletBalanceDoesNotTreatFailureAsZero(t *testing.T) {
-	for _, tc := range []struct {
-		name, address string
-		fail          bool
-		status        int
-	}{
-		{"invalid address", "bad", false, 400},
-		{"unavailable", "0x0000000000000000000000000000000000000001", true, 503},
-		{"empty wallet", "0x0000000000000000000000000000000000000001", false, 200},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request = httptest.NewRequest(http.MethodGet, "/wallet/balance?address="+tc.address, nil)
-			calls := 0
-			writeWalletBalance(c, func(address string) (float64, error) {
-				calls++
-				if tc.fail {
-					return 0, errors.New("unreachable")
-				}
-				return 0, nil
-			})
-			if w.Code != tc.status {
-				t.Fatalf("status %d", w.Code)
-			}
-			if tc.status == 400 && calls != 0 {
-				t.Fatal("invalid address reached RPC")
-			}
-			if tc.fail && strings.Contains(w.Body.String(), "balance_usdc") {
-				t.Fatal("invented balance on failure")
-			}
-			if tc.status == 200 && !strings.Contains(w.Body.String(), `"balance_usdc":"0.000000"`) {
-				t.Fatal("real zero not returned")
-			}
-			if w.Header().Get("Cache-Control") != "no-store" {
-				t.Fatal("balance must not be browser cached")
-			}
-		})
+// The wallet generate/balance/export/validate routes were removed with the
+// claw402 wallet UI; route-level 404 assertions live in
+// claw402_removal_test.go. Only the internal derivation helper survives
+// (launch preflight still validates legacy claw402 model keys).
+func TestWalletAddressDerivationHelper(t *testing.T) {
+	privateKey, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatal(err)
 	}
-}
-
-func TestWalletGenerationAndImportDerivation(t *testing.T) {
-	s := &Server{}
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	s.handleWalletGenerate(c)
-	var generated walletGenerateResponse
-	if json.Unmarshal(w.Body.Bytes(), &generated) != nil || w.Code != 200 {
-		t.Fatal("wallet generation failed")
-	}
-	if w.Header().Get("Cache-Control") != "no-store" {
-		t.Fatal("private key response must not be cached")
-	}
-	key, err := crypto.HexToECDSA(strings.TrimPrefix(generated.PrivateKey, "0x"))
-	if err != nil || crypto.PubkeyToAddress(key.PublicKey).Hex() != generated.Address {
-		t.Fatal("address does not match generated key")
-	}
-	// The claw402 wallet-import validation endpoint was removed; derivation
-	// survives only as the internal helper.
-	derived, err := walletAddressFromPrivateKey(generated.PrivateKey)
-	if err != nil || derived != generated.Address {
+	privKeyHex := "0x" + hex.EncodeToString(crypto.FromECDSA(privateKey))
+	derived, err := walletAddressFromPrivateKey(privKeyHex)
+	if err != nil || derived != crypto.PubkeyToAddress(privateKey.PublicKey).Hex() {
 		t.Fatal("helper derived a different address", derived, err)
 	}
 	if _, err = walletAddressFromPrivateKey("0x" + strings.Repeat("0", 64)); err == nil {
 		t.Fatal("invalid key accepted")
 	}
+	if _, err = walletAddressFromPrivateKey(strings.Repeat("a", 66)); err == nil {
+		t.Fatal("non-0x key accepted")
+	}
 }
-
-// The claw402 wallet-export route was removed with wallet onboarding; route
-// assertions live in claw402_removal_test.go. The surviving wallet endpoints
-// (validate/generate/balance) are covered above.
