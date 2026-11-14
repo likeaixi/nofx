@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"nofx/auth"
+	"nofx/crypto"
 	"nofx/logger"
 	"nofx/store"
 
@@ -41,93 +42,161 @@ func (s *Server) handleLogout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out"})
 }
 
-// handleRegister Handle user registration request.
-// handleRegister allows registration only when no users exist yet (first-time setup).
-// This is a single-user system; subsequent registrations are permanently closed.
+// handleRegister starts two-step registration. Step 1 verifies the invite (if
+// the instance is already initialized), creates a pending user with a fresh
+// TOTP secret, and returns the otpauth URL. The account cannot log in until
+// step 2 (handleRegisterConfirm) verifies a code from the authenticator.
 func (s *Server) handleRegister(c *gin.Context) {
-	userCount, err := s.store.User().Count()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check user count"})
-		return
-	}
-
-	if userCount > 0 {
-		c.JSON(http.StatusForbidden, gin.H{"error": "System already initialized"})
-		return
-	}
-
 	var req struct {
-		Email    string `json:"email" binding:"required,email"`
-		Password string `json:"password" binding:"required,min=8"`
-		Lang     string `json:"lang"`
+		Email      string `json:"email" binding:"required,email"`
+		Password   string `json:"password" binding:"required,min=8"`
+		Lang       string `json:"lang"`
+		InviteCode string `json:"invite_code"`
 	}
-
 	if err := c.ShouldBindJSON(&req); err != nil {
 		SafeBadRequest(c, "Invalid request parameters")
 		return
 	}
-
 	lang := req.Lang
 	if lang != "zh" && lang != "id" {
 		lang = "en"
 	}
 
-	// Check if email already exists
-	_, err = s.store.User().GetByEmail(req.Email)
-	if err == nil {
+	userCount, err := s.store.User().Count()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check user count"})
+		return
+	}
+	isFirst := userCount == 0
+
+	// Invite gate: the untouched first registration claims instance ownership;
+	// every later registration needs a valid, unused invite.
+	if !isFirst {
+		if strings.TrimSpace(req.InviteCode) == "" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Invite code required"})
+			return
+		}
+		if _, err := s.store.Invite().GetValid(strings.TrimSpace(req.InviteCode)); err != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Invalid invite code"})
+			return
+		}
+	}
+
+	if _, err := s.store.User().GetByEmail(req.Email); err == nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "Email already registered"})
 		return
 	}
-
-	// Generate password hash
 	passwordHash, err := auth.HashPassword(req.Password)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Password processing failed"})
 		return
 	}
 
-	// Create user
+	secret, url, err := auth.GenerateTOTP(req.Email)
+	if err != nil {
+		SafeInternalError(c, "Failed to generate authenticator secret", err)
+		return
+	}
+
 	userID := uuid.New().String()
+	role := store.RoleUser
+	if isFirst {
+		role = store.RoleOwner
+	}
 	user := &store.User{
 		ID:           userID,
 		Email:        req.Email,
 		PasswordHash: passwordHash,
+		Role:         role,
+		TotpSecret:   crypto.EncryptedString(secret),
 	}
-
-	err = s.store.User().CreateFirst(user)
-	if errors.Is(err, store.ErrAlreadyInitialized) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "System already initialized"})
-		return
-	}
-	if err != nil {
+	if isFirst {
+		// registrationLock serializes the ownership race across processes.
+		if err := s.store.User().CreateFirst(user); errors.Is(err, store.ErrAlreadyInitialized) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Invite code required"})
+			return
+		} else if err != nil {
+			SafeInternalError(c, "Failed to create user", err)
+			return
+		}
+	} else if err := s.store.User().CreateUser(user); err != nil {
 		SafeInternalError(c, "Failed to create user", err)
 		return
 	}
+	_ = lang // default strategies are created at confirm time
 
-	// NOTE: Orphan record adoption was removed for security reasons. Previously,
-	// after a reset-account call, any new user would inherit the prior owner's
-	// wallet keys and exchange API credentials — a catastrophic IDOR/takeover
-	// path. Operators who need to migrate credentials across users must do so
-	// explicitly via export/import, never via implicit adoption on registration.
+	c.JSON(http.StatusOK, gin.H{
+		"totp_secret":   secret,
+		"otpauth_url":   url,
+		"is_first_user": isFirst,
+	})
+}
 
-	// Generate JWT token
+// handleRegisterConfirm activates a pending registration: password + TOTP code
+// verified, invite atomically claimed (single use), recovery codes issued.
+func (s *Server) handleRegisterConfirm(c *gin.Context) {
+	var req struct {
+		Email      string `json:"email" binding:"required,email"`
+		Password   string `json:"password" binding:"required"`
+		TotpCode   string `json:"totp_code" binding:"required"`
+		InviteCode string `json:"invite_code"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		SafeBadRequest(c, "Invalid request parameters")
+		return
+	}
+	user, err := s.store.User().GetByEmail(req.Email)
+	if err != nil {
+		auth.CheckPassword(req.Password, dummyPasswordHash)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Email or password incorrect"})
+		return
+	}
+	if !auth.CheckPassword(req.Password, user.PasswordHash) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Email or password incorrect"})
+		return
+	}
+	if user.TotpEnabled {
+		c.JSON(http.StatusConflict, gin.H{"error": "Account already activated; use login"})
+		return
+	}
+	if !auth.ValidateTOTP(req.TotpCode, user.TotpSecret.String()) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid verification code"})
+		return
+	}
+	if req.InviteCode != "" {
+		if err := s.store.Invite().MarkUsed(strings.TrimSpace(req.InviteCode), user.ID); err != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Invalid invite code"})
+			return
+		}
+	}
+	if err := s.store.User().UpdateTOTP(user.ID, user.TotpSecret, true); err != nil {
+		SafeInternalError(c, "Failed to activate account", err)
+		return
+	}
+	codes, err := auth.GenerateRecoveryCodes(8)
+	if err != nil {
+		SafeInternalError(c, "Failed to generate recovery codes", err)
+		return
+	}
+	hashes := make([]string, len(codes))
+	for i, code := range codes {
+		hashes[i] = auth.HashRecoveryCode(code)
+	}
+	if err := s.store.User().SetRecoveryCodes(user.ID, hashes); err != nil {
+		SafeInternalError(c, "Failed to store recovery codes", err)
+		return
+	}
+	if err := s.initUserDefaultConfigs(user.ID, "en"); err != nil {
+		logger.Infof("Failed to initialize user default configs: %v", err)
+	}
 	token, err := auth.GenerateJWT(user.ID, user.Email, user.AuthVersion)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
 	}
-
-	// Initialize default model and exchange configs for user
-	err = s.initUserDefaultConfigs(user.ID, lang)
-	if err != nil {
-		logger.Infof("Failed to initialize user default configs: %v", err)
-	}
-
 	c.JSON(http.StatusOK, gin.H{
-		"token":   token,
-		"user_id": user.ID,
-		"email":   user.Email,
-		"message": "Registration successful",
+		"token": token, "user_id": user.ID, "email": user.Email,
+		"role": user.Role, "recovery_codes": codes,
 	})
 }
 
