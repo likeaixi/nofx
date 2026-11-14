@@ -63,6 +63,7 @@ docs/qa/fixtures/agent_self_play_seed.zh-CN.json
 # 密钥和敏感文件
 # 注意：crypto目录包含加密服务代码，应该被提交
 # 只忽略密钥文件本身
+SERVER.md
 secrets/
 *.key
 *.pem
