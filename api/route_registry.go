@@ -42,6 +42,8 @@ func (s *Server) routeWithSchema(g *gin.RouterGroup, method, path, description, 
 		g.PUT(path, h)
 	case "DELETE":
 		g.DELETE(path, h)
+	case "PATCH":
+		g.PATCH(path, h)
 	}
 }
 

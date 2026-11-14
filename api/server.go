@@ -225,6 +225,14 @@ func (s *Server) setupRoutes() {
 				`Body: {"new_password":"<string, min 8 chars>"}`,
 				s.handleChangePassword)
 
+			// Owner-only administration (invites and user management)
+			admin := protected.Group("/", s.requireOwner())
+			s.route(admin, "POST", "/admin/invites", "Create invite code", s.handleCreateInvite)
+			s.route(admin, "GET", "/admin/invites", "List invite codes", s.handleListInvites)
+			s.route(admin, "DELETE", "/admin/invites/:code", "Revoke unused invite code", s.handleRevokeInvite)
+			s.route(admin, "GET", "/admin/users", "List users", s.handleAdminListUsers)
+			s.route(admin, "PATCH", "/admin/users/:id", "Enable/disable user", s.handleAdminSetUserDisabled)
+
 			// Server IP query (requires authentication, for whitelist configuration)
 			s.route(protected, "GET", "/server-ip", "Get server public IP (for exchange whitelist)", s.handleGetServerIP)
 
@@ -472,6 +480,7 @@ func (s *Server) handleGetSystemConfig(c *gin.Context) {
 	userCount, _ := s.store.User().Count()
 	c.JSON(http.StatusOK, gin.H{
 		"initialized":      userCount > 0,
+		"invite_required":  userCount > 0,
 		"btc_eth_leverage": 10,
 		"altcoin_leverage": 5,
 	})
@@ -700,6 +709,7 @@ func (s *Server) authMiddleware() gin.HandlerFunc {
 		// Store user information in context
 		c.Set("user_id", claims.UserID)
 		c.Set("email", user.Email)
+		c.Set("role", user.Role)
 		c.Next()
 	}
 }
