@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   User,
+  Users,
   Cpu,
   Building2,
   Eye,
@@ -16,9 +17,10 @@ import { useLanguage } from '../contexts/LanguageContext'
 import { api } from '../lib/api'
 import { ExchangeConfigModal } from '../components/trader/ExchangeConfigModal'
 import { ModelConfigModal } from '../components/trader/ModelConfigModal'
+import { AdminUsersPanel } from '../components/settings/AdminUsersPanel'
 import type { Exchange, AIModel, ExchangeAccountState } from '../types'
 
-type Tab = 'account' | 'models' | 'exchanges'
+type Tab = 'account' | 'models' | 'exchanges' | 'users'
 
 function configBadge(label: string, active: boolean) {
   return (
@@ -334,6 +336,12 @@ export function SettingsPage() {
     { key: 'account', label: 'Account', icon: <User size={16} /> },
     { key: 'models', label: 'AI Models', icon: <Cpu size={16} /> },
     { key: 'exchanges', label: 'Exchanges', icon: <Building2 size={16} /> },
+    // Owner-only user management. Legacy sessions persisted before the role
+    // field existed have user.role === undefined — the tab stays hidden for
+    // them (safe default; owners regain it after re-login).
+    ...(user?.role === 'owner'
+      ? [{ key: 'users' as Tab, label: 'Users', icon: <Users size={16} /> }]
+      : []),
   ]
 
   return (
@@ -609,6 +617,9 @@ export function SettingsPage() {
               )}
             </div>
           )}
+
+          {/* Users Tab (owner only) */}
+          {activeTab === 'users' && <AdminUsersPanel />}
         </div>
       </div>
 
