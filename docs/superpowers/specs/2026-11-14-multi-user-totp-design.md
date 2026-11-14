@@ -30,21 +30,23 @@
 
 ## 3. 账户体系设计
 
-### 3.1 注册（两步）
+### 3.1 注册（两步）（2026-11-15 修订：服务端原子认领，confirm 不再携带邀请码）
 
 1. `POST /api/register` `{email, password, invite_code?}`
-   - `userCount == 0`（实例未初始化）：免邀请码，建 owner
-   - 否则必须携带有效邀请码（存在、未用、未作废）
-   - 校验 email 唯一；创建**待激活用户**：`role=user`（或首用户 `owner`）、`totp_secret=新随机`、`totp_enabled=false`
-   - 返回 `otpauth://` URI（含 secret），前端显示二维码；**此步不标记邀请码已用**
-2. `POST /api/register/confirm` `{email, password, totp_code}`
-   - 复验身份 + 校验验证码（`pquerna/otp`，窗口 ±1 步）
-   - 事务内：原子标记邀请码 `used_by/used_at`（并发同码只有一个成功）→ `totp_enabled=true` → 生成 8 个一次性恢复码返回（仅此一次明文展示）
+   - `userCount == 0`（实例未初始化）：免邀请码，建 owner（`CreateFirst` 串行化首用户抢占）
+   - 否则必须携带有效邀请码（存在、未用、未作废，`GetValid` 预检）
+   - 校验 email 唯一；创建**待激活用户**：`role=user`（或首用户 `owner`）、`totp_secret=新随机`、`totp_enabled=false`，并把邀请码**落盘到待激活用户行**（`users.registration_invite`）；**此步不标记邀请码已用**
+   - 返回 `{totp_secret, otpauth_url, is_first_user}`，前端显示二维码
+2. `POST /api/register/confirm` `{email, password, totp_code}`（**无 invite_code 字段**）
+   - 复验密码 + 校验验证码（`pquerna/otp`，窗口 ±1 步）
+   - 服务端从待激活行读取 `registration_invite` 并单条原子认领（`UPDATE ... WHERE code=? AND used_by IS NULL AND revoked=false`，`RowsAffected=1` 否则 403；并发同码只有一个成功）→ `totp_enabled=true` → 生成 8 个一次性恢复码返回（仅此一次明文展示）
+   - 邀请码是否消耗由服务端行状态决定，客户端省略/篡改字段无法绕过单次认领
 
 ### 3.2 登录
 
 `POST /api/login` `{email, password, totp_code}`
 - `totp_code` 接受 6 位验证码**或**任一未用恢复码（恢复码命中即作废）
+- 成功响应 `{token, user_id, email, role}`（2026-11-15 修订：新增 `role` 供前端做 owner 页签判定；不再返回 `message`）
 - `totp_enabled=false` 的账号一律 403 `totp_binding_required`，前端引导进入补绑流程（覆盖两类账号：注册未 confirm 的半激活账号、升级后未绑定的存量账号）
 - 失败信息保持现有防枚举策略（统一错误文案 + dummy bcrypt）
 - 沿用现有登录限流（已按真实客户端 IP）
@@ -108,7 +110,7 @@ owner 判定：`role == "owner"`（数据库字段，不用 env）。
 ## 5. 数据库变更
 
 - 新表 `invite_codes`：`code(PK) / created_by / used_by(null) / created_at / used_at(null) / revoked(bool)`
-- `users` 加列：`role(string, "user")`、`disabled(bool, false)`、`totp_secret(crypto.EncryptedString)`、`totp_enabled(bool, false)`、`recovery_codes(JSON，存 SHA-256 哈希)`
+- `users` 加列：`role(string, "user")`、`disabled(bool, false)`、`totp_secret(crypto.EncryptedString)`、`totp_enabled(bool, false)`、`recovery_codes(JSON，存 SHA-256 哈希)`、`registration_invite(string, "")`（待激活行所持邀请码，confirm 时服务端认领）
 - 均经 GORM AutoMigrate；首次用户升级迁移时置 `role="owner"`
 
 ## 6. 安全设计要点
