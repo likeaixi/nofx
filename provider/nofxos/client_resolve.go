@@ -9,18 +9,15 @@ import (
 )
 
 // ResolveClient returns a nofxos data client, routed through the claw402
-// x402 payment gateway. Resolution order:
-// the explicit walletKey argument, then the CLAW402_WALLET_KEY environment
-// variable. Missing/invalid keys fail closed; they must not bypass payment.
-// Legacy constructors cannot enable a direct-origin fallback.
+// x402 payment gateway. Only the explicit walletKey argument is honored; the
+// CLAW402_WALLET_KEY environment fallback was removed with the claw402
+// onboarding flow. Missing/invalid keys fail closed; they must not bypass
+// payment. Legacy constructors cannot enable a direct-origin fallback.
 func ResolveClient(walletKey string) *Client {
 	walletKey = strings.TrimSpace(walletKey)
-	if walletKey == "" {
-		walletKey = strings.TrimSpace(os.Getenv("CLAW402_WALLET_KEY"))
-	}
 	client := NewClient(DefaultBaseURL, DefaultAuthKey)
 	if walletKey == "" {
-		client.gatewayErr = fmt.Errorf("Claw402 fee wallet is not configured; paid data access is unavailable")
+		client.gatewayErr = fmt.Errorf("CLAW402_WALLET_KEY removed; paid data requires a per-user claw402 model")
 		return client
 	}
 

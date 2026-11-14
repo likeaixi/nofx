@@ -414,6 +414,12 @@ func (s *Server) initUserDefaultConfigs(userID string, lang string) error {
 }
 
 func (s *Server) createDefaultStrategies(userID string, lang string) error {
+	return createDefaultStrategiesFor(userID, lang, s.store)
+}
+
+// createDefaultStrategiesFor is the store-parameterized core of
+// createDefaultStrategies so tests can exercise it without a full Server.
+func createDefaultStrategiesFor(userID string, lang string, st *store.Store) error {
 	type strategyI18n struct {
 		name, description string
 	}
@@ -422,13 +428,13 @@ func (s *Server) createDefaultStrategies(userID string, lang string) error {
 	}
 	locales := map[string]strategyLocale{
 		"zh": {
-			defaultStrategy: strategyI18n{"NOFX Claw402 Auto Strategy", "The only built-in strategy: read the Claw402.ai direction board each cycle, load direction history and cost/liquidation heatmaps, then manage positions by the live board."},
+			defaultStrategy: strategyI18n{"NOFX Auto Strategy", "The built-in strategy: each cycle it scans the top open-interest coins, analyzes them with standard indicators, and manages positions under strict risk control."},
 		},
 		"en": {
-			defaultStrategy: strategyI18n{"NOFX Claw402 Auto Strategy", "The only built-in strategy: read the Claw402.ai direction board each cycle, load direction history and cost/liquidation heatmaps, then manage positions by the live board."},
+			defaultStrategy: strategyI18n{"NOFX Auto Strategy", "The built-in strategy: each cycle it scans the top open-interest coins, analyzes them with standard indicators, and manages positions under strict risk control."},
 		},
 		"id": {
-			defaultStrategy: strategyI18n{"Strategi Otomatis NOFX Claw402", "Satu strategi bawaan: membaca papan arah Claw402.ai setiap siklus, memuat riwayat arah dan heatmap biaya/likuidasi, lalu mengelola posisi mengikuti papan langsung."},
+			defaultStrategy: strategyI18n{"Strategi Otomatis NOFX", "Satu strategi bawaan: setiap siklus memindai koin dengan open interest tertinggi, menganalisisnya dengan indikator standar, dan mengelola posisi dengan kontrol risiko ketat."},
 		},
 	}
 	locale, ok := locales[lang]
@@ -443,18 +449,21 @@ func (s *Server) createDefaultStrategies(userID string, lang string) error {
 		applyConfig func(*store.StrategyConfig)
 	}
 
-	setClaw402Strategy := func(c *store.StrategyConfig) {
-		c.CoinSource.SourceType = "vergex_signal"
+	setDefaultStrategy := func(c *store.StrategyConfig) {
+		// The default coin source is the free OI top ranking. Claw402/Vergex
+		// paid signals were removed with the wallet onboarding flow, so any
+		// vergex defaults from the base config are cleared here.
+		c.CoinSource.SourceType = "oi_top"
 		c.CoinSource.StaticCoins = nil
 		c.CoinSource.UseAI500 = false
-		c.CoinSource.UseOITop = false
+		c.CoinSource.UseOITop = true
 		c.CoinSource.UseOILow = false
 		c.CoinSource.UseHyperAll = false
 		c.CoinSource.UseHyperMain = false
 		c.CoinSource.HyperRankCategory = "all"
-		c.CoinSource.VergexLimit = 10
-		c.CoinSource.VergexMarketType = "all"
-		c.CoinSource.VergexChain = "hyperliquid"
+		c.CoinSource.VergexLimit = 0
+		c.CoinSource.VergexMarketType = ""
+		c.CoinSource.VergexChain = ""
 		c.RiskControl.MaxPositions = store.AutopilotDefaultMaxPositions
 		c.RiskControl.BTCETHMaxLeverage = 10
 		c.RiskControl.AltcoinMaxLeverage = 10
@@ -480,7 +489,7 @@ func (s *Server) createDefaultStrategies(userID string, lang string) error {
 			description: locale.defaultStrategy.description,
 			isActive:    true,
 			applyConfig: func(c *store.StrategyConfig) {
-				setClaw402Strategy(c)
+				setDefaultStrategy(c)
 			},
 		},
 	}
@@ -521,7 +530,7 @@ func (s *Server) createDefaultStrategies(userID string, lang string) error {
 		"Strategi Tren Saham AS", "Strategi Stabil Saham AS", "Strategi Breakout Saham AS",
 	}
 
-	return s.store.Transaction(func(tx *gorm.DB) error {
+	return st.Transaction(func(tx *gorm.DB) error {
 		// Remove obsolete built-in risk-profile presets for this user. If a trader still
 		// references one of them, keep it to avoid breaking an existing running setup.
 		deleteResult := tx.Where("user_id = ? AND name IN ? AND id NOT IN (SELECT strategy_id FROM traders WHERE user_id = ? AND strategy_id IS NOT NULL)", userID, legacyDefaultNames, userID).

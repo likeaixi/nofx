@@ -212,13 +212,9 @@ func (s *Server) setupRoutes() {
 		// Routes requiring authentication
 		protected := api.Group("/", s.authMiddleware())
 		s.registerPlanning(api, protected)
-		// UI-only secret export: do not register in the AI route/tool catalog.
-		protected.POST("/wallet/export", s.handleWalletExport)
 		{
 			// Logout (add to blacklist)
 			s.route(protected, "POST", "/logout", "Logout (blacklist token)", s.handleLogout)
-			s.route(protected, "POST", "/onboarding/beginner", "Prepare beginner claw402 wallet and default model", s.handleBeginnerOnboarding)
-			s.route(protected, "GET", "/onboarding/beginner/current", "Get current beginner claw402 wallet", s.handleCurrentBeginnerWallet)
 
 			// User account management
 			s.routeWithSchema(protected, "PUT", "/user/password", "Change current user password",
@@ -235,14 +231,6 @@ func (s *Server) setupRoutes() {
 
 			// Server IP query (requires authentication, for whitelist configuration)
 			s.route(protected, "GET", "/server-ip", "Get server public IP (for exchange whitelist)", s.handleGetServerIP)
-
-			s.route(protected, "GET", "/vergex/direction-change/leaderboard", "Vergex OI Top 30 bull/bear direction leaderboard via claw402", s.handleVergexDirectionChangeLeaderboard)
-			s.route(protected, "GET", "/vergex/direction-change/current", "Vergex current bull/bear direction via claw402 (?symbol=BTC)", s.handleVergexDirectionChangeCurrent)
-			s.route(protected, "GET", "/vergex/direction-change/history", "Vergex bull/bear direction history via claw402 (?symbol=BTC&type=all&page=1&page_size=20)", s.handleVergexDirectionChangeHistory)
-			s.route(protected, "GET", "/vergex/cost-liquidation-heatmap", "Vergex cost/liquidation heatmap via claw402 (?marketType=hip3_perp&symbol=AAPL)", s.handleVergexCostLiquidationHeatmap)
-			s.route(protected, "GET", "/vergex/flow-markets", "Vergex net-flow market ranking via claw402 (?chain=mainnet&window=1h&limit=25)", s.handleVergexFlowMarkets)
-			s.route(protected, "GET", "/vergex/holder-winrate-map", "Vergex holder win-rate matrix via claw402 (?marketType=hip3_perp&symbol=NVDA&winMin=0&winMax=100&costMin=92&costMax=108)", s.handleVergexHolderWinrateMap)
-			s.route(protected, "GET", "/vergex/holder-winrate-map/holders", "Vergex win-rate matrix address drilldown via claw402 (?marketType=hip3_perp&symbol=NVDA&snapshotId=…&row=0&rowEnd=19&column=1&columnEnd=16&side=long&offset=0&limit=50)", s.handleVergexHolderWinrateHolders)
 
 			// AI trader management
 			s.routeWithSchema(protected, "GET", "/my-traders", "List user's traders with status",
@@ -358,10 +346,8 @@ CRITICAL: Always use the "id" field for strategy_id.`,
 IMPORTANT: For most use cases just POST {"name":"<name>"} — the backend fills everything in. Only include "config" when the user explicitly requests custom settings (specific coins, custom leverage, custom timeframes).
 
 StrategyConfig fields:
-  coin_source.source_type: "vergex_signal" (Claw402/Vergex direction board; default and recommended)
-  coin_source.vergex_limit: number of Claw402 candidates enriched with detail data (default 10, max 10)
-  coin_source.vergex_market_type: "all" for the full Claw402 board; detail calls use each ranking item's market_type
-  coin_source.vergex_chain: "hyperliquid"
+  coin_source.source_type: "oi_top" (OI top ranking; free default and recommended), "static", "ai500", "hyper_all", "hyper_main", or legacy "vergex_signal" (Claw402 paid board; requires a per-user claw402 model)
+  coin_source.oi_top_limit: number of top open-interest coins (default 3)
   indicators.klines.primary_timeframe: "1m"|"3m"|"5m"|"15m"|"1h"|"4h" — scalping→"5m", trend/swing→"1h"/"4h"
   indicators.klines.primary_count: number of candles (20-100)
   indicators.klines.enable_multi_timeframe: true for trend/swing analysis

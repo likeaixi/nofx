@@ -164,6 +164,14 @@ func (s *Store) initTables() error {
 	if err := s.Invite().initTables(); err != nil {
 		return fmt.Errorf("failed to initialize invite tables: %w", err)
 	}
+
+	// Multi-user migration: claw402 auto-wallet onboarding was removed. Drop
+	// the shared claw402 AI-model rows (their fee wallets are per-user secrets
+	// that no longer have a management path). Runs once per startup; users
+	// configure their own model providers instead.
+	if err := s.gdb.Where("provider = ?", "claw402").Delete(&AIModel{}).Error; err != nil {
+		return fmt.Errorf("failed to remove claw402 ai models: %w", err)
+	}
 	return nil
 }
 

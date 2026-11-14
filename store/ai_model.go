@@ -55,24 +55,6 @@ func (s *AIModelStore) initDefaultData() error {
 	return nil
 }
 
-// FindOrphanClaw402 finds a claw402 model whose user_id no longer exists in the users table.
-// Used to recover wallets after account reset.
-func (s *AIModelStore) FindOrphanClaw402() (*AIModel, error) {
-	var model AIModel
-	err := s.db.Where("provider = ? AND api_key != '' AND user_id NOT IN (SELECT id FROM users)", "claw402").
-		First(&model).Error
-	if err != nil {
-		return nil, err
-	}
-	return &model, nil
-}
-
-// AdoptModel re-assigns an existing model to a new user.
-func (s *AIModelStore) AdoptModel(modelID, newUserID string) error {
-	return s.db.Model(&AIModel{}).Where("id = ?", modelID).
-		Update("user_id", newUserID).Error
-}
-
 // List retrieves user's AI model list
 func (s *AIModelStore) List(userID string) ([]*AIModel, error) {
 	var models []*AIModel
@@ -148,24 +130,6 @@ func (s *AIModelStore) GetDefault(userID string) (*AIModel, error) {
 func (s *AIModelStore) firstEnabledUsable(userID string) (*AIModel, error) {
 	var models []AIModel
 	err := s.db.Where("user_id = ? AND enabled = ? AND api_key != ''", userID, true).
-		Order("updated_at DESC, id ASC").
-		Find(&models).Error
-	if err != nil {
-		return nil, err
-	}
-	for i := range models {
-		if hasUsableAPIKey(models[i]) {
-			return &models[i], nil
-		}
-	}
-	return nil, gorm.ErrRecordNotFound
-}
-
-// GetAnyEnabled returns the first enabled AI model across all users.
-// Used by single-user features that need any working LLM client.
-func (s *AIModelStore) GetAnyEnabled() (*AIModel, error) {
-	var models []AIModel
-	err := s.db.Where("enabled = ?", true).
 		Order("updated_at DESC, id ASC").
 		Find(&models).Error
 	if err != nil {

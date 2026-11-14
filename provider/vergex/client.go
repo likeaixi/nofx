@@ -11,7 +11,6 @@ import (
 	"nofx/mcp"
 	"nofx/mcp/payment"
 	"nofx/provider/hyperliquid"
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -125,10 +124,9 @@ func NewClient(baseURL, privateKeyHex string, logger mcp.Logger) (*Client, error
 	}
 	baseURL = strings.TrimRight(baseURL, "/")
 	if privateKeyHex == "" {
-		privateKeyHex = os.Getenv("CLAW402_WALLET_KEY")
-	}
-	if privateKeyHex == "" {
-		return nil, fmt.Errorf("claw402 wallet private key not set")
+		// The claw402 wallet environment fallback was removed; the key must be
+		// passed explicitly by the (now unreachable) caller.
+		return nil, fmt.Errorf("claw402 wallet env fallback removed; provide the wallet key explicitly")
 	}
 	if logger == nil {
 		logger = mcp.NewNoopLogger()

@@ -43,22 +43,22 @@ func TestCreateDefaultStrategiesUsesOneReadyToRunClaw402Preset(t *testing.T) {
 		t.Fatalf("expected exactly one active strategy, got %d", activeCount)
 	}
 
-	defaultStrategy := byName["NOFX Claw402 Auto Strategy"]
+	defaultStrategy := byName["NOFX Auto Strategy"]
 	if defaultStrategy == nil || !defaultStrategy.IsActive {
-		t.Fatalf("NOFX Claw402 Auto Strategy should exist and be active")
+		t.Fatalf("NOFX Auto Strategy should exist and be active")
 	}
 	trendCfg, err := defaultStrategy.ParseConfig()
 	if err != nil {
 		t.Fatalf("default ParseConfig failed: %v", err)
 	}
-	if trendCfg.CoinSource.SourceType != "vergex_signal" || trendCfg.CoinSource.VergexLimit != 10 || trendCfg.CoinSource.VergexMarketType != "all" {
-		t.Fatalf("default strategy should use the Claw402/Vergex all-market direction board, got %+v", trendCfg.CoinSource)
+	if trendCfg.CoinSource.SourceType != "oi_top" || !trendCfg.CoinSource.UseOITop || trendCfg.CoinSource.VergexLimit > 0 {
+		t.Fatalf("default strategy should use the free OI top ranking, got %+v", trendCfg.CoinSource)
 	}
 	if trendCfg.CoinSource.UseAI500 || trendCfg.RiskControl.MaxPositions != store.AutopilotDefaultMaxPositions {
-		t.Fatalf("default strategy should be Claw402/Vergex native with an 8-position book, got coin=%+v risk=%+v", trendCfg.CoinSource, trendCfg.RiskControl)
+		t.Fatalf("default strategy should be OI-top native with an 8-position book, got coin=%+v risk=%+v", trendCfg.CoinSource, trendCfg.RiskControl)
 	}
 	if trendCfg.RiskControl.BTCETHMaxLeverage != 10 || trendCfg.RiskControl.AltcoinMaxLeverage != 10 {
-		t.Fatalf("default strategy should use 10x leverage for all Claw402 opens, got risk=%+v", trendCfg.RiskControl)
+		t.Fatalf("default strategy should use 10x leverage for all opens, got risk=%+v", trendCfg.RiskControl)
 	}
 	if trendCfg.RiskControl.BTCETHMaxPositionValueRatio != store.AutopilotMaxPositionValueRatio ||
 		trendCfg.RiskControl.AltcoinMaxPositionValueRatio != store.AutopilotMaxPositionValueRatio ||
@@ -82,7 +82,7 @@ func TestCreateDefaultStrategiesMigratesExistingTwoPositionAutopilot(t *testing.
 	legacy := &store.Strategy{
 		ID:          uuid.New().String(),
 		UserID:      userID,
-		Name:        "NOFX Claw402 Auto Strategy",
+		Name:        "NOFX Auto Strategy",
 		Description: "legacy two-position config",
 		IsActive:    true,
 	}
@@ -173,8 +173,8 @@ func TestCreateDefaultStrategiesMigratesLegacyPresetsWithoutOverridingActiveCust
 	if byName["Balanced Strategy"] != 0 {
 		t.Fatalf("legacy preset should be removed, got names=%+v", byName)
 	}
-	if byName["NOFX Claw402 Auto Strategy"] != 1 {
-		t.Fatalf("expected exactly one NOFX Claw402 Auto Strategy, got names=%+v", byName)
+	if byName["NOFX Auto Strategy"] != 1 {
+		t.Fatalf("expected exactly one NOFX Auto Strategy, got names=%+v", byName)
 	}
 	if len(activeNames) != 1 || activeNames[0] != "aa" {
 		t.Fatalf("existing active custom strategy should stay the only active one, got %+v", activeNames)

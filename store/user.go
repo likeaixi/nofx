@@ -308,17 +308,3 @@ func (s *UserStore) EnsureSingleOwner() error {
 func (s *UserStore) DeleteAll() error {
 	return s.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&User{}).Error
 }
-
-// EnsureAdmin ensures admin user exists
-func (s *UserStore) EnsureAdmin() error {
-	var count int64
-	s.db.Model(&User{}).Where("id = ?", "admin").Count(&count)
-	if count > 0 {
-		return nil
-	}
-	return s.Create(&User{
-		ID:           "admin",
-		Email:        "admin@localhost",
-		PasswordHash: "",
-	})
-}

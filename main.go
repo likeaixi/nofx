@@ -111,28 +111,10 @@ func main() {
 		logger.Fatalf("❌ Failed to load traders: %v", err)
 	}
 
-	// Display loaded trader information
-	traders, err := st.Trader().List("default")
-	if err != nil {
-		logger.Fatalf("❌ Failed to get trader list: %v", err)
-	}
-
-	logger.Info("🤖 AI Trader Configurations in Database:")
-	if len(traders) == 0 {
-		logger.Info("  (No trader configurations, please create via Web interface)")
-	} else {
-		for _, t := range traders {
-			status := "❌ Stopped"
-			if t.IsRunning {
-				status = "✅ Running"
-			}
-			idShort := t.ID
-			if len(idShort) > 8 {
-				idShort = idShort[:8]
-			}
-			logger.Infof("  • %s [%s] %s - AI Model: %s, Exchange: %s",
-				t.Name, idShort, status, t.AIModelID, t.ExchangeID)
-		}
+	// Display loaded trader information across all users
+	allTraders, err := st.Trader().ListAll()
+	if err == nil {
+		logger.Infof("🤖 Loaded %d trader(s) from store", len(allTraders))
 	}
 
 	// Start API server

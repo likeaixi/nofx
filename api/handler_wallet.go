@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
-	"nofx/store"
 	"nofx/wallet"
 	"strings"
 	"time"
@@ -155,36 +154,23 @@ func checkClaw402Health() string {
 	return "error"
 }
 
-// Export is explicit and owner-scoped. It never creates, adopts, enables or
-// falls back to a shared/environment wallet, and is excluded from AI tools.
-func (s *Server) handleWalletExport(c *gin.Context) {
-	c.Header("Cache-Control", "no-store")
-	c.Header("Pragma", "no-cache")
-	user := c.GetString("user_id")
-	if user == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
-		return
+// walletAddressFromPrivateKey derives the EVM address for a 0x-prefixed
+// private key. The claw402 wallet onboarding/export routes were removed, but
+// model listing and launch preflight still display wallet addresses for
+// legacy claw402 models.
+func walletAddressFromPrivateKey(privateKey string) (string, error) {
+	key := strings.TrimSpace(privateKey)
+	if !strings.HasPrefix(key, "0x") {
+		return "", fmt.Errorf("private key must start with 0x")
 	}
-	var in struct {
-		ModelID string `json:"model_id"`
-		Address string `json:"address"`
+	if len(key) != 66 {
+		return "", fmt.Errorf("private key must be 66 characters")
 	}
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1024)
-	if c.ShouldBindJSON(&in) != nil || in.ModelID == "" || !common.IsHexAddress(in.Address) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Select a saved AI wallet before exporting"})
-		return
+
+	privateKeyObj, err := crypto.HexToECDSA(strings.TrimPrefix(key, "0x"))
+	if err != nil {
+		return "", err
 	}
-	var model store.AIModel
-	// AIModelStore.Get can fall back to the default owner. Never use that fallback for secrets.
-	if err := s.store.GormDB().Where("user_id = ? AND id = ? AND provider = ?", user, in.ModelID, "claw402").First(&model).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Saved AI wallet not found"})
-		return
-	}
-	key := strings.TrimSpace(model.APIKey.String())
-	address, err := walletAddressFromPrivateKey(key)
-	if err != nil || !strings.EqualFold(address, in.Address) {
-		c.JSON(http.StatusConflict, gin.H{"error": "Wallet changed. Reopen wallet settings before exporting"})
-		return
-	}
-	c.JSON(http.StatusOK, walletGenerateResponse{Address: address, PrivateKey: key})
+
+	return crypto.PubkeyToAddress(privateKeyObj.PublicKey).Hex(), nil
 }

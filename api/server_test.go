@@ -331,7 +331,9 @@ func TestPublicTraderListResponse_SystemPromptTemplate(t *testing.T) {
 	}
 }
 
-func TestVergexWinrateRoutesRegistered(t *testing.T) {
+// The claw402/vergex data routes were removed with wallet onboarding; none of
+// them may remain registered.
+func TestVergexRoutesRemoved(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	s := &Server{router: gin.New()}
 	s.setupRoutes()
@@ -345,9 +347,10 @@ func TestVergexWinrateRoutesRegistered(t *testing.T) {
 	for _, path := range []string{
 		"/api/vergex/holder-winrate-map",
 		"/api/vergex/holder-winrate-map/holders",
+		"/api/vergex/direction-change/leaderboard",
 	} {
-		if !found[path] {
-			t.Fatalf("GET %s is not registered", path)
+		if found[path] {
+			t.Fatalf("GET %s is still registered", path)
 		}
 	}
 }

@@ -64,6 +64,18 @@ func (c *Client) SetClaw402(claw402Client *Claw402DataClient) {
 	c.gatewayErr = nil
 }
 
+// SetGatewayError fail-closes every paid data request with the given error.
+// Used when the claw402 wallet path is unavailable so callers get one clear
+// message instead of silent degradation.
+func (c *Client) SetGatewayError(err error) {
+	if err == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.gatewayErr = err
+}
+
 // SetConfig updates client configuration
 func (c *Client) SetConfig(baseURL, authKey string) {
 	c.mu.Lock()

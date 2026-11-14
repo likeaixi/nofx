@@ -3,6 +3,7 @@ package kernel
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -193,17 +194,20 @@ type StrategyEngine struct {
 }
 
 // NewStrategyEngine creates strategy execution engine.
-// Paid market data always goes through Claw402. If no key is passed, resolve
-// CLAW402_WALLET_KEY; missing/invalid wallets disable paid data, not payment.
+// Paid market data goes through Claw402 and requires an explicit per-user
+// wallet key argument. The claw402 wallet environment fallback was removed
+// with the claw402 onboarding flow: when the key argument is missing the
+// paid-data client fails closed with "claw402 wallet removed; configure a
+// custom model API key" — free data sources keep working.
 func NewStrategyEngine(config *store.StrategyConfig, claw402WalletKey ...string) *StrategyEngine {
 	walletKey := ""
 	if len(claw402WalletKey) > 0 {
 		walletKey = strings.TrimSpace(claw402WalletKey[0])
 	}
-	if walletKey == "" {
-		walletKey = strings.TrimSpace(os.Getenv("CLAW402_WALLET_KEY"))
-	}
 	client := nofxos.ResolveClient(walletKey)
+	if walletKey == "" {
+		client.SetGatewayError(errors.New("claw402 wallet removed; configure a custom model API key"))
+	}
 	if walletKey != "" {
 		claw402URL := strings.TrimSpace(os.Getenv("CLAW402_URL"))
 		if claw402URL == "" {
