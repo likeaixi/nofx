@@ -1,6 +1,8 @@
 package store
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"nofx/auth"
@@ -80,6 +82,57 @@ func TestUserTOTPFields(t *testing.T) {
 	}
 	if us.ConsumeRecoveryCode("u1", codes[0]) {
 		t.Fatal("recovery code reused")
+	}
+}
+
+// TestConsumeRecoveryCodeRejectsStaleWrite proves the CAS guard the
+// ConsumeRecoveryCode success flag relies on: two writers that both read the
+// same recovery_codes value cannot both land their guarded update — the first
+// affects 1 row, the second 0 rows with no error. Without keying success on
+// RowsAffected the second racer would wrongly report success.
+func TestConsumeRecoveryCodeRejectsStaleWrite(t *testing.T) {
+	us := newTestUserStore(t)
+	if err := us.CreateUser(&User{ID: "u1", Email: "u1@x.test", PasswordHash: "h"}); err != nil {
+		t.Fatal(err)
+	}
+	h0 := auth.HashRecoveryCode("AAAA-BBBB")
+	h1 := auth.HashRecoveryCode("CCCC-DDDD")
+	stale, err := json.Marshal([]string{h0, h1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := us.db.Model(&User{}).Where("id = ?", "u1").Update("recovery_codes", string(stale)).Error; err != nil {
+		t.Fatal(err)
+	}
+	won, err := json.Marshal([]string{h1})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Both writers use the read value (stale) in the guard, like two racers
+	// that read recovery_codes before either wrote.
+	winner := us.db.Model(&User{}).Where("id = ? AND recovery_codes = ?", "u1", string(stale)).
+		Update("recovery_codes", string(won))
+	if winner.Error != nil || winner.RowsAffected != 1 {
+		t.Fatalf("winner claim: err=%v rows=%d", winner.Error, winner.RowsAffected)
+	}
+	loser := us.db.Model(&User{}).Where("id = ? AND recovery_codes = ?", "u1", string(stale)).
+		Update("recovery_codes", "[]")
+	if loser.Error != nil || loser.RowsAffected != 0 {
+		t.Fatalf("stale claim must report failure via rows: err=%v rows=%d", loser.Error, loser.RowsAffected)
+	}
+
+	// The stale write must not have landed: winner's list survives.
+	got, err := us.GetByID("u1")
+	if err != nil || got.RecoveryCodes != string(won) {
+		t.Fatalf("stale writer overwrote winner: %+v %v", got, err)
+	}
+	// End to end: the already-consumed hash is gone and consuming it again fails.
+	if us.ConsumeRecoveryCode("u1", "AAAA-BBBB") {
+		t.Fatal("stale consume must not report success")
+	}
+	if got, _ := us.GetByID("u1"); strings.Contains(got.RecoveryCodes, h0) {
+		t.Fatal("consumed hash still stored")
 	}
 }
 

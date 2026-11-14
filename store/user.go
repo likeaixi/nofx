@@ -250,8 +250,12 @@ func (s *UserStore) ConsumeRecoveryCode(userID, plaintext string) bool {
 			return nil
 		}
 		raw, _ := json.Marshal(kept)
-		consumed = tx.Model(&User{}).Where("id = ? AND recovery_codes = ?", userID, u.RecoveryCodes).
-			Update("recovery_codes", string(raw)).Error == nil
+		res := tx.Model(&User{}).Where("id = ? AND recovery_codes = ?", userID, u.RecoveryCodes).
+			Update("recovery_codes", string(raw))
+		// CAS semantics: under READ COMMITTED a racing writer may have changed
+		// recovery_codes since our read, making this guarded update match zero
+		// rows without error. Only a matched row proves this caller won.
+		consumed = res.Error == nil && res.RowsAffected == 1
 		return nil
 	})
 	return err == nil && consumed
