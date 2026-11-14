@@ -110,6 +110,12 @@ func (s *Server) handleRegister(c *gin.Context) {
 		Role:         role,
 		TotpSecret:   crypto.EncryptedString(secret),
 	}
+	if !isFirst {
+		// Record the sponsoring invite on the pending row so that confirm
+		// claims it server-side; a client omitting the field at confirm time
+		// must never be able to skip the single-use claim.
+		user.RegistrationInvite = strings.TrimSpace(req.InviteCode)
+	}
 	if isFirst {
 		// registrationLock serializes the ownership race across processes.
 		if err := s.store.User().CreateFirst(user); errors.Is(err, store.ErrAlreadyInitialized) {
@@ -133,13 +139,14 @@ func (s *Server) handleRegister(c *gin.Context) {
 }
 
 // handleRegisterConfirm activates a pending registration: password + TOTP code
-// verified, invite atomically claimed (single use), recovery codes issued.
+// verified, invite atomically claimed (single use), recovery codes issued. The
+// invite is claimed from the server-side row written at step 1 — never from a
+// client-supplied field, so omitting it cannot bypass the single-use claim.
 func (s *Server) handleRegisterConfirm(c *gin.Context) {
 	var req struct {
-		Email      string `json:"email" binding:"required,email"`
-		Password   string `json:"password" binding:"required"`
-		TotpCode   string `json:"totp_code" binding:"required"`
-		InviteCode string `json:"invite_code"`
+		Email    string `json:"email" binding:"required,email"`
+		Password string `json:"password" binding:"required"`
+		TotpCode string `json:"totp_code" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		SafeBadRequest(c, "Invalid request parameters")
@@ -163,8 +170,8 @@ func (s *Server) handleRegisterConfirm(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid verification code"})
 		return
 	}
-	if req.InviteCode != "" {
-		if err := s.store.Invite().MarkUsed(strings.TrimSpace(req.InviteCode), user.ID); err != nil {
+	if user.RegistrationInvite != "" {
+		if err := s.store.Invite().MarkUsed(user.RegistrationInvite, user.ID); err != nil {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Invalid invite code"})
 			return
 		}

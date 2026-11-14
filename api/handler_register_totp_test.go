@@ -51,11 +51,8 @@ func TestRegisterFirstUserBootstrap(t *testing.T) {
 	}
 }
 
-func confirmBody(email, password, secret, invite string, code string) string {
+func confirmBody(email, password, code string) string {
 	b := map[string]string{"email": email, "password": password, "totp_code": code}
-	if invite != "" {
-		b["invite_code"] = invite
-	}
 	raw, _ := json.Marshal(b)
 	return string(raw)
 }
@@ -78,7 +75,7 @@ func TestRegisterConfirmFirstUser(t *testing.T) {
 	secret := reg["totp_secret"].(string)
 
 	w = securityRequest(env.s.router, "POST", "/api/register/confirm",
-		confirmBody("owner@x.test", "Passw0rd!x", secret, "", validCode(t, secret)), "")
+		confirmBody("owner@x.test", "Passw0rd!x", validCode(t, secret)), "")
 	if w.Code != 200 {
 		t.Fatal(w.Code, w.Body.String())
 	}
@@ -128,7 +125,7 @@ func TestRegisterRequiresInviteAfterInit(t *testing.T) {
 	}
 }
 
-// 同码并发 confirm 只能成功一个
+// 同码并发 confirm 只能成功一个（客户端无需回传邀请码——服务端行内领取）
 func TestRegisterConfirmInviteSingleUse(t *testing.T) {
 	env := newRegEnv(t)
 	st := env.s.store
@@ -144,29 +141,62 @@ func TestRegisterConfirmInviteSingleUse(t *testing.T) {
 	}
 	s1, _ := register("a@x.test")
 	s2, _ := register("b@x.test")
+	emails := []string{"a@x.test", "b@x.test"}
+	// TOTP codes are generated up front: validCode must not run off the test
+	// goroutine (t.Fatal from a spawned goroutine is not a clean failure).
+	codes := []string{validCode(t, s1), validCode(t, s2)}
 
 	var wg sync.WaitGroup
 	results := make(chan int, 2)
-	for i, sec := range []string{s1, s2} {
-		email := []string{"a@x.test", "b@x.test"}[i]
+	for i := range codes {
 		wg.Add(1)
-		go func(email, sec string) {
+		go func(email, code string) {
 			defer wg.Done()
 			w := securityRequest(env.s.router, "POST", "/api/register/confirm",
-				confirmBody(email, "Passw0rd!x", sec, "RACECODE99", validCode(t, sec)), "")
+				confirmBody(email, "Passw0rd!x", code), "")
 			results <- w.Code
-		}(email, sec)
+		}(emails[i], codes[i])
 	}
 	wg.Wait()
 	close(results)
-	ok := 0
+	counts := map[int]int{}
 	for code := range results {
-		if code == 200 {
-			ok++
-		}
+		counts[code]++
 	}
-	if ok != 1 {
-		t.Fatalf("exactly one confirm must win, got %d", ok)
+	if counts[200] != 1 || counts[403] != 1 {
+		t.Fatalf("exactly one confirm must win (other 403), got %v", counts)
+	}
+}
+
+// confirm 不回传邀请码也必须原子领取——否则一个码可无限注册
+func TestRegisterConfirmConsumesInviteWithoutClientEcho(t *testing.T) {
+	env := newRegEnv(t)
+	st := env.s.store
+	st.User().CreateUser(storeUser("owner@x.test", store.RoleOwner))
+	st.User().UpdateTOTP("u-owner", mustSecret("KRSXG5CTMVRXEZLU"), true)
+	st.Invite().Create("ECHOLESS99", "u-owner")
+
+	// Step 1 carries the code; confirm sends only email/password/totp_code.
+	w := securityRequest(env.s.router, "POST", "/api/register",
+		`{"email":"a@x.test","password":"Passw0rd!x","invite_code":"ECHOLESS99"}`, "")
+	var reg map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &reg)
+	secret := reg["totp_secret"].(string)
+
+	w = securityRequest(env.s.router, "POST", "/api/register/confirm",
+		confirmBody("a@x.test", "Passw0rd!x", validCode(t, secret)), "")
+	if w.Code != 200 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	// The codeless confirm must still have consumed the invite server-side.
+	if inv, err := st.Invite().GetValid("ECHOLESS99"); err == nil || inv != nil {
+		t.Fatal("invite survived a codeless confirm", inv, err)
+	}
+	// ...and the spent code cannot sponsor another registration.
+	w = securityRequest(env.s.router, "POST", "/api/register",
+		`{"email":"b@x.test","password":"Passw0rd!x","invite_code":"ECHOLESS99"}`, "")
+	if w.Code != 403 || !strings.Contains(w.Body.String(), "Invalid invite code") {
+		t.Fatal(w.Code, w.Body.String())
 	}
 }
 

@@ -27,9 +27,13 @@ type User struct {
 	TotpSecret    crypto.EncryptedString `gorm:"column:totp_secret;default:''" json:"-"`
 	TotpEnabled   bool                   `gorm:"not null;default:false" json:"-"`
 	RecoveryCodes string                 `gorm:"column:recovery_codes;default:'[]'" json:"-"`
-	AuthVersion   int64                  `gorm:"not null;default:0" json:"-"`
-	CreatedAt     time.Time              `json:"created_at"`
-	UpdatedAt     time.Time              `json:"updated_at"`
+	// RegistrationInvite records the invite code a pending registration was
+	// sponsored by, so confirm claims it server-side; the client never decides
+	// whether an invite is consumed.
+	RegistrationInvite string    `gorm:"column:registration_invite;default:''" json:"-"`
+	AuthVersion        int64     `gorm:"not null;default:0" json:"-"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 func (User) TableName() string { return "users" }
@@ -69,6 +73,7 @@ func (s *UserStore) initTables() error {
 				`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret TEXT DEFAULT ''`,
 				`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN NOT NULL DEFAULT false`,
 				`ALTER TABLE users ADD COLUMN IF NOT EXISTS recovery_codes TEXT DEFAULT '[]'`,
+				`ALTER TABLE users ADD COLUMN IF NOT EXISTS registration_invite TEXT DEFAULT ''`,
 			} {
 				if err := s.db.Exec(statement).Error; err != nil {
 					return err
