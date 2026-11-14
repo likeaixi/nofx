@@ -1,11 +1,15 @@
 package store
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"nofx/auth"
+	"nofx/crypto"
 )
 
 // UserStore user storage
@@ -15,12 +19,17 @@ type UserStore struct {
 
 // User user model
 type User struct {
-	ID           string    `gorm:"primaryKey" json:"id"`
-	Email        string    `gorm:"uniqueIndex:idx_users_email;not null" json:"email"`
-	PasswordHash string    `gorm:"column:password_hash;not null" json:"-"`
-	AuthVersion  int64     `gorm:"not null;default:0" json:"-"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID            string                 `gorm:"primaryKey" json:"id"`
+	Email         string                 `gorm:"uniqueIndex:idx_users_email;not null" json:"email"`
+	PasswordHash  string                 `gorm:"column:password_hash;not null" json:"-"`
+	Role          string                 `gorm:"not null;default:user" json:"role"`
+	Disabled      bool                   `gorm:"not null;default:false" json:"-"`
+	TotpSecret    crypto.EncryptedString `gorm:"column:totp_secret;default:''" json:"-"`
+	TotpEnabled   bool                   `gorm:"not null;default:false" json:"-"`
+	RecoveryCodes string                 `gorm:"column:recovery_codes;default:'[]'" json:"-"`
+	AuthVersion   int64                  `gorm:"not null;default:0" json:"-"`
+	CreatedAt     time.Time              `json:"created_at"`
+	UpdatedAt     time.Time              `json:"updated_at"`
 }
 
 func (User) TableName() string { return "users" }
@@ -55,6 +64,11 @@ func (s *UserStore) initTables() error {
 				`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT ''`,
 				`ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
 				`ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
+				`ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user'`,
+				`ALTER TABLE users ADD COLUMN IF NOT EXISTS disabled BOOLEAN NOT NULL DEFAULT false`,
+				`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret TEXT DEFAULT ''`,
+				`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN NOT NULL DEFAULT false`,
+				`ALTER TABLE users ADD COLUMN IF NOT EXISTS recovery_codes TEXT DEFAULT '[]'`,
 			} {
 				if err := s.db.Exec(statement).Error; err != nil {
 					return err
@@ -76,10 +90,18 @@ func (s *UserStore) initTables() error {
 				}
 			}
 
-			return nil
+			// Existing table: columns ensured manually above; run owner migration.
+			return s.EnsureSingleOwner()
 		}
 	}
-	return s.db.AutoMigrate(&User{})
+	if err := s.db.AutoMigrate(&User{}); err != nil {
+		return err
+	}
+	// Owner migration after the sqlite / fresh-table AutoMigrate path.
+	if err := s.EnsureSingleOwner(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Create creates user
@@ -88,6 +110,13 @@ func (s *UserStore) Create(user *User) error {
 }
 
 var ErrAlreadyInitialized = errors.New("system already initialized")
+
+const (
+	// RoleOwner is the single administrator role (manages users and invites).
+	RoleOwner = "owner"
+	// RoleUser is the standard authenticated-user role.
+	RoleUser = "user"
+)
 
 // A singleton row serializes first registration across processes, not just
 // goroutines. Updating it acquires a write lock in both SQLite and PostgreSQL.
@@ -170,6 +199,100 @@ func (s *UserStore) UpdatePassword(userID, passwordHash string) error {
 		return gorm.ErrRecordNotFound
 	}
 	return nil
+}
+
+// CreateUser creates a user (multi-user registration path)
+func (s *UserStore) CreateUser(user *User) error {
+	return s.db.Create(user).Error
+}
+
+// UpdateTOTP persists the encrypted TOTP secret and its enablement state
+func (s *UserStore) UpdateTOTP(userID string, secret crypto.EncryptedString, enabled bool) error {
+	return s.db.Model(&User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+		"totp_secret":  secret,
+		"totp_enabled": enabled,
+		"updated_at":   time.Now().UTC(),
+	}).Error
+}
+
+// SetRecoveryCodes replaces the stored recovery-code hash array
+func (s *UserStore) SetRecoveryCodes(userID string, hashes []string) error {
+	raw, err := json.Marshal(hashes)
+	if err != nil {
+		return err
+	}
+	return s.db.Model(&User{}).Where("id = ?", userID).Update("recovery_codes", string(raw)).Error
+}
+
+// ConsumeRecoveryCode atomically removes one matching hash; false = not found/already used.
+func (s *UserStore) ConsumeRecoveryCode(userID, plaintext string) bool {
+	hash := auth.HashRecoveryCode(plaintext)
+	consumed := false
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		var u User
+		if err := tx.Where("id = ?", userID).First(&u).Error; err != nil {
+			return nil
+		}
+		var hashes []string
+		if err := json.Unmarshal([]byte(u.RecoveryCodes), &hashes); err != nil {
+			return nil
+		}
+		kept := hashes[:0]
+		found := false
+		for _, h := range hashes {
+			if h == hash && !found {
+				found = true
+				continue
+			}
+			kept = append(kept, h)
+		}
+		if !found {
+			return nil
+		}
+		raw, _ := json.Marshal(kept)
+		consumed = tx.Model(&User{}).Where("id = ? AND recovery_codes = ?", userID, u.RecoveryCodes).
+			Update("recovery_codes", string(raw)).Error == nil
+		return nil
+	})
+	return err == nil && consumed
+}
+
+// SetDisabled disables/re-enables a user; disabling bumps auth_version so
+// existing sessions are invalidated.
+func (s *UserStore) SetDisabled(userID string, disabled bool) error {
+	updates := map[string]interface{}{"disabled": disabled, "updated_at": time.Now().UTC()}
+	if disabled {
+		updates["auth_version"] = gorm.Expr("auth_version + 1")
+	}
+	result := s.db.Model(&User{}).Where("id = ?", userID).Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+// EnsureSingleOwner migrates a pre-multi-user database: when no owner exists
+// but users do, the earliest user is promoted to owner. Idempotent.
+func (s *UserStore) EnsureSingleOwner() error {
+	var owners int64
+	if err := s.db.Model(&User{}).Where("role = ?", RoleOwner).Count(&owners).Error; err != nil {
+		return err
+	}
+	if owners > 0 {
+		return nil
+	}
+	var earliest User
+	err := s.db.Order("created_at").First(&earliest).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return s.db.Model(&User{}).Where("id = ?", earliest.ID).Update("role", RoleOwner).Error
 }
 
 // DeleteAll deletes all users (reset system to uninitialized state)

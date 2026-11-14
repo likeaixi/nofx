@@ -29,6 +29,7 @@ type Store struct {
 	order    *OrderStore
 	grid     *GridStore
 	aiCharge *AIChargeStore
+	invite   *InviteStore
 
 	mu sync.RWMutex
 }
@@ -159,6 +160,9 @@ func (s *Store) initTables() error {
 	}
 	if err := s.AICharge().initTables(); err != nil {
 		return fmt.Errorf("failed to initialize AI charge tables: %w", err)
+	}
+	if err := s.Invite().initTables(); err != nil {
+		return fmt.Errorf("failed to initialize invite tables: %w", err)
 	}
 	return nil
 }
@@ -291,6 +295,16 @@ func (s *Store) AICharge() *AIChargeStore {
 		s.aiCharge = NewAIChargeStore(s.gdb)
 	}
 	return s.aiCharge
+}
+
+// Invite gets invite code storage
+func (s *Store) Invite() *InviteStore {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.invite == nil {
+		s.invite = NewInviteStore(s.gdb)
+	}
+	return s.invite
 }
 
 // Close closes database connection
