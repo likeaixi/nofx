@@ -15,6 +15,7 @@ export const ROUTES = {
   home: '/',
   login: '/login',
   register: '/register',
+  bindTotp: '/bind-totp',
   setup: '/setup',
   welcome: '/welcome',
   faq: '/faq',

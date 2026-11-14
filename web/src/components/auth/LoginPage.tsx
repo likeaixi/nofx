@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { useAuth } from '../../contexts/AuthContext'
 import { useLanguage } from '../../contexts/LanguageContext'
 import { t } from '../../i18n/translations'
+import { ROUTES } from '../../router/paths'
 import { DeepVoidBackground } from '../common/DeepVoidBackground'
 
 export function LoginPage() {
@@ -14,6 +15,7 @@ export function LoginPage() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [totpCode, setTotpCode] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -51,15 +53,22 @@ export function LoginPage() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    const result = await login(email, password)
+    const result = await login(email, password, totpCode.trim() || undefined)
     setLoading(false)
     if (result.success) {
       if (expiredToastId) toast.dismiss(expiredToastId)
-    } else {
-      const msg = result.message || t('loginFailed', language)
-      setError(msg)
-      toast.error(msg)
+      return
     }
+    if (result.needsBinding) {
+      // Pending registration / pre-upgrade account: it must bind an
+      // authenticator before it can hold a session. Carry the entered
+      // credentials so the bind page only asks for the code.
+      navigate(ROUTES.bindTotp, { state: { email, password } })
+      return
+    }
+    const msg = result.message || t('loginFailed', language)
+    setError(msg)
+    toast.error(msg)
   }
 
   return (
@@ -228,6 +237,25 @@ export function LoginPage() {
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+              </div>
+
+              {/* Authenticator code (TOTP or a single-use recovery code) */}
+              <div>
+                <label className="block text-[10.5px] font-medium uppercase tracking-[0.14em] text-nofx-text-muted mb-2">
+                  Authenticator code
+                </label>
+                <input
+                  type="text"
+                  value={totpCode}
+                  onChange={(e) => setTotpCode(e.target.value.trim())}
+                  className="w-full bg-nofx-bg-lighter border border-[rgba(25,36,52,0.14)] rounded-lg px-4 py-[11px] text-[14px] text-nofx-text placeholder-nofx-text-muted focus:outline-hidden focus:border-nofx-gold/50 focus:bg-nofx-bg-lighter focus:ring-2 focus:ring-nofx-gold/20 transition-all"
+                  placeholder="6-digit code or recovery code"
+                  autoComplete="off"
+                />
+                <p className="mt-1.5 text-[11px] text-nofx-text-muted">
+                  From your authenticator app. Leave empty only if your account
+                  has no authenticator bound yet.
+                </p>
               </div>
 
               {/* Error banner */}

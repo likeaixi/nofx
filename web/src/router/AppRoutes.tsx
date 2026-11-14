@@ -14,8 +14,8 @@ import { SiteFooter } from '../components/common/SiteFooter'
 import { LoginRequiredOverlay } from '../components/auth/LoginRequiredOverlay'
 import { LoginPage } from '../components/auth/LoginPage'
 import { RegisterPage } from '../components/auth/RegisterPage'
+import { BindTotpPage } from '../components/auth/BindTotpPage'
 import { ResetPasswordPage } from '../components/auth/ResetPasswordPage'
-import { SetupPage } from '../components/modals/SetupPage'
 import { CompetitionPage } from '../components/trader/CompetitionPage'
 import { AITradersPage } from '../components/trader/AITradersPage'
 import { TraderLaunchGuestPage } from '../components/trader/TraderLaunchGuestPage'
@@ -402,10 +402,6 @@ export function AppRoutes() {
     return <LoadingScreen />
   }
 
-  if (systemConfig && !systemConfig.initialized && !user) {
-    return <SetupPage />
-  }
-
   return (
     <>
       <LegacyHashRedirect />
@@ -434,16 +430,19 @@ export function AppRoutes() {
         <Route path={ROUTES.home} element={<LandingPage />} />
         <Route path={ROUTES.login} element={<LoginPage />} />
         <Route path={ROUTES.register} element={<RegisterPage />} />
+        <Route path={ROUTES.bindTotp} element={<BindTotpPage />} />
         <Route path={ROUTES.resetPassword} element={<ResetPasswordPage />} />
         <Route
           path={ROUTES.setup}
           element={
+            // Registration is always open (invite-gated once initialized), so
+            // first-run setup funnels into the standard register flow.
             user ? (
               <Navigate to={ROUTES.welcome} replace />
             ) : systemConfig?.initialized ? (
               <Navigate to={ROUTES.login} replace />
             ) : (
-              <SetupPage />
+              <Navigate to={ROUTES.register} replace />
             )
           }
         />

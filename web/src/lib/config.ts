@@ -1,5 +1,6 @@
 export interface SystemConfig {
   initialized: boolean
+  invite_required?: boolean
   beta_mode?: boolean
 }
 

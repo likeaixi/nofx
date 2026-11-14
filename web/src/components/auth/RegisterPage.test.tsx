@@ -1,4 +1,34 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { RegisterPage } from './RegisterPage'
+
+const totpMocks = vi.hoisted(() => ({
+  register: vi.fn(),
+  confirmRegister: vi.fn(),
+  getConfig: vi.fn(),
+}))
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}))
+vi.mock('../../contexts/LanguageContext', () => ({
+  useLanguage: () => ({ language: 'en' }),
+}))
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({
+    register: totpMocks.register,
+    confirmRegister: totpMocks.confirmRegister,
+  }),
+}))
+vi.mock('../../lib/config', () => ({
+  getSystemConfig: totpMocks.getConfig,
+}))
+vi.mock('qrcode.react', () => ({
+  QRCodeSVG: (props: { value: string }) => (
+    <div data-testid="qr" data-value={props.value} />
+  ),
+}))
 
 /**
  * PR #XXX test: fix inconsistent password validation
@@ -373,5 +403,229 @@ describe('RegisterPage - Password Validation Consistency (Logic Tests)', () => {
 
       expect(validation1).toEqual(validation2)
     })
+  })
+})
+
+/**
+ * Two-step TOTP registration contract tests.
+ *
+ * Step 1 (form): POST /api/register → {totp_secret, otpauth_url,
+ * is_first_user} — no session yet. Step 2 (totp): POST /api/register/confirm
+ * with EXACTLY {email, password, totp_code} (no invite_code — the invite is
+ * claimed server-side) → session + recovery codes shown once.
+ */
+describe('RegisterPage - two-step TOTP registration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    totpMocks.getConfig.mockResolvedValue({
+      initialized: true,
+      invite_required: true,
+    })
+  })
+
+  function renderPage() {
+    return render(
+      <MemoryRouter initialEntries={['/register']}>
+        <Routes>
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/traders" element={<div>TRADERS-PAGE</div>} />
+          <Route path="/welcome" element={<div>WELCOME-PAGE</div>} />
+        </Routes>
+      </MemoryRouter>
+    )
+  }
+
+  /**
+   * Fill the step-1 form and submit. `invite === null` asserts that no invite
+   * input is rendered (fresh instance). The leading act() lets the
+   * /api/config fetch land so conditional inputs settle before we query them.
+   */
+  async function fillStepOne(invite: string | null = 'invite123') {
+    await act(async () => {})
+
+    const inviteInput = screen.queryByPlaceholderText('XXXXXXXXXX')
+    if (invite === null) {
+      expect(inviteInput).toBeNull()
+    } else {
+      expect(inviteInput).not.toBeNull()
+      fireEvent.change(inviteInput, { target: { value: invite } })
+    }
+
+    fireEvent.change(screen.getByPlaceholderText('you@example.com'), {
+      target: { value: 'owner@example.com' },
+    })
+    const passwords = screen.getAllByPlaceholderText('••••••••')
+    fireEvent.change(passwords[0], { target: { value: 'StrongPass123!' } })
+    fireEvent.change(passwords[1], { target: { value: 'StrongPass123!' } })
+    const submit = screen.getByRole('button', { name: /create account/i })
+    await waitFor(() => expect(submit).not.toBeDisabled())
+    fireEvent.click(submit)
+  }
+
+  it('completes invite → QR → code → recovery codes → workspace', async () => {
+    totpMocks.register.mockResolvedValue({
+      success: true,
+      data: {
+        totp_secret: 'SECRET234',
+        otpauth_url: 'otpauth://totp/NOFX:owner@example.com',
+        is_first_user: false,
+      },
+    })
+    totpMocks.confirmRegister.mockResolvedValue({
+      success: true,
+      data: {
+        token: 'tok',
+        user_id: 'u-1',
+        email: 'owner@example.com',
+        role: 'user',
+        recovery_codes: ['aaaa-bbbb', 'cccc-dddd'],
+      },
+    })
+    renderPage()
+
+    await fillStepOne()
+
+    // Invite code is uppercased before submission.
+    await waitFor(() =>
+      expect(totpMocks.register).toHaveBeenCalledWith(
+        'owner@example.com',
+        'StrongPass123!',
+        'INVITE123'
+      )
+    )
+
+    // Step 2: QR + manual secret.
+    const qr = await screen.findByTestId('qr')
+    expect(qr.getAttribute('data-value')).toBe(
+      'otpauth://totp/NOFX:owner@example.com'
+    )
+    expect(screen.getByText('SECRET234')).toBeTruthy()
+
+    fireEvent.change(screen.getByPlaceholderText('123456'), {
+      target: { value: '123456' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^confirm/i }))
+
+    // Step 3: recovery codes shown exactly once, with the warning.
+    expect(await screen.findByText('aaaa-bbbb')).toBeTruthy()
+    expect(screen.getByText('cccc-dddd')).toBeTruthy()
+    expect(screen.getByText(/shown only once/i)).toBeTruthy()
+
+    // Confirm body is exactly {email, password, totp_code} — no invite_code.
+    await waitFor(() => expect(totpMocks.confirmRegister).toHaveBeenCalled())
+    expect(totpMocks.confirmRegister.mock.calls[0]).toEqual([
+      'owner@example.com',
+      'StrongPass123!',
+      '123456',
+    ])
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /i saved them — enter workspace/i })
+    )
+    expect(await screen.findByText('TRADERS-PAGE')).toBeTruthy()
+  })
+
+  it('routes the first user into the guided (welcome) flow', async () => {
+    totpMocks.register.mockResolvedValue({
+      success: true,
+      data: {
+        totp_secret: 'S',
+        otpauth_url: 'otpauth://totp/first',
+        is_first_user: true,
+      },
+    })
+    totpMocks.confirmRegister.mockResolvedValue({
+      success: true,
+      data: {
+        token: 'tok',
+        user_id: 'u-1',
+        email: 'owner@example.com',
+        role: 'owner',
+        recovery_codes: ['r1'],
+      },
+    })
+    renderPage()
+
+    await fillStepOne()
+    await screen.findByTestId('qr')
+    fireEvent.change(screen.getByPlaceholderText('123456'), {
+      target: { value: '654321' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^confirm/i }))
+
+    expect(await screen.findByText('r1')).toBeTruthy()
+    fireEvent.click(
+      screen.getByRole('button', { name: /i saved them — enter workspace/i })
+    )
+    expect(await screen.findByText('WELCOME-PAGE')).toBeTruthy()
+  })
+
+  it('hides the invite input and omits the invite when invite_required is false', async () => {
+    totpMocks.getConfig.mockResolvedValue({
+      initialized: false,
+      invite_required: false,
+    })
+    totpMocks.register.mockResolvedValue({
+      success: true,
+      data: {
+        totp_secret: 'S',
+        otpauth_url: 'otpauth://totp/first',
+        is_first_user: true,
+      },
+    })
+    renderPage()
+
+    await fillStepOne(null)
+
+    expect(screen.queryByPlaceholderText('XXXXXXXXXX')).toBeNull()
+    await waitFor(() =>
+      expect(totpMocks.register).toHaveBeenCalledWith(
+        'owner@example.com',
+        'StrongPass123!',
+        undefined
+      )
+    )
+    expect(await screen.findByTestId('qr')).toBeTruthy()
+  })
+
+  it('keeps the form step when registration is rejected (invite errors)', async () => {
+    totpMocks.register.mockResolvedValue({
+      success: false,
+      message: 'Invite code required',
+    })
+    renderPage()
+
+    await fillStepOne()
+
+    expect(await screen.findByText('Invite code required')).toBeTruthy()
+    expect(screen.queryByTestId('qr')).toBeNull()
+    expect(totpMocks.confirmRegister).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a wrong confirmation code and stays on the QR step', async () => {
+    totpMocks.register.mockResolvedValue({
+      success: true,
+      data: {
+        totp_secret: 'S',
+        otpauth_url: 'otpauth://totp/x',
+        is_first_user: false,
+      },
+    })
+    totpMocks.confirmRegister.mockResolvedValue({
+      success: false,
+      message: 'Invalid verification code',
+    })
+    renderPage()
+
+    await fillStepOne()
+    await screen.findByTestId('qr')
+    fireEvent.change(screen.getByPlaceholderText('123456'), {
+      target: { value: '000000' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^confirm/i }))
+
+    expect(await screen.findByText('Invalid verification code')).toBeTruthy()
+    expect(screen.getByTestId('qr')).toBeTruthy()
+    expect(screen.queryByText(/shown only once/i)).toBeNull()
   })
 })
