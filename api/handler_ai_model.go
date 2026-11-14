@@ -11,7 +11,6 @@ import (
 	"nofx/logger"
 	"nofx/security"
 	"nofx/store"
-	"nofx/wallet"
 
 	"github.com/gin-gonic/gin"
 )
@@ -34,8 +33,6 @@ type SafeModelConfig struct {
 	HasAPIKey       bool   `json:"has_api_key"`
 	CustomAPIURL    string `json:"customApiUrl"`    // Custom API URL (usually not sensitive)
 	CustomModelName string `json:"customModelName"` // Custom model name (not sensitive)
-	WalletAddress   string `json:"walletAddress,omitempty"`
-	BalanceUSDC     string `json:"balanceUsdc,omitempty"`
 }
 
 // ModelConfigUpdate is a single model's update payload. It is a named type
@@ -64,25 +61,15 @@ func (s *Server) handleGetModelConfigs(c *gin.Context) {
 		return
 	}
 
-	// If no models in database, return default models
-	if len(models) == 0 {
-		logger.Infof("⚠️ No AI models in database, returning defaults")
-		defaultModels := []SafeModelConfig{
-			{ID: "claw402", Name: "Claw402 (Base USDC)", Provider: "claw402", Enabled: false, HasAPIKey: false},
-		}
-		c.JSON(http.StatusOK, defaultModels)
-		return
-	}
-
-	logger.Infof("✅ Found %d AI model configs", len(models))
-
-	// Convert to safe response structure, remove sensitive information
+	// Convert to safe response structure, remove sensitive information.
+	// The claw402 wallet advertisement was removed with wallet onboarding; an
+	// unconfigured account simply has no models yet.
 	safeModels := make([]SafeModelConfig, 0, len(models))
 	for _, model := range models {
 		if !store.IsVisibleAIModel(model) {
 			continue
 		}
-		safeModel := SafeModelConfig{
+		safeModels = append(safeModels, SafeModelConfig{
 			ID:              model.ID,
 			Name:            model.Name,
 			Provider:        model.Provider,
@@ -90,29 +77,7 @@ func (s *Server) handleGetModelConfigs(c *gin.Context) {
 			HasAPIKey:       model.APIKey != "",
 			CustomAPIURL:    model.CustomAPIURL,
 			CustomModelName: model.CustomModelName,
-		}
-
-		if model.Provider == "claw402" {
-			if privateKey := strings.TrimSpace(model.APIKey.String()); privateKey != "" {
-				if walletAddress, addrErr := walletAddressFromPrivateKey(privateKey); addrErr == nil {
-					safeModel.WalletAddress = walletAddress
-					safeModel.BalanceUSDC = wallet.QueryUSDCBalanceStr(walletAddress)
-				} else {
-					logger.Warnf("⚠️ Failed to derive claw402 wallet address for model %s: %v", model.ID, addrErr)
-				}
-			}
-		}
-
-		safeModels = append(safeModels, safeModel)
-	}
-
-	if len(safeModels) == 0 {
-		logger.Infof("⚠️ No visible AI models in database, returning defaults")
-		defaultModels := []SafeModelConfig{
-			{ID: "claw402", Name: "Claw402 (Base USDC)", Provider: "claw402", Enabled: false, HasAPIKey: false},
-		}
-		c.JSON(http.StatusOK, defaultModels)
-		return
+		})
 	}
 
 	c.JSON(http.StatusOK, safeModels)
@@ -121,7 +86,10 @@ func (s *Server) handleGetModelConfigs(c *gin.Context) {
 // handleUpdateModelConfigs Update AI model configurations (supports both encrypted and plain text based on config)
 func (s *Server) handleUpdateModelConfigs(c *gin.Context) {
 	userID := c.GetString("user_id")
+	// config.Get() is fail-soft and may return nil (e.g. tests, tools);
+	// treat a missing config as plain-JSON mode.
 	cfg := config.Get()
+	transportEncrypted := cfg != nil && cfg.TransportEncryption
 
 	// Read raw request body
 	bodyBytes, err := c.GetRawData()
@@ -133,7 +101,7 @@ func (s *Server) handleUpdateModelConfigs(c *gin.Context) {
 	var req UpdateModelConfigRequest
 
 	// Check if transport encryption is enabled
-	if !cfg.TransportEncryption {
+	if !transportEncrypted {
 		// Transport encryption disabled, accept plain JSON
 		if err := json.Unmarshal(bodyBytes, &req); err != nil {
 			logger.Infof("❌ Failed to parse plain JSON request: %v", err)
@@ -198,6 +166,15 @@ func (s *Server) handleUpdateModelConfigs(c *gin.Context) {
 
 	tradersToReload := make(map[string]bool)
 	for modelID, modelData := range req.Models {
+		// Claw402 auto-wallet onboarding was removed; block (re-)creating
+		// claw402 models. This mirrors UpdateWithName's create-branch provider
+		// inference: the provider is the id itself or its last "_"-separated
+		// segment, so both "claw402" and "<name>_claw402" would mint a row.
+		if modelID == "claw402" || strings.HasSuffix(modelID, "_claw402") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "claw402 provider removed; configure a custom model"})
+			return
+		}
+
 		// SSRF protection: validate custom_api_url before storing
 		if modelData.CustomAPIURL != "" {
 			cleanURL := strings.TrimSuffix(modelData.CustomAPIURL, "#")
@@ -240,12 +217,9 @@ func (s *Server) handleUpdateModelConfigs(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Model configuration updated"})
 }
 
-// handleGetSupportedModels Get list of AI models supported by the system
+// handleGetSupportedModels Get list of AI models supported by the system.
+// The static claw402 advertisement was removed with wallet onboarding; custom
+// OpenAI-compatible models are configured directly via PUT /api/models.
 func (s *Server) handleGetSupportedModels(c *gin.Context) {
-	// Return static list of supported AI models with default versions
-	supportedModels := []map[string]interface{}{
-		{"id": "claw402", "name": "Claw402 (Base USDC)", "provider": "claw402", "defaultModel": "gpt-5.6"},
-	}
-
-	c.JSON(http.StatusOK, supportedModels)
+	c.JSON(http.StatusOK, []map[string]interface{}{})
 }

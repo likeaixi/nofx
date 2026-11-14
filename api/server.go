@@ -155,8 +155,7 @@ func (s *Server) setupRoutes() {
 		// System config (no authentication required, for frontend to determine admin mode/registration status)
 		s.route(api, "GET", "/config", "Get system configuration", s.handleGetSystemConfig)
 
-		// Wallet validation (no authentication required — used by frontend config form)
-		api.POST("/wallet/validate", s.handleWalletValidate)
+		// Wallet utilities (no authentication required — used by frontend config form)
 		api.POST("/wallet/generate", s.handleWalletGenerate)
 		api.GET("/wallet/balance", s.handleWalletBalance)
 		s.route(api, "GET", "/hyperliquid/connect-config", "Get NOFX Hyperliquid builder authorization config", s.handleHyperliquidConnectConfig)

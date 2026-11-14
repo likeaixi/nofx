@@ -69,30 +69,14 @@ func TestWalletGenerationAndImportDerivation(t *testing.T) {
 	if err != nil || crypto.PubkeyToAddress(key.PublicKey).Hex() != generated.Address {
 		t.Fatal("address does not match generated key")
 	}
-	for _, valid := range []bool{true, false} {
-		privateKey := generated.PrivateKey
-		if !valid {
-			privateKey = "0x" + strings.Repeat("0", 64)
-		}
-		w = httptest.NewRecorder()
-		c, _ = gin.CreateTestContext(w)
-		body, _ := json.Marshal(walletValidateRequest{PrivateKey: privateKey, DeriveOnly: true})
-		c.Request = httptest.NewRequest(http.MethodPost, "/wallet/validate", strings.NewReader(string(body)))
-		c.Request.Header.Set("Content-Type", "application/json")
-		s.handleWalletValidate(c)
-		var result walletValidateResponse
-		if json.Unmarshal(w.Body.Bytes(), &result) != nil || result.Valid != valid {
-			t.Fatal("incorrect validation result")
-		}
-		if valid && result.Address != generated.Address {
-			t.Fatal("incorrect derived address")
-		}
-		if strings.Contains(w.Body.String(), privateKey) {
-			t.Fatal("import response contains a private key")
-		}
-		if result.BalanceUSDC != "" {
-			t.Fatal("derivation must not query funding or require external services")
-		}
+	// The claw402 wallet-import validation endpoint was removed; derivation
+	// survives only as the internal helper.
+	derived, err := walletAddressFromPrivateKey(generated.PrivateKey)
+	if err != nil || derived != generated.Address {
+		t.Fatal("helper derived a different address", derived, err)
+	}
+	if _, err = walletAddressFromPrivateKey("0x" + strings.Repeat("0", 64)); err == nil {
+		t.Fatal("invalid key accepted")
 	}
 }
 

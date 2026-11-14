@@ -75,11 +75,10 @@ var claw402ModelEndpoints = map[string]string{
 	"glm-5": "/api/v1/ai/zhipu/chat",
 }
 
-func init() {
-	mcp.RegisterProvider(mcp.ProviderClaw402, func(opts ...mcp.ClientOption) mcp.AIClient {
-		return NewClaw402ClientWithOptions(opts...)
-	})
-}
+// The claw402 provider registration (init() -> mcp.RegisterProvider) was
+// removed with the claw402 user-facing paths: NewAIClientByProvider("claw402")
+// now returns nil and callers fall back to a generic client. The package is
+// kept compiling for the dead-code sweep but is no longer registered.
 
 // Claw402Client implements AIClient using claw402.ai's x402 v2 USDC payment gateway.
 // When the selected model routes to an Anthropic endpoint, it automatically uses
