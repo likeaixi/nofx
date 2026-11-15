@@ -210,13 +210,13 @@ export function TerminalDashboard({
   const latest = decisions && decisions.length > 0 ? decisions[0] : undefined
   const candidateCoins = latest?.candidate_coins ?? []
 
-  // The instrument the panels follow: prefer a symbol the bot is ACTUALLY
-  // holding (first open position, else this cycle's first candidate) so the
-  // price panels match the real traded symbol; fall back to SP500.
-  const [selectedSym] = useState<string | null>(null)
+  // The instrument the panels follow: a manually selected position (click a
+  // row in the Positions table), else a symbol the bot is ACTUALLY holding
+  // (first open position, else this cycle's first candidate), else BTC.
+  const [selectedSym, setSelectedSym] = useState<string | null>(null)
   const defaultSym = useMemo(() => {
     const heldBases = [...(positions ?? []).map((p) => p.symbol), ...candidateCoins].map(baseLabel).filter(Boolean)
-    return heldBases[0] || 'SP500'
+    return heldBases[0] || 'BTC'
   }, [positions, candidateCoins])
   const activeSym = baseLabel(selectedSym || defaultSym)
   const sourceSymbol = [...(positions ?? []).map((p) => p.symbol), ...candidateCoins].find((s) => baseLabel(s) === activeSym) || selectedSym || defaultSym
@@ -511,8 +511,20 @@ export function TerminalDashboard({
                     const win = (p.unrealized_pnl ?? 0) >= 0
                     const notional = Math.abs(p.quantity ?? 0) * (p.mark_price || p.entry_price || 0)
                     return (
-                      <tr key={`${p.symbol}-${i}`} style={{ borderTop: '1px solid var(--tm-hair)' }}>
-                        <td style={{ padding: '5px 0', fontWeight: 500 }}>{baseLabel(p.symbol)}</td>
+                      <tr
+                        key={`${p.symbol}-${i}`}
+                        onClick={() => setSelectedSym(baseLabel(p.symbol))}
+                        title={`Show ${baseLabel(p.symbol)} order book & K-line`}
+                        style={{
+                          borderTop: '1px solid var(--tm-hair)',
+                          cursor: 'pointer',
+                          background: baseLabel(p.symbol) === activeSym ? 'var(--tm-up-dim, rgba(46,204,113,0.07))' : 'transparent',
+                        }}
+                      >
+                        <td style={{ padding: '5px 0', fontWeight: 500 }}>
+                          {baseLabel(p.symbol) === activeSym && <span style={{ color: 'var(--tm-up)', marginRight: 4 }}>●</span>}
+                          {baseLabel(p.symbol)}
+                        </td>
                         <td style={{ padding: '5px 0' }} className={long ? 'tm-up' : 'tm-dn'}>{long ? 'long' : 'short'} <span style={{ color: 'var(--tm-muted)' }}>{p.leverage}×</span></td>
                         <td style={{ padding: '5px 0', textAlign: 'right', color: 'var(--tm-ink-2)' }}>{fmtPx(p.entry_price)}</td>
                         <td style={{ padding: '5px 0', textAlign: 'right', color: 'var(--tm-ink-2)' }}>{fmtUsd(notional)}</td>
@@ -522,7 +534,10 @@ export function TerminalDashboard({
                           <td style={{ padding: '5px 0 5px 8px', textAlign: 'right', width: 1 }}>
                             <button
                               type="button"
-                              onClick={() => void closePositionRow(p.symbol, long ? 'LONG' : 'SHORT')}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                void closePositionRow(p.symbol, long ? 'LONG' : 'SHORT')
+                              }}
                               disabled={closing !== null}
                               title={`Close ${p.symbol}`}
                               className="tm-mono"
