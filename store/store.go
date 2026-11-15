@@ -172,6 +172,27 @@ func (s *Store) initTables() error {
 	if err := s.gdb.Where("provider = ?", "claw402").Delete(&AIModel{}).Error; err != nil {
 		return fmt.Errorf("failed to remove claw402 ai models: %w", err)
 	}
+
+	// Pre-upgrade default strategies kept the Claw402 branding. Adopt the
+	// current built-in name; when a user owns BOTH names (the launch flow
+	// could create the fresh one beside the legacy default), move the INACTIVE
+	// duplicate aside so the active strategy carries the clean name. Name-only
+	// rewrite — configs are untouched. Idempotent.
+	legacyNames := "('NOFX Claw402 Auto Strategy', 'Strategi Otomatis NOFX Claw402')"
+	for _, stmt := range []string{
+		`UPDATE strategies SET name = 'NOFX Auto Strategy (duplicate)'
+		 WHERE name = 'NOFX Auto Strategy' AND is_active = 0
+		   AND user_id IN (SELECT user_id FROM strategies WHERE name IN ` + legacyNames + `)`,
+		`UPDATE strategies SET name = 'NOFX Auto Strategy (legacy)'
+		 WHERE name IN ` + legacyNames + ` AND is_active = 0
+		   AND user_id IN (SELECT user_id FROM strategies WHERE name = 'NOFX Auto Strategy')`,
+		`UPDATE strategies SET name = 'NOFX Auto Strategy'
+		 WHERE name IN ` + legacyNames,
+	} {
+		if err := s.gdb.Exec(stmt).Error; err != nil {
+			return fmt.Errorf("failed to rename legacy claw402 strategies: %w", err)
+		}
+	}
 	return nil
 }
 
