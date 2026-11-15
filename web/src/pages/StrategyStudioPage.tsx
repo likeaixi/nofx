@@ -1109,7 +1109,10 @@ export function StrategyStudioPage() {
                 ) : null}
               </section>
 
-              <details className="hidden rounded-lg border border-[rgba(25,36,52,0.14)] bg-nofx-bg-deeper p-4">
+              <details
+                open
+                className="rounded-lg border border-[rgba(25,36,52,0.14)] bg-nofx-bg-deeper p-4"
+              >
                 <summary className="cursor-pointer text-sm font-semibold text-nofx-text">
                   {text(language, 'Advanced settings', 'Advanced settings')}
                 </summary>
