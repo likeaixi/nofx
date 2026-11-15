@@ -544,19 +544,16 @@ func (e *StrategyEngine) getOITopCoins(limit int) ([]CandidateCoin, error) {
 		limit = 10
 	}
 
-	positions, err := e.nofxosClient.GetOITopPositions()
+	// Free Binance public OI ranking — the paid claw402/nofxos board was
+	// removed with the wallet onboarding flow.
+	symbols, err := market.GetBinanceOIRanking("top", limit)
 	if err != nil {
 		return nil, err
 	}
-
 	var candidates []CandidateCoin
-	for i, pos := range positions {
-		if i >= limit {
-			break
-		}
-		symbol := market.Normalize(pos.Symbol)
+	for _, raw := range symbols {
 		candidates = append(candidates, CandidateCoin{
-			Symbol:  symbol,
+			Symbol:  market.Normalize(raw),
 			Sources: []string{"oi_top"},
 		})
 	}
@@ -568,19 +565,16 @@ func (e *StrategyEngine) getOILowCoins(limit int) ([]CandidateCoin, error) {
 		limit = 10
 	}
 
-	positions, err := e.nofxosClient.GetOILowPositions()
+	// Free Binance public OI ranking — see getOITopCoins.
+	symbols, err := market.GetBinanceOIRanking("low", limit)
 	if err != nil {
 		return nil, err
 	}
 
 	var candidates []CandidateCoin
-	for i, pos := range positions {
-		if i >= limit {
-			break
-		}
-		symbol := market.Normalize(pos.Symbol)
+	for _, raw := range symbols {
 		candidates = append(candidates, CandidateCoin{
-			Symbol:  symbol,
+			Symbol:  market.Normalize(raw),
 			Sources: []string{"oi_low"},
 		})
 	}
