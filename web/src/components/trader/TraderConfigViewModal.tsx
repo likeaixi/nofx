@@ -3,10 +3,11 @@ import { t } from '../../i18n/translations'
 import { useLanguage } from '../../contexts/LanguageContext'
 import { PunkAvatar, getTraderAvatar } from '../common/PunkAvatar'
 
-// Extract the name part after the last underscore
-function getShortName(fullName: string): string {
-  const parts = fullName.split('_')
-  return parts.length > 1 ? parts[parts.length - 1] : fullName
+// Extract the name part after the last underscore; tolerate missing fields —
+// the public-config endpoint intentionally exposes a limited payload.
+function getShortName(fullName?: string | null): string {
+  const parts = (fullName ?? '').split('_')
+  return parts.length > 1 ? parts[parts.length - 1] : (fullName ?? '')
 }
 
 interface TraderConfigViewModalProps {
@@ -112,11 +113,11 @@ export function TraderConfigViewModal({
               />
               <InfoRow
                 label={t('traderConfigView.exchange', language)}
-                value={getShortName(traderData.exchange_id).toUpperCase()}
+                value={getShortName(traderData.exchange_id || traderData.exchange).toUpperCase() || '—'}
               />
               <InfoRow
                 label={t('traderConfigView.initialBalance', language)}
-                value={`$${traderData.initial_balance.toLocaleString()}`}
+                value={`$${(traderData.initial_balance ?? 0).toLocaleString()}`}
               />
               <InfoRow
                 label={t('traderConfigView.marginMode', language)}

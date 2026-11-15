@@ -154,14 +154,16 @@ export interface TraderConfigData {
   trader_id?: string
   trader_name: string
   ai_model: string
-  exchange_id: string
+  exchange_id?: string
+  // The public-config endpoint exposes the venue name only (no exchange_id)
+  exchange?: string
   strategy_id?: string  // Strategy ID
   strategy_name?: string  // Strategy name
-  is_cross_margin: boolean
-  show_in_competition: boolean  // Whether to show in the competition arena
-  scan_interval_minutes: number
-  initial_balance: number
-  is_running: boolean
+  is_cross_margin?: boolean
+  show_in_competition?: boolean  // Whether to show in the competition arena
+  scan_interval_minutes?: number
+  initial_balance?: number
+  is_running?: boolean
   // Legacy fields below (kept for backward compatibility)
   btc_eth_leverage?: number
   altcoin_leverage?: number

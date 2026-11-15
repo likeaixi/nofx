@@ -145,6 +145,11 @@ export function TraderConfigModal({
       setFormData({
         ...traderData,
         strategy_id: traderData.strategy_id || '',
+        exchange_id: traderData.exchange_id || traderData.exchange || '',
+        is_cross_margin: traderData.is_cross_margin ?? true,
+        is_running: traderData.is_running ?? false,
+        scan_interval_minutes: traderData.scan_interval_minutes ?? 15,
+        initial_balance: traderData.initial_balance ?? 0,
       })
     } else if (!isEditMode) {
       setFormData({
