@@ -174,7 +174,60 @@ func (s *Server) handlePositions(c *gin.Context) {
 	if positions == nil {
 		positions = make([]map[string]interface{}, 0)
 	}
+	normalizePositionFields(positions)
 	c.JSON(http.StatusOK, positions)
+}
+
+// normalizePositionFields augments live position maps with the snake_case
+// keys documented on GET /api/positions (and read by the web terminal).
+// Every exchange adapter returns Binance-style camelCase — the engine reads
+// those keys, so they are preserved and the aliases are added alongside.
+func normalizePositionFields(positions []map[string]interface{}) {
+	for _, pos := range positions {
+		getFloat := func(key string) (float64, bool) {
+			v, ok := pos[key].(float64)
+			return v, ok
+		}
+		if _, exists := pos["entry_price"]; !exists {
+			if v, ok := getFloat("entryPrice"); ok {
+				pos["entry_price"] = v
+			}
+		}
+		if _, exists := pos["mark_price"]; !exists {
+			if v, ok := getFloat("markPrice"); ok {
+				pos["mark_price"] = v
+			}
+		}
+		if _, exists := pos["unrealized_pnl"]; !exists {
+			if v, ok := getFloat("unRealizedProfit"); ok {
+				pos["unrealized_pnl"] = v
+			}
+		}
+		if _, exists := pos["quantity"]; !exists {
+			if v, ok := getFloat("positionAmt"); ok {
+				pos["quantity"] = abs64(v)
+			}
+		}
+		if _, exists := pos["unrealized_pnl_pct"]; !exists {
+			entry, entryOK := getFloat("entryPrice")
+			qty, qtyOK := getFloat("positionAmt")
+			lev, _ := getFloat("leverage")
+			pnl, pnlOK := getFloat("unRealizedProfit")
+			margin := entry * abs64(qty)
+			if entryOK && qtyOK && pnlOK && margin > 0 && lev > 0 {
+				pos["unrealized_pnl_pct"] = pnl / (margin / lev) * 100
+			} else {
+				pos["unrealized_pnl_pct"] = 0.0
+			}
+		}
+	}
+}
+
+func abs64(v float64) float64 {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
 
 // handlePositionHistory Historical closed positions with statistics
