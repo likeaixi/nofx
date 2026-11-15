@@ -81,6 +81,12 @@ export default function HeaderBar({
       auth: true,
     },
     {
+      page: 'traders',
+      path: ROUTES.traders,
+      label: 'Traders',
+      auth: true,
+    },
+    {
       page: 'strategy',
       path: ROUTES.strategy,
       label: t('strategyNav', language),

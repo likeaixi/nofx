@@ -451,11 +451,11 @@ export function StrategyStudioPage() {
         prompt_sections: undefined,
       }
       const created = await api.createStrategy({
-        name: text(language, 'NOFX Auto Strategy', 'NOFX Auto Strategy'),
+        name: text(language, 'New Strategy', 'New Strategy'),
         description: text(
           language,
-          'The single built-in strategy: scan the OI-top ranking, fetch per-symbol details, then trade with raw candles.',
-          'The single built-in strategy: scan the OI-top ranking, fetch per-symbol details, then trade with raw candles.'
+          'OI-top ranking scan with default risk controls — rename and tune freely.',
+          'OI-top ranking scan with default risk controls — rename and tune freely.'
         ),
         config: defaultConfig,
       })
@@ -740,7 +740,7 @@ export function StrategyStudioPage() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <h1 className="text-xl font-semibold text-nofx-text">
-              {text(language, 'NOFX Autopilot', 'NOFX Autopilot')}
+              {text(language, 'Strategy', 'Strategy')}
             </h1>
             <p className="mt-1 text-sm text-nofx-text-muted">
               {text(
@@ -766,10 +766,21 @@ export function StrategyStudioPage() {
         </div>
       </div>
 
-      <div className="grid min-h-[calc(100vh-137px)] grid-cols-1">
-        <aside className="hidden border-r border-[rgba(25,36,52,0.14)] bg-nofx-bg-deeper p-3">
-          <div className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-nofx-text-muted">
-            {text(language, 'My strategies', 'My strategies')}
+      <div className="grid min-h-[calc(100vh-137px)] grid-cols-1 md:grid-cols-[280px_1fr]">
+        <aside className="border-r border-[rgba(25,36,52,0.14)] bg-nofx-bg-deeper p-3">
+          <div className="mb-2 flex items-center justify-between px-2">
+            <span className="text-xs font-medium uppercase tracking-wide text-nofx-text-muted">
+              {text(language, 'My strategies', 'My strategies')}
+            </span>
+            <button
+              type="button"
+              title={text(language, 'New strategy', 'New strategy')}
+              onClick={() => void createStrategy()}
+              className="inline-flex items-center gap-1 rounded-md border border-[rgba(25,36,52,0.14)] bg-nofx-bg-lighter px-2 py-1 text-[11px] font-semibold text-nofx-gold hover:border-nofx-gold/40"
+            >
+              <Plus className="h-3 w-3" />
+              {text(language, 'New', 'New')}
+            </button>
           </div>
           <div className="space-y-2">
             {strategies.map((strategy) => (
@@ -810,7 +821,7 @@ export function StrategyStudioPage() {
         <main className="overflow-y-auto p-5">
           {selectedStrategy && aiConfig && coinSource && indicators && risk ? (
             <div className="mx-auto max-w-7xl space-y-4">
-              <section className="hidden rounded-lg border border-[rgba(25,36,52,0.14)] bg-nofx-bg-lighter p-4">
+              <section className="rounded-lg border border-[rgba(25,36,52,0.14)] bg-nofx-bg-lighter p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <input
