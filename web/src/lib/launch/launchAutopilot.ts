@@ -48,7 +48,7 @@ export async function launchAutopilot(
         ok: false,
         kind: 'setup',
         message: exchangeResult.reason,
-        setupTarget: 'hyperliquid',
+        setupTarget: 'exchanges',
       }
     }
     const exchange = exchangeResult.exchange

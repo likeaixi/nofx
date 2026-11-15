@@ -44,11 +44,13 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
   const [configsLoading, setConfigsLoading] = useState(true)
   const [configError, setConfigError] = useState('')
   const [showLaunch, setShowLaunch] = useState(
-    searchParams.get('setup') === 'hyperliquid-funds'
+    searchParams.get('setup') === 'exchanges-funds' ||
+      searchParams.get('setup') === 'hyperliquid-funds'
   )
   const configView =
     searchParams.get('view') === 'autopilot' ||
-    searchParams.get('setup') === 'hyperliquid-funds'
+    searchParams.get('setup') === 'exchanges-funds' ||
+      searchParams.get('setup') === 'hyperliquid-funds'
       ? 'autopilot'
       : 'connections'
   const changeConfigView = (view: string) => {
@@ -698,15 +700,9 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
     setShowModelModal(true)
   }
 
-  const handleOpenHyperliquidConfig = () => {
-    const existingHyperliquid = allExchanges?.find(
-      (exchange) =>
-        exchange.exchange_type === 'hyperliquid' ||
-        exchange.id === 'hyperliquid'
-    )
-
-    setEditingExchange(existingHyperliquid?.id || null)
-    setInitialExchangeType(existingHyperliquid ? null : 'hyperliquid')
+  const handleOpenExchangeConfig = () => {
+    setEditingExchange(null)
+    setInitialExchangeType(null)
     setShowExchangeModal(true)
   }
 
@@ -718,9 +714,9 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
 
     if (setupTarget === 'models') {
       handleOpenModelConfig()
-    } else if (setupTarget === 'hyperliquid') {
-      handleOpenHyperliquidConfig()
-    } else if (setupTarget === 'hyperliquid-funds') {
+    } else if (setupTarget === 'exchanges') {
+      handleOpenExchangeConfig()
+    } else if (setupTarget === 'exchanges-funds' || setupTarget === 'hyperliquid-funds') {
       setShowLaunch(true)
       // Funding shortfall: bring the guided launch panel (with the trading
       // balance step and live preflight polling) into view.
@@ -728,14 +724,14 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
         .getElementById('autopilot-launch-panel')
         ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       toast.info(
-        'Deposit USDC to your Hyperliquid account, the balance check updates automatically.'
+        'Deposit funds to your exchange account, the balance check updates automatically.'
       )
     } else {
       return
     }
 
     const nextParams = new URLSearchParams(searchParams)
-    if (setupTarget === 'hyperliquid-funds') nextParams.set('view', 'autopilot')
+    if (setupTarget === 'exchanges-funds' || setupTarget === 'hyperliquid-funds') nextParams.set('view', 'autopilot')
     nextParams.delete('setup')
     setSearchParams(nextParams, { replace: true })
   }, [
@@ -763,7 +759,7 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
       language={language}
       onRefresh={refreshLaunchState}
       onOpenModelConfig={handleOpenModelConfig}
-      onOpenHyperliquidConfig={handleOpenHyperliquidConfig}
+      onOpenExchangeConfig={handleOpenExchangeConfig}
     />
   )
 

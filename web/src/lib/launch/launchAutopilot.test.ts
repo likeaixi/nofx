@@ -179,10 +179,10 @@ describe('launchAutopilot', () => {
     expect(outcome.setupTarget).toBe('models')
   })
 
-  it('routes missing exchange setup to the hyperliquid anchor', async () => {
+  it('routes missing exchange setup to the exchanges anchor', async () => {
     mocks.resolveLaunchExchange.mockResolvedValue({
       exchange: null,
-      reason: 'No Hyperliquid account is connected.',
+      reason: 'No exchange account is connected.',
     })
 
     const outcome = await launchAutopilot({ ensureStrategy: vi.fn() })
@@ -191,7 +191,7 @@ describe('launchAutopilot', () => {
       expect.objectContaining({
         ok: false,
         kind: 'setup',
-        setupTarget: 'hyperliquid',
+        setupTarget: 'exchanges',
       })
     )
     expect(mocks.runLaunchPreflight).not.toHaveBeenCalled()

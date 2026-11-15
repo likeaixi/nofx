@@ -38,19 +38,19 @@ describe('setupTargetForCheck', () => {
     ).toBe('models')
   })
 
-  it('routes exchange config/account problems to hyperliquid setup', () => {
+  it('routes exchange config/account problems to exchange setup', () => {
     expect(
       setupTargetForCheck({ id: 'exchange_config', status: 'failed' })
-    ).toBe('hyperliquid')
+    ).toBe('exchanges')
     expect(
       setupTargetForCheck({ id: 'exchange_account', status: 'failed' })
-    ).toBe('hyperliquid')
+    ).toBe('exchanges')
   })
 
   it('routes funding shortfalls to the funds anchor', () => {
     expect(
       setupTargetForCheck({ id: 'exchange_funds', status: 'failed' })
-    ).toBe('hyperliquid-funds')
+    ).toBe('exchanges-funds')
   })
 
   it('has no anchor for strategy problems', () => {
@@ -135,5 +135,39 @@ describe('pickTradingExchange', () => {
       hyperliquidWalletAddr: ' ',
     } as unknown as Exchange
     expect(pickTradingExchange([noAddr])).toBeNull()
+  })
+
+  it('accepts any enabled CEX with a saved key — no HL prerequisites', () => {
+    const binance = {
+      id: 'binance-1',
+      exchange_type: 'binance',
+      enabled: true,
+      has_api_key: true,
+    } as unknown as Exchange
+    expect(pickTradingExchange([binance])?.id).toBe('binance-1')
+
+    const disabled = { ...binance, enabled: false } as unknown as Exchange
+    expect(pickTradingExchange([disabled])).toBeNull()
+
+    const noKey = { ...binance, has_api_key: false } as unknown as Exchange
+    expect(pickTradingExchange([noKey])).toBeNull()
+  })
+
+  it('prefers the first ready exchange across mixed venues', () => {
+    const incompleteHL = {
+      id: 'hl',
+      exchange_type: 'hyperliquid',
+      enabled: true,
+      has_api_key: true,
+      hyperliquidBuilderApproved: false,
+      hyperliquidWalletAddr: '0x1',
+    } as unknown as Exchange
+    const okx = {
+      id: 'okx-1',
+      exchange_type: 'okx',
+      enabled: true,
+      has_api_key: true,
+    } as unknown as Exchange
+    expect(pickTradingExchange([incompleteHL, okx])?.id).toBe('okx-1')
   })
 })

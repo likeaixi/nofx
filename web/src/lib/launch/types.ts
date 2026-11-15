@@ -29,7 +29,7 @@ export interface LaunchPreflightResult {
 }
 
 /** Guided-setup anchor consumed by the traders page (`?setup=`). */
-export type SetupTarget = 'models' | 'hyperliquid' | 'hyperliquid-funds'
+export type SetupTarget = 'models' | 'exchanges' | 'exchanges-funds'
 
 export type LaunchOutcome =
   | { ok: true; traderId: string; warning?: string }

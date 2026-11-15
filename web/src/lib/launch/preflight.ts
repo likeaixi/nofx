@@ -70,9 +70,9 @@ export function setupTargetForCheck(check: LaunchCheck): SetupTarget | null {
       return 'models'
     case 'exchange_config':
     case 'exchange_account':
-      return 'hyperliquid'
+      return 'exchanges'
     case 'exchange_funds':
-      return 'hyperliquid-funds'
+      return 'exchanges-funds'
     default:
       return null
   }

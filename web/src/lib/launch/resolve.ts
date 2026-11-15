@@ -18,17 +18,25 @@ export function pickTradingModel(models: AIModel[]) {
   return models.find((model) => model.enabled && modelHasCredential(model)) || null
 }
 
+/**
+ * A launch-capable exchange: enabled with a saved credential. Hyperliquid
+ * additionally needs the one-time agent authorization (builder approval plus
+ * wallet address) before the agent can sign trades.
+ */
+export function exchangeLaunchReady(exchange: Exchange) {
+  if (!exchange.enabled || !exchangeHasKey(exchange)) return false
+  if (isHyperliquidExchange(exchange)) {
+    return (
+      Boolean(exchange.hyperliquidBuilderApproved) &&
+      (exchange.hyperliquidWalletAddr || '').trim() !== ''
+    )
+  }
+  return true
+}
+
+/** Any exchange that can execute Autopilot trades right now. */
 export function pickTradingExchange(exchanges: Exchange[]) {
-  return (
-    exchanges.find(
-      (exchange) =>
-        isHyperliquidExchange(exchange) &&
-        exchange.enabled &&
-        exchangeHasKey(exchange) &&
-        Boolean(exchange.hyperliquidBuilderApproved) &&
-        (exchange.hyperliquidWalletAddr || '').trim() !== ''
-    ) || null
-  )
+  return exchanges.find(exchangeLaunchReady) || null
 }
 
 /**
@@ -41,8 +49,9 @@ export async function resolveLaunchModel(): Promise<AIModel | null> {
 }
 
 /**
- * Resolves a launch-capable exchange. Returns the exchange or a message
- * explaining the most specific missing prerequisite.
+ * Resolves a launch-capable exchange — any venue with a saved credential.
+ * Returns the exchange or a message explaining the most specific missing
+ * prerequisite.
  */
 export async function resolveLaunchExchange(): Promise<
   { exchange: Exchange } | { exchange: null; reason: string }
@@ -51,27 +60,31 @@ export async function resolveLaunchExchange(): Promise<
   const ready = pickTradingExchange(exchanges)
   if (ready) return { exchange: ready }
 
-  const hyperliquid = exchanges.find(isHyperliquidExchange)
-  if (!hyperliquid) {
+  if (exchanges.length === 0) {
     return {
       exchange: null,
       reason:
-        'No Hyperliquid account is connected. Connect Hyperliquid and authorize the NOFX agent first.',
+        'No exchange account is connected. Connect an exchange in Config first.',
     }
   }
-  if (!hyperliquid.enabled) {
+
+  const enabled = exchanges.find((exchange) => exchange.enabled)
+  if (!enabled) {
     return {
       exchange: null,
-      reason: 'The Hyperliquid account is disabled. Enable it first.',
+      reason: 'No enabled exchange. Enable the exchange account first.',
     }
   }
-  if (!exchangeHasKey(hyperliquid)) {
+  if (!exchangeHasKey(enabled)) {
     return {
       exchange: null,
-      reason:
-        'The Hyperliquid agent key is missing. Reconnect Hyperliquid and save the agent wallet.',
+      reason: `The ${enabled.name || enabled.exchange_type} API key is missing. Reconnect the exchange and save its API key.`,
     }
   }
+
+  // Enabled with a key but still not launch-ready: only Hyperliquid has
+  // extra prerequisites, so report the most specific one.
+  const hyperliquid = enabled
   if (!hyperliquid.hyperliquidBuilderApproved) {
     return {
       exchange: null,
@@ -81,7 +94,6 @@ export async function resolveLaunchExchange(): Promise<
   }
   return {
     exchange: null,
-    reason:
-      'The Hyperliquid wallet address is missing. Reconnect Hyperliquid first.',
+    reason: 'The Hyperliquid wallet address is missing. Reconnect Hyperliquid first.',
   }
 }

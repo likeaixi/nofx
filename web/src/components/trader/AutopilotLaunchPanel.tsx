@@ -20,7 +20,11 @@ import {
   launchAutopilot,
 } from '../../lib/launch/launchAutopilot'
 import { runLaunchPreflight } from '../../lib/launch/preflight'
-import { modelHasCredential } from '../../lib/launch/resolve'
+import {
+  isHyperliquidExchange,
+  modelHasCredential,
+  pickTradingExchange,
+} from '../../lib/launch/resolve'
 import type { LaunchPreflightResult } from '../../lib/launch/types'
 import type {
   AIModel,
@@ -41,7 +45,7 @@ interface AutopilotLaunchPanelProps {
   language: string
   onRefresh: () => Promise<void>
   onOpenModelConfig?: () => void
-  onOpenHyperliquidConfig?: () => void
+  onOpenExchangeConfig?: () => void
 }
 
 const MIN_TRADING_USDC = 12
@@ -65,6 +69,10 @@ function formatUSDC(value: number) {
   }).format(value)
 }
 
+function exchangeLabel(exchange: Exchange) {
+  return exchange.name || exchange.exchange_type || 'exchange'
+}
+
 export function AutopilotLaunchPanel({
   models,
   exchanges,
@@ -74,7 +82,7 @@ export function AutopilotLaunchPanel({
   language,
   onRefresh,
   onOpenModelConfig,
-  onOpenHyperliquidConfig,
+  onOpenExchangeConfig,
 }: AutopilotLaunchPanelProps) {
   const navigate = useNavigate()
   const [launching, setLaunching] = useState(false)
@@ -88,26 +96,26 @@ export function AutopilotLaunchPanel({
     [models]
   )
 
-  const hyperliquidExchange = useMemo(
-    () =>
-      exchanges.find(
-        (exchange) =>
-          exchange.exchange_type === 'hyperliquid' &&
-          exchange.enabled &&
-          Boolean(exchange.hyperliquidWalletAddr) &&
-          Boolean(exchange.hyperliquidBuilderApproved)
-      ) || null,
+  // Any exchange with a saved credential can run Autopilot — Hyperliquid,
+  // Binance, OKX, Bybit, etc. Hyperliquid additionally requires the one-time
+  // agent authorization, enforced by exchangeLaunchReady.
+  const launchExchange = useMemo(
+    () => pickTradingExchange(exchanges),
     [exchanges]
   )
+  const launchIsHyperliquid = launchExchange
+    ? isHyperliquidExchange(launchExchange)
+    : false
 
-  // Any hyperliquid account (even partially configured) is enough for the
+  // Any connected account (even partially configured) is enough for the
   // server preflight — it reports exactly which prerequisite is missing.
   const preflightExchange = useMemo(
     () =>
-      hyperliquidExchange ||
-      exchanges.find((exchange) => exchange.exchange_type === 'hyperliquid') ||
+      launchExchange ||
+      exchanges.find((exchange) => exchange.enabled) ||
+      exchanges[0] ||
       null,
-    [exchanges, hyperliquidExchange]
+    [exchanges, launchExchange]
   )
 
   // Server-side preflight is the source of truth for balances: it queries the
@@ -154,17 +162,25 @@ export function AutopilotLaunchPanel({
 
   // A stored builder-approved flag is not proof that this saved signing agent
   // is still approved. A different NOFX installation can replace the agent.
+  // Only Hyperliquid launches need this on-chain re-verification; CEX
+  // accounts are validated by the server-side account check below.
   const [verifiedExchangeId, setVerifiedExchangeId] = useState<string | null>(null)
   useEffect(() => {
     setVerifiedExchangeId(null)
-    if (!hyperliquidExchange?.hyperliquidWalletAddr || !hyperliquidExchange.hyperliquidAgentAddress || hyperliquidExchange.testnet) return
+    if (
+      !launchIsHyperliquid ||
+      !launchExchange?.hyperliquidWalletAddr ||
+      !launchExchange.hyperliquidAgentAddress ||
+      launchExchange.testnet
+    )
+      return
     let cancelled = false
     const check = async () => {
       try {
-        const proof = await api.getHyperliquidAgent(hyperliquidExchange.hyperliquidWalletAddr!)
+        const proof = await api.getHyperliquidAgent(launchExchange.hyperliquidWalletAddr!)
         const approved = proof.builderApproved && proof.agents?.some((agent) =>
-          agent.address.toLowerCase() === hyperliquidExchange.hyperliquidAgentAddress!.toLowerCase() && agent.validUntil > Date.now())
-        if (!cancelled) setVerifiedExchangeId(approved ? hyperliquidExchange.id : null)
+          agent.address.toLowerCase() === launchExchange.hyperliquidAgentAddress!.toLowerCase() && agent.validUntil > Date.now())
+        if (!cancelled) setVerifiedExchangeId(approved ? launchExchange.id : null)
       } catch {
         if (!cancelled) setVerifiedExchangeId(null)
       }
@@ -172,19 +188,27 @@ export function AutopilotLaunchPanel({
     void check()
     const timer = setInterval(() => void check(), 30000)
     return () => { cancelled = true; clearInterval(timer) }
-  }, [hyperliquidExchange])
-  const hyperliquidConnected = !!hyperliquidExchange && verifiedExchangeId === hyperliquidExchange.id
-  const exchangeState = hyperliquidExchange
-    ? exchangeAccountStates[hyperliquidExchange.id]
+  }, [launchExchange, launchIsHyperliquid])
+  const hyperliquidVerified =
+    !!launchExchange && launchIsHyperliquid && verifiedExchangeId === launchExchange.id
+  const exchangeState = launchExchange
+    ? exchangeAccountStates[launchExchange.id]
     : undefined
   const accountCheck = preflightCheck('exchange_account')
+  const exchangeConnected = launchExchange
+    ? launchIsHyperliquid
+      ? hyperliquidVerified
+      : accountCheck
+        ? accountCheck.status === 'ok'
+        : exchangeState?.status === 'ok'
+    : false
   const tradingFundsCheck = preflightCheck('exchange_funds')
   const tradingBalance =
     tradingFundsCheck?.actual ??
     parseNumber(exchangeState?.available_balance ?? exchangeState?.total_equity)
   const minTradingUSDC = preflight?.min_trading_usdc ?? MIN_TRADING_USDC
   const tradingBalanceReady =
-    hyperliquidConnected &&
+    exchangeConnected &&
     (accountCheck && tradingFundsCheck
       ? accountCheck.status === 'ok' && tradingFundsCheck.status !== 'failed'
       : exchangeState?.status === 'ok' && tradingBalance >= minTradingUSDC)
@@ -196,7 +220,7 @@ export function AutopilotLaunchPanel({
     [traders]
   )
 
-  const allReady = modelReady && hyperliquidConnected && tradingBalanceReady
+  const allReady = modelReady && exchangeConnected && tradingBalanceReady
 
   const refreshEverything = async () => {
     setRefreshing(true)
@@ -208,7 +232,7 @@ export function AutopilotLaunchPanel({
   }
 
   const handleLaunch = async () => {
-    if (!aiModel || !hyperliquidExchange) return
+    if (!aiModel || !launchExchange) return
     setLaunching(true)
     try {
       // Shared launch path (same as Strategy Studio): server preflight with
@@ -226,8 +250,8 @@ export function AutopilotLaunchPanel({
         if (outcome.kind !== 'error') {
           if (outcome.setupTarget === 'models') {
             onOpenModelConfig?.()
-          } else if (outcome.setupTarget === 'hyperliquid') {
-            onOpenHyperliquidConfig?.()
+          } else if (outcome.setupTarget === 'exchanges') {
+            onOpenExchangeConfig?.()
           }
         }
         await refreshEverything()
@@ -272,17 +296,20 @@ export function AutopilotLaunchPanel({
       ),
     },
     {
-      title: 'Step 2 · Connect Hyperliquid',
-      detail:
-        'Approve NOFX once with your crypto wallet (Rabby or MetaMask). This lets the AI place trades for you — it can never withdraw your money.',
-      status: hyperliquidConnected ? 'ready' : 'action',
-      meta: hyperliquidExchange?.hyperliquidWalletAddr
-        ? `${shortAddress(hyperliquidExchange.hyperliquidWalletAddr)} · ${hyperliquidConnected ? 'authorized' : 'authorization not verified — reconnect'} `
-        : 'A few clicks + 3 wallet signatures',
+      title: 'Step 2 · Connect an exchange',
+      detail: launchIsHyperliquid
+        ? 'Approve NOFX once with your crypto wallet (Rabby or MetaMask). This lets the AI place trades for you — it can never withdraw your money.'
+        : 'Add your exchange API key (trade permission, withdrawals off). This lets the AI place trades for you — it can never withdraw your money.',
+      status: exchangeConnected ? 'ready' : 'action',
+      meta: launchExchange
+        ? launchIsHyperliquid && launchExchange.hyperliquidWalletAddr
+          ? `${shortAddress(launchExchange.hyperliquidWalletAddr)} · ${exchangeConnected ? 'authorized' : 'authorization not verified — reconnect'} `
+          : `${exchangeLabel(launchExchange)} · ${exchangeConnected ? 'connected' : 'check the saved API key'}`
+        : 'Any supported exchange — Binance, OKX, Bybit, Hyperliquid…',
       action: (
         <button
           type="button"
-          onClick={() => onOpenHyperliquidConfig?.()}
+          onClick={() => onOpenExchangeConfig?.()}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-nofx-gold hover:text-nofx-accent"
         >
           <Wallet className="h-3.5 w-3.5" />
@@ -292,14 +319,17 @@ export function AutopilotLaunchPanel({
     },
     {
       title: 'Step 3 · Add trading money ($12+)',
-      detail:
-        'Deposit USDC into your Hyperliquid account (app.hyperliquid.xyz → Deposit, USDC on Arbitrum). This is what the AI trades with — start small, you can add more anytime.',
+      detail: launchIsHyperliquid
+        ? 'Deposit USDC into your Hyperliquid account (app.hyperliquid.xyz → Deposit, USDC on Arbitrum). This is what the AI trades with — start small, you can add more anytime.'
+        : `Deposit USDT/USDC into your ${
+            launchExchange ? exchangeLabel(launchExchange) : 'exchange'
+          } account. This is what the AI trades with — start small, you can add more anytime.`,
       status: tradingBalanceReady
         ? 'ready'
-        : hyperliquidConnected
+        : exchangeConnected
           ? 'action'
           : 'blocked',
-      meta: hyperliquidConnected
+      meta: exchangeConnected
         ? `${formatUSDC(tradingBalance)} USDC available${
             tradingBalanceReady ? '' : ` · needs ≥ ${minTradingUSDC} USDC`
           }`
@@ -334,13 +364,13 @@ export function AutopilotLaunchPanel({
       )
     }
 
-    if (!hyperliquidConnected) {
+    if (!exchangeConnected) {
       return (
         <button
           type="button"
           onClick={() => {
-            if (onOpenHyperliquidConfig) {
-              onOpenHyperliquidConfig()
+            if (onOpenExchangeConfig) {
+              onOpenExchangeConfig()
             } else {
               document
                 .getElementById('hyperliquid-quick-connect')
@@ -349,14 +379,14 @@ export function AutopilotLaunchPanel({
           }}
           className="inline-flex items-center justify-center gap-2 rounded-lg bg-nofx-gold px-4 py-3 text-sm font-bold text-white hover:bg-nofx-accent"
         >
-          Connect Hyperliquid
+          Connect an exchange
           <ArrowRight className="h-4 w-4" />
         </button>
       )
     }
 
     if (!tradingBalanceReady) {
-      return (
+      return launchIsHyperliquid ? (
         <a
           href="https://app.hyperliquid.xyz/"
           target="_blank"
@@ -366,6 +396,15 @@ export function AutopilotLaunchPanel({
           Deposit USDC on Hyperliquid
           <ExternalLink className="h-4 w-4" />
         </a>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onOpenExchangeConfig?.()}
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-nofx-gold px-4 py-3 text-sm font-bold text-white hover:bg-nofx-accent"
+        >
+          Fund your exchange account
+          <ArrowRight className="h-4 w-4" />
+        </button>
       )
     }
 
@@ -418,7 +457,7 @@ export function AutopilotLaunchPanel({
                 Start NOFX Autopilot in minutes
               </h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-nofx-text-muted">
-                Four small steps: a model API key, a Hyperliquid authorization
+                Four small steps: a model API key, an exchange connection
                 and a little trading capital. The AI trades for you, and you
                 can stop it anytime.
               </p>
@@ -486,23 +525,28 @@ export function AutopilotLaunchPanel({
         <aside className="border-t border-nofx-gold/20 bg-nofx-bg p-5 md:p-6 xl:border-l xl:border-t-0">
           <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-nofx-text">
             <Wallet className="h-4 w-4 text-nofx-gold" />
-            Hyperliquid setup
+            {launchIsHyperliquid ? 'Hyperliquid setup' : 'Exchange setup'}
           </div>
-          {hyperliquidConnected ? (
+          {exchangeConnected && launchExchange ? (
             <div className="rounded-lg border border-nofx-success/25 bg-nofx-success/10 p-4">
               <div className="flex items-center gap-2 text-sm font-semibold text-nofx-success">
                 <CheckCircle2 className="h-4 w-4" />
-                Trading authorization is ready
+                {launchIsHyperliquid
+                  ? 'Trading authorization is ready'
+                  : `${exchangeLabel(launchExchange)} is connected`}
               </div>
               <div className="mt-2 font-mono text-xs text-nofx-success/90">
-                {shortAddress(hyperliquidExchange?.hyperliquidWalletAddr)}
+                {launchIsHyperliquid
+                  ? shortAddress(launchExchange.hyperliquidWalletAddr)
+                  : exchangeLabel(launchExchange)}
               </div>
               <p className="mt-3 text-xs leading-5 text-nofx-text-muted">
-                Funds stay in your Hyperliquid account. NOFX only stores the
-                authorized Agent key required for automated execution.
+                {launchIsHyperliquid
+                  ? 'Funds stay in your Hyperliquid account. NOFX only stores the authorized Agent key required for automated execution.'
+                  : 'Funds stay in your exchange account. NOFX only stores the trade-enabled API key — keep withdrawals disabled.'}
               </p>
             </div>
-          ) : (
+          ) : launchIsHyperliquid || !launchExchange ? (
             <div>
               <div id="hyperliquid-quick-connect">
                 <HyperliquidWalletConnect
@@ -512,6 +556,22 @@ export function AutopilotLaunchPanel({
                   onSaved={refreshEverything}
                 />
               </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-[rgba(25,36,52,0.14)] bg-nofx-bg-deeper p-4">
+              <p className="text-xs leading-5 text-nofx-text-muted">
+                {launchExchange
+                  ? `${exchangeLabel(launchExchange)} needs attention — reopen the exchange settings and re-save its API key.`
+                  : 'Connect any supported exchange in Config.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => onOpenExchangeConfig?.()}
+                className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-nofx-gold hover:text-nofx-accent"
+              >
+                <Wallet className="h-3.5 w-3.5" />
+                Open exchange settings
+              </button>
             </div>
           )}
         </aside>
