@@ -17,10 +17,9 @@ import (
 // venue data needs no wallet and no third-party subscription.
 
 var (
-	oiRankingTickerURL       = "https://fapi.binance.com/fapi/v1/ticker/24hr"
-	oiRankingHistURL         = "https://fapi.binance.com/futures/data/openInterestHist"
-	oiRankingExchangeInfoURL = "https://fapi.binance.com/fapi/v1/exchangeInfo"
-	oiRankingClient          = &http.Client{Timeout: 15 * time.Second}
+	oiRankingTickerURL = "https://fapi.binance.com/fapi/v1/ticker/24hr"
+	oiRankingHistURL   = "https://fapi.binance.com/futures/data/openInterestHist"
+	oiRankingClient    = &http.Client{Timeout: 15 * time.Second}
 )
 
 const (
@@ -50,62 +49,6 @@ func resetOIRankingCacheForTest() {
 	oiRankingCache.fetchedAt = time.Time{}
 	oiRankingCache.rows = nil
 	oiRankingCache.err = nil
-	coinPerpCache.mu.Lock()
-	defer coinPerpCache.mu.Unlock()
-	coinPerpCache.fetchedAt = time.Time{}
-	coinPerpCache.symbols = nil
-}
-
-// coinPerpCache remembers which USDT pairs are crypto (underlyingType COIN)
-// per Binance exchangeInfo. Small payload subset, refreshed rarely.
-var coinPerpCache struct {
-	mu        sync.Mutex
-	fetchedAt time.Time
-	symbols   map[string]bool
-}
-
-const coinPerpCacheTTL = 6 * time.Hour
-
-// binanceCoinPerpSymbols returns the COIN-underlying symbol set, or nil when
-// exchangeInfo is unavailable (callers then keep the suffix-only filter).
-func binanceCoinPerpSymbols() map[string]bool {
-	coinPerpCache.mu.Lock()
-	if coinPerpCache.symbols != nil && time.Since(coinPerpCache.fetchedAt) < coinPerpCacheTTL {
-		cached := coinPerpCache.symbols
-		coinPerpCache.mu.Unlock()
-		return cached
-	}
-	coinPerpCache.mu.Unlock()
-
-	resp, err := oiRankingClient.Get(oiRankingExchangeInfoURL)
-	if err != nil {
-		return nil
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil
-	}
-	var info struct {
-		Symbols []struct {
-			Symbol         string `json:"symbol"`
-			UnderlyingType string `json:"underlyingType"`
-		} `json:"symbols"`
-	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 32<<20)).Decode(&info); err != nil {
-		return nil
-	}
-	coins := make(map[string]bool, len(info.Symbols))
-	for _, s := range info.Symbols {
-		if s.UnderlyingType == "COIN" {
-			coins[s.Symbol] = true
-		}
-	}
-
-	coinPerpCache.mu.Lock()
-	coinPerpCache.fetchedAt = time.Now()
-	coinPerpCache.symbols = coins
-	coinPerpCache.mu.Unlock()
-	return coins
 }
 
 // GetBinanceOIRanking returns USDT perpetuals ranked by 1h open-interest
@@ -181,20 +124,12 @@ func fetchBinanceOIRanking() ([]OIRankedSymbol, error) {
 		entries = append(entries, universeEntry{symbol: tk.Symbol, volume: v})
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].volume > entries[j].volume })
-	// Crypto perps only: Binance lists commodity (XAU/XAG), equity and index
-	// TradFi perps with USDT quotes too — those need a separate trading
-	// agreement and do not belong in a crypto OI ranking. Filter falls back
-	// to the suffix rule when exchangeInfo is unavailable.
-	coinPerps := binanceCoinPerpSymbols()
 	universe := make([]string, 0, oiRankingUniverseSize)
 	for _, entry := range entries {
 		if len(universe) >= oiRankingUniverseSize {
 			break
 		}
 		if strings.HasSuffix(entry.symbol, "USDT") && !strings.Contains(entry.symbol, "_") {
-			if coinPerps != nil && !coinPerps[entry.symbol] {
-				continue
-			}
 			universe = append(universe, entry.symbol)
 		}
 	}
