@@ -48,13 +48,52 @@ func oiRankingTestServers(t *testing.T) (*atomic.Int32, *atomic.Int32) {
 	}))
 	t.Cleanup(hist.Close)
 
-	previousTick, previousHist := oiRankingTickerURL, oiRankingHistURL
-	oiRankingTickerURL, oiRankingHistURL = ticker.URL, hist.URL
-	t.Cleanup(func() { oiRankingTickerURL, oiRankingHistURL = previousTick, previousHist })
+	exchangeInfo := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"symbols":[
+			{"symbol":"BTCUSDT","underlyingType":"COIN"},
+			{"symbol":"ETHUSDT","underlyingType":"COIN"},
+			{"symbol":"SOLUSDT","underlyingType":"COIN"},
+			{"symbol":"DOGEUSDT","underlyingType":"COIN"},
+			{"symbol":"1000PEPEUSDT","underlyingType":"COIN"},
+			{"symbol":"ADAUSDT","underlyingType":"COIN"},
+			{"symbol":"XAGUSDT","underlyingType":"COMMODITY"}
+		]}`))
+	}))
+	t.Cleanup(exchangeInfo.Close)
+
+	previousTick, previousHist, previousInfo := oiRankingTickerURL, oiRankingHistURL, oiRankingExchangeInfoURL
+	oiRankingTickerURL, oiRankingHistURL, oiRankingExchangeInfoURL = ticker.URL, hist.URL, exchangeInfo.URL
+	t.Cleanup(func() {
+		oiRankingTickerURL, oiRankingHistURL, oiRankingExchangeInfoURL = previousTick, previousHist, previousInfo
+	})
 
 	resetOIRankingCacheForTest()
 	t.Cleanup(resetOIRankingCacheForTest)
 	return &tickerCalls, &histCalls
+}
+
+func TestBinanceOIRankingExcludesTradFiUnderlyings(t *testing.T) {
+	_, _ = oiRankingTestServers(t)
+
+	// Re-point the ticker at a board where silver (COMMODITY) tops the volume.
+	silver := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`[
+			{"symbol":"XAGUSDT","quoteVolume":"9000000000"},
+			{"symbol":"BTCUSDT","quoteVolume":"5000000000"}
+		]`))
+	}))
+	t.Cleanup(silver.Close)
+	oiRankingTickerURL = silver.URL
+	resetOIRankingCacheForTest()
+
+	got, err := GetBinanceOIRanking("top", 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0] != "BTCUSDT" {
+		t.Fatalf("tradFi underlyings must be excluded, got %v", got)
+	}
 }
 
 func TestBinanceOIRankingTopOrdersByIncrease(t *testing.T) {
