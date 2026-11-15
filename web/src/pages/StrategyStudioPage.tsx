@@ -296,18 +296,20 @@ export function StrategyStudioPage() {
   const indicators = aiConfig?.indicators
   const risk = aiConfig?.risk_control
   const selectedSymbols = coinSource?.static_coins || []
-  const scope = 'all' as Scope
+  const [scope, setScopeTab] = useState<Scope>('crypto')
   const activeProfile = profileFromRisk(risk)
 
   const visibleSymbols = useMemo(() => {
-    const tradefi = symbols.filter((item) => item.category !== 'crypto')
-    const scoped =
-      scope === 'all'
-        ? tradefi
-        : tradefi.filter((item) => item.category === scope)
-    return [...scoped].sort(
-      (a, b) => (b.volume_24h || 0) - (a.volume_24h || 0)
-    )
+    // 'all' keeps its historical meaning: the full TradFi board without
+    // crypto. 'crypto' surfaces the Hyperliquid perp board that the symbol
+    // API already returns; the remaining scopes are TradFi categories.
+    const pool =
+      scope === 'crypto'
+        ? symbols.filter((item) => item.category === 'crypto')
+        : scope === 'all'
+          ? symbols.filter((item) => item.category !== 'crypto')
+          : symbols.filter((item) => item.category === scope)
+    return [...pool].sort((a, b) => (b.volume_24h || 0) - (a.volume_24h || 0))
   }, [scope, symbols])
 
   const selectedSet = useMemo(
@@ -657,13 +659,6 @@ export function StrategyStudioPage() {
     })
   }
 
-  const setScope = (nextScope: Scope) => {
-    patchCoinSource({
-      hyper_rank_category: nextScope,
-      static_coins: [],
-    })
-  }
-
   const setTimeframe = (timeframe: string) => {
     patchIndicators({
       klines: {
@@ -944,7 +939,7 @@ export function StrategyStudioPage() {
                   </div>
                 </div>
 
-                <div className="hidden mb-4 flex-wrap gap-2">
+                <div className="mb-4 flex flex-wrap gap-2">
                   {scopeOptions.map((option) => {
                     const poolCount =
                       option.value === 'all'
@@ -957,7 +952,7 @@ export function StrategyStudioPage() {
                       <button
                         key={option.value}
                         type="button"
-                        onClick={() => setScope(option.value)}
+                        onClick={() => setScopeTab(option.value)}
                         className={`rounded-lg border px-3 py-2 text-xs transition ${
                           scope === option.value
                             ? 'border-nofx-gold bg-nofx-gold/10 text-nofx-gold'
