@@ -15,16 +15,16 @@ func oiRankingTestServers(t *testing.T) (*atomic.Int32, *atomic.Int32) {
 
 	ticker := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tickerCalls.Add(1)
-		// Volume-ordered universe; BTCUSDT_250627 (delivery) must be excluded.
-		_ = json.NewEncoder(w).Encode([]map[string]interface{}{
-			{"symbol": "BTCUSDT", "quoteVolume": 5_000_000_000},
-			{"symbol": "ETHUSDT", "quoteVolume": 3_000_000_000},
-			{"symbol": "SOLUSDT", "quoteVolume": 1_000_000_000},
-			{"symbol": "DOGEUSDT", "quoteVolume": 500_000_000},
-			{"symbol": "BTCUSDT_250627", "quoteVolume": 9_000_000_000},
-			{"symbol": "1000PEPEUSDT", "quoteVolume": 400_000_000},
-			{"symbol": "ADAUSDT", "quoteVolume": 300_000_000},
-		})
+		// Real Binance payloads serialize numbers as strings.
+		_, _ = w.Write([]byte(`[
+			{"symbol":"BTCUSDT","quoteVolume":"5000000000"},
+			{"symbol":"ETHUSDT","quoteVolume":"3000000000"},
+			{"symbol":"SOLUSDT","quoteVolume":"1000000000"},
+			{"symbol":"DOGEUSDT","quoteVolume":"500000000"},
+			{"symbol":"BTCUSDT_250627","quoteVolume":"9000000000"},
+			{"symbol":"1000PEPEUSDT","quoteVolume":"400000000"},
+			{"symbol":"ADAUSDT","quoteVolume":"300000000"}
+		]`))
 	}))
 	t.Cleanup(ticker.Close)
 

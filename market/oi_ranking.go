@@ -106,22 +106,31 @@ func fetchBinanceOIRanking() ([]OIRankedSymbol, error) {
 		return nil, fmt.Errorf("oi ranking universe unavailable: HTTP %d", resp.StatusCode)
 	}
 	var tickers []struct {
-		Symbol      string  `json:"symbol"`
-		QuoteVolume float64 `json:"quoteVolume"`
+		Symbol      string      `json:"symbol"`
+		QuoteVolume json.Number `json:"quoteVolume"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 8<<20)).Decode(&tickers); err != nil {
 		return nil, fmt.Errorf("oi ranking universe parse failed: %w", err)
 	}
 
 	// USDT perps only; "_" marks delivery contracts we cannot trade spot-perp.
-	universe := make([]string, 0, oiRankingUniverseSize)
-	sort.Slice(tickers, func(i, j int) bool { return tickers[i].QuoteVolume > tickers[j].QuoteVolume })
+	type universeEntry struct {
+		symbol string
+		volume float64
+	}
+	entries := make([]universeEntry, 0, len(tickers))
 	for _, tk := range tickers {
+		v, _ := tk.QuoteVolume.Float64()
+		entries = append(entries, universeEntry{symbol: tk.Symbol, volume: v})
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].volume > entries[j].volume })
+	universe := make([]string, 0, oiRankingUniverseSize)
+	for _, entry := range entries {
 		if len(universe) >= oiRankingUniverseSize {
 			break
 		}
-		if strings.HasSuffix(tk.Symbol, "USDT") && !strings.Contains(tk.Symbol, "_") {
-			universe = append(universe, tk.Symbol)
+		if strings.HasSuffix(entry.symbol, "USDT") && !strings.Contains(entry.symbol, "_") {
+			universe = append(universe, entry.symbol)
 		}
 	}
 	if len(universe) == 0 {
