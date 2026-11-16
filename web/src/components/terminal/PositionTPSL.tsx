@@ -113,7 +113,10 @@ export function PositionTPSL({
   )
 
   const { tp, sl } = parseTpsl(data)
-  const useFallback = !!error
+  // Only fall back to decision intent when the exchange query failed AND we
+  // have no data at all — after a failed revalidate SWR keeps the previous
+  // data, which is fresher than the decision record and must not be mislabeled.
+  const useFallback = !!error && data === undefined
   const fbTp =
     useFallback && fallback !== undefined && (fallback.tp ?? 0) > 0
       ? fallback.tp
@@ -126,9 +129,9 @@ export function PositionTPSL({
   const slList = fbSl !== undefined ? [fbSl] : sl
   if (tpList.length === 0 && slList.length === 0) return null
 
-  const row = (kind: 'TP' | 'SL', price: number) => (
+  const row = (kind: 'TP' | 'SL', price: number, i: number) => (
     <div
-      key={`${kind}-${price}`}
+      key={`${kind}-${i}-${price}`}
       style={{ color: kind === 'TP' ? TP_COLOR : SL_COLOR }}
     >
       {kind} {fmtPx(price)} {fmtPct(distPct(price, markPrice))}
@@ -139,8 +142,8 @@ export function PositionTPSL({
     <TerminalTooltip
       content={
         <>
-          {tpList.map((p) => row('TP', p))}
-          {slList.map((p) => row('SL', p))}
+          {tpList.map((p, i) => row('TP', p, i))}
+          {slList.map((p, i) => row('SL', p, i))}
           {useFallback && (
             <div style={{ color: 'var(--tm-muted, #6b7a8c)', fontSize: 9 }}>
               decision fallback

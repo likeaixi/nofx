@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -97,5 +98,25 @@ describe('PositionTPSL', () => {
     const { container } = mount({ traderId: undefined })
     expect(getOpenOrders).not.toHaveBeenCalled()
     expect(container.innerHTML).toBe('')
+  })
+
+  it('keeps stale exchange rows unlabeled when a revalidate fails after success', async () => {
+    getOpenOrders.mockResolvedValueOnce([
+      order({ type: 'STOP_MARKET', stop_price: 90 }),
+    ])
+    getOpenOrders.mockRejectedValueOnce(new Error('boom'))
+    mount({ fallback: { tp: 120 } })
+    await screen.findByTestId('tpsl-trigger')
+
+    // Force an SWR revalidation; it rejects but keeps the previous data.
+    act(() => {
+      window.dispatchEvent(new Event('online'))
+    })
+    await waitFor(() => expect(getOpenOrders).toHaveBeenCalledTimes(2))
+
+    fireEvent.mouseEnter(screen.getByTestId('tpsl-trigger'))
+    expect(screen.getByText('SL 90.00 -10.00%')).toBeInTheDocument()
+    expect(screen.queryByText('TP 120.0 +20.00%')).toBeNull()
+    expect(screen.queryByText('decision fallback')).toBeNull()
   })
 })
