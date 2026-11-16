@@ -533,7 +533,7 @@ export function TerminalDashboard({
                         <td style={{ padding: '5px 0', textAlign: 'right' }} className={win ? 'tm-up' : 'tm-dn'}>{(p.unrealized_pnl_pct ?? 0).toFixed(2)}%</td>
                         <td style={{ padding: '5px 0', textAlign: 'right', width: 1 }}>
                           <PositionTPSL
-                            traderId={traderId}
+                            traderId={on ? undefined : traderId}
                             symbol={p.symbol}
                             markPrice={p.mark_price || p.entry_price}
                             fallback={tpslFallback.get(baseLabel(p.symbol))}
