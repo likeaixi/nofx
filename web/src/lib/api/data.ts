@@ -2,6 +2,7 @@ import type {
   SystemStatus,
   AccountInfo,
   Position,
+  OpenOrder,
   DecisionRecord,
   Statistics,
   TraderFullStats,
@@ -79,6 +80,23 @@ export const dataApi = {
         : `${API_BASE}/positions`
     const result = await httpClient.request<Position[]>(url, { silent })
     if (!result.success) throw new Error('Failed to fetch positions')
+    return result.data!
+  },
+
+  async getOpenOrders(
+    traderId: string,
+    symbol: string,
+    silent?: boolean
+  ): Promise<OpenOrder[]> {
+    const params = new URLSearchParams({
+      trader_id: traderId,
+      symbol,
+    })
+    const result = await httpClient.request<OpenOrder[]>(
+      `${API_BASE}/open-orders?${params}`,
+      { silent }
+    )
+    if (!result.success) throw new Error('Failed to fetch open orders')
     return result.data!
   },
 

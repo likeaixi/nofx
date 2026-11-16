@@ -48,6 +48,19 @@ export interface Position {
   margin_used: number
 }
 
+// Mirrors backend trader/types.OpenOrder (GET /api/open-orders).
+export interface OpenOrder {
+  order_id: string
+  symbol: string
+  side: string // BUY/SELL
+  position_side: string // LONG/SHORT
+  type: string // LIMIT/STOP_MARKET/TAKE_PROFIT_MARKET
+  price: number
+  stop_price: number // Trigger price (for stop orders)
+  quantity: number
+  status: string
+}
+
 export interface DecisionAction {
   action: string
   symbol: string
