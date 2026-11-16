@@ -15,6 +15,8 @@ import { OrchestrationTopology } from './OrchestrationTopology'
 import { OrderBook } from './OrderBook'
 import { KlineChart } from './KlineChart'
 import { ExecutionLog } from './ExecutionLog'
+import { PositionTPSL } from './PositionTPSL'
+import { baseLabel, buildTpslFallback } from './tpsl'
 import { formatRequestError } from '../../lib/requestErrors'
 import { RiskRadar } from './RiskRadar'
 import { EdgeProfile } from './EdgeProfile'
@@ -54,10 +56,6 @@ function fmtPx(n: number | undefined): string {
   if (n == null || Number.isNaN(n) || n === 0) return '—'
   const dp = n >= 1000 ? 0 : n >= 100 ? 1 : n >= 1 ? 2 : 4
   return n.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp })
-}
-function baseLabel(raw?: string): string {
-  if (!raw) return ''
-  return raw.toUpperCase().replace(/^XYZ:/, '').replace(/[-_]/g, '').replace(/(USDT|USDC|USD)$/, '')
 }
 function parseScanMinutes(scan?: string): number {
   if (!scan) return 15
@@ -206,6 +204,8 @@ export function TerminalDashboard({
   const fullStats = on ? sim!.fullStats : realFullStats
   const history = on ? sim!.history : realHistory
   const config = on ? (sim!.config as unknown as typeof realConfig) : realConfig
+
+  const tpslFallback = useMemo(() => buildTpslFallback(decisions), [decisions])
 
   const latest = decisions && decisions.length > 0 ? decisions[0] : undefined
   const candidateCoins = latest?.candidate_coins ?? []
@@ -502,6 +502,7 @@ export function TerminalDashboard({
                     <td style={{ padding: '0 0 3px', textAlign: 'right' }}>size</td>
                     <td style={{ padding: '0 0 3px', textAlign: 'right' }}>PnL</td>
                     <td style={{ padding: '0 0 3px', textAlign: 'right' }}>return%</td>
+                    <td style={{ padding: '0 0 3px', textAlign: 'right' }}>TP/SL</td>
                     {traderId && !on && <td style={{ padding: '0 0 3px' }} />}
                   </tr>
                 </thead>
@@ -530,6 +531,14 @@ export function TerminalDashboard({
                         <td style={{ padding: '5px 0', textAlign: 'right', color: 'var(--tm-ink-2)' }}>{fmtUsd(notional)}</td>
                         <td style={{ padding: '5px 0', textAlign: 'right' }} className={win ? 'tm-up' : 'tm-dn'}>{fmtUsd(p.unrealized_pnl, true)}</td>
                         <td style={{ padding: '5px 0', textAlign: 'right' }} className={win ? 'tm-up' : 'tm-dn'}>{(p.unrealized_pnl_pct ?? 0).toFixed(2)}%</td>
+                        <td style={{ padding: '5px 0', textAlign: 'right', width: 1 }}>
+                          <PositionTPSL
+                            traderId={traderId}
+                            symbol={p.symbol}
+                            markPrice={p.mark_price || p.entry_price}
+                            fallback={tpslFallback.get(baseLabel(p.symbol))}
+                          />
+                        </td>
                         {traderId && !on && (
                           <td style={{ padding: '5px 0 5px 8px', textAlign: 'right', width: 1 }}>
                             <button
