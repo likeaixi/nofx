@@ -74,15 +74,54 @@ describe('buildTpslFallback', () => {
 
   it('maps newest-first decisions by normalized symbol; first entry wins', () => {
     const m = buildTpslFallback([
-      rec([{ action: 'OPEN_LONG', symbol: 'BTCUSDT', quantity: 1, leverage: 1, price: 100, stop_loss: 90, take_profit: 120, order_id: 1, timestamp: '', success: true }]),
-      rec([{ action: 'OPEN_LONG', symbol: 'BTCUSDT', quantity: 1, leverage: 1, price: 100, stop_loss: 80, take_profit: 130, order_id: 2, timestamp: '', success: true }]),
+      rec([
+        {
+          action: 'OPEN_LONG',
+          symbol: 'BTCUSDT',
+          quantity: 1,
+          leverage: 1,
+          price: 100,
+          stop_loss: 90,
+          take_profit: 120,
+          order_id: 1,
+          timestamp: '',
+          success: true,
+        },
+      ]),
+      rec([
+        {
+          action: 'OPEN_LONG',
+          symbol: 'BTCUSDT',
+          quantity: 1,
+          leverage: 1,
+          price: 100,
+          stop_loss: 80,
+          take_profit: 130,
+          order_id: 2,
+          timestamp: '',
+          success: true,
+        },
+      ]),
     ])
     expect(m.get('BTC')).toEqual({ tp: 120, sl: 90 })
   })
 
   it('matches symbol formats BTCUSDT / xyz:BTC / BTC to the same key', () => {
     const m = buildTpslFallback([
-      rec([{ action: 'OPEN_LONG', symbol: 'xyz:BTC', quantity: 1, leverage: 1, price: 100, stop_loss: 90, take_profit: 0, order_id: 1, timestamp: '', success: true }]),
+      rec([
+        {
+          action: 'OPEN_LONG',
+          symbol: 'xyz:BTC',
+          quantity: 1,
+          leverage: 1,
+          price: 100,
+          stop_loss: 90,
+          take_profit: 0,
+          order_id: 1,
+          timestamp: '',
+          success: true,
+        },
+      ]),
     ])
     expect(m.get('BTC')).toEqual({ tp: undefined, sl: 90 })
     expect(m.get('BTCUSDT')).toBeUndefined() // key is normalized base label
@@ -90,7 +129,20 @@ describe('buildTpslFallback', () => {
 
   it('skips actions without positive tp/sl', () => {
     const m = buildTpslFallback([
-      rec([{ action: 'OPEN_LONG', symbol: 'ETH', quantity: 1, leverage: 1, price: 100, stop_loss: 0, take_profit: 0, order_id: 1, timestamp: '', success: true }]),
+      rec([
+        {
+          action: 'OPEN_LONG',
+          symbol: 'ETH',
+          quantity: 1,
+          leverage: 1,
+          price: 100,
+          stop_loss: 0,
+          take_profit: 0,
+          order_id: 1,
+          timestamp: '',
+          success: true,
+        },
+      ]),
     ])
     expect(m.size).toBe(0)
   })

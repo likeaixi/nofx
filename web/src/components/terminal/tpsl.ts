@@ -6,7 +6,10 @@ export interface TpslFallback {
 }
 
 /** Split exchange open orders into TP and SL trigger prices. */
-export function parseTpsl(orders: OpenOrder[] | undefined): { tp: number[]; sl: number[] } {
+export function parseTpsl(orders: OpenOrder[] | undefined): {
+  tp: number[]
+  sl: number[]
+} {
   const tp: number[] = []
   const sl: number[] = []
   for (const o of orders ?? []) {
@@ -26,7 +29,11 @@ export function distPct(trigger: number, mark: number): number {
 /** crypto majors trade on the Hyperliquid main dex; strip namespaces and quote suffixes. */
 export function baseLabel(raw?: string): string {
   if (!raw) return ''
-  return raw.toUpperCase().replace(/^XYZ:/, '').replace(/[-_]/g, '').replace(/(USDT|USDC|USD)$/, '')
+  return raw
+    .toUpperCase()
+    .replace(/^XYZ:/, '')
+    .replace(/[-_]/g, '')
+    .replace(/(USDT|USDC|USD)$/, '')
 }
 
 /**
@@ -34,7 +41,9 @@ export function baseLabel(raw?: string): string {
  * exchange open-orders query fails). Records arrive newest-first, so the
  * first matching action per symbol wins.
  */
-export function buildTpslFallback(decisions: DecisionRecord[] | undefined): Map<string, TpslFallback> {
+export function buildTpslFallback(
+  decisions: DecisionRecord[] | undefined
+): Map<string, TpslFallback> {
   const m = new Map<string, TpslFallback>()
   for (const rec of decisions ?? []) {
     for (const a of rec?.decisions ?? []) {

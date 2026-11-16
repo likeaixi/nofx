@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SWRConfig } from 'swr'
 import { PositionTPSL } from './PositionTPSL'
@@ -15,7 +21,14 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-function mount(props: Partial<{ traderId?: string; symbol: string; markPrice: number; fallback?: { tp?: number; sl?: number } }> = {}) {
+function mount(
+  props: Partial<{
+    traderId?: string
+    symbol: string
+    markPrice: number
+    fallback?: { tp?: number; sl?: number }
+  }> = {}
+) {
   return render(
     <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
       <PositionTPSL traderId="t1" symbol="BTCUSDT" markPrice={100} {...props} />
@@ -55,7 +68,9 @@ describe('PositionTPSL', () => {
   })
 
   it('renders only the red dot when only a SL order exists', async () => {
-    getOpenOrders.mockResolvedValue([order({ type: 'STOP_MARKET', stop_price: 90 })])
+    getOpenOrders.mockResolvedValue([
+      order({ type: 'STOP_MARKET', stop_price: 90 }),
+    ])
     mount()
     const dots = await screen.findAllByText('●')
     expect(dots).toHaveLength(1)

@@ -10,7 +10,13 @@ const TP_COLOR = '#2E8B57'
 const SL_COLOR = '#D6433A'
 
 /** Lightweight hover tooltip: portals to body, fixed position, viewport-clamped. */
-export function TerminalTooltip({ content, children }: { content: ReactNode; children: ReactNode }) {
+export function TerminalTooltip({
+  content,
+  children,
+}: {
+  content: ReactNode
+  children: ReactNode
+}) {
   const [open, setOpen] = useState(false)
   const [style, setStyle] = useState<CSSProperties | null>(null)
   const anchorRef = useRef<HTMLSpanElement>(null)
@@ -49,7 +55,12 @@ export function TerminalTooltip({ content, children }: { content: ReactNode; chi
             ref={popRef}
             className="tm-mono"
             style={{
-              ...(style ?? { position: 'fixed', top: -9999, left: -9999, visibility: 'hidden' }),
+              ...(style ?? {
+                position: 'fixed',
+                top: -9999,
+                left: -9999,
+                visibility: 'hidden',
+              }),
               zIndex: 1000,
               background: 'var(--tm-bg, #0b0f14)',
               border: '1px solid var(--tm-hair, #263140)',
@@ -79,14 +90,22 @@ interface PositionTPSLProps {
 
 function fmtPx(n: number): string {
   const dp = n >= 1000 ? 0 : n >= 100 ? 1 : n >= 1 ? 2 : 4
-  return n.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp })
+  return n.toLocaleString('en-US', {
+    minimumFractionDigits: dp,
+    maximumFractionDigits: dp,
+  })
 }
 function fmtPct(n: number): string {
   return Number.isNaN(n) ? '—' : `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`
 }
 
 /** TP/SL status dots for one position row; hover shows trigger prices vs mark. */
-export function PositionTPSL({ traderId, symbol, markPrice, fallback }: PositionTPSLProps) {
+export function PositionTPSL({
+  traderId,
+  symbol,
+  markPrice,
+  fallback,
+}: PositionTPSLProps) {
   const { data, error } = useSWR(
     traderId ? `open-orders-${traderId}-${symbol}` : null,
     () => api.getOpenOrders(traderId!, symbol, true),
@@ -95,14 +114,23 @@ export function PositionTPSL({ traderId, symbol, markPrice, fallback }: Position
 
   const { tp, sl } = parseTpsl(data)
   const useFallback = !!error
-  const fbTp = useFallback && fallback !== undefined && (fallback.tp ?? 0) > 0 ? fallback.tp : undefined
-  const fbSl = useFallback && fallback !== undefined && (fallback.sl ?? 0) > 0 ? fallback.sl : undefined
+  const fbTp =
+    useFallback && fallback !== undefined && (fallback.tp ?? 0) > 0
+      ? fallback.tp
+      : undefined
+  const fbSl =
+    useFallback && fallback !== undefined && (fallback.sl ?? 0) > 0
+      ? fallback.sl
+      : undefined
   const tpList = fbTp !== undefined ? [fbTp] : tp
   const slList = fbSl !== undefined ? [fbSl] : sl
   if (tpList.length === 0 && slList.length === 0) return null
 
   const row = (kind: 'TP' | 'SL', price: number) => (
-    <div key={`${kind}-${price}`} style={{ color: kind === 'TP' ? TP_COLOR : SL_COLOR }}>
+    <div
+      key={`${kind}-${price}`}
+      style={{ color: kind === 'TP' ? TP_COLOR : SL_COLOR }}
+    >
       {kind} {fmtPx(price)} {fmtPct(distPct(price, markPrice))}
     </div>
   )
@@ -114,7 +142,9 @@ export function PositionTPSL({ traderId, symbol, markPrice, fallback }: Position
           {tpList.map((p) => row('TP', p))}
           {slList.map((p) => row('SL', p))}
           {useFallback && (
-            <div style={{ color: 'var(--tm-muted, #6b7a8c)', fontSize: 9 }}>decision fallback</div>
+            <div style={{ color: 'var(--tm-muted, #6b7a8c)', fontSize: 9 }}>
+              decision fallback
+            </div>
           )}
         </>
       }
@@ -122,7 +152,11 @@ export function PositionTPSL({ traderId, symbol, markPrice, fallback }: Position
       <span style={{ letterSpacing: 2 }}>
         {tpList.length > 0 && <span style={{ color: TP_COLOR }}>●</span>}
         {slList.length > 0 && (
-          <span style={{ color: SL_COLOR, marginLeft: tpList.length > 0 ? 3 : 0 }}>●</span>
+          <span
+            style={{ color: SL_COLOR, marginLeft: tpList.length > 0 ? 3 : 0 }}
+          >
+            ●
+          </span>
         )}
       </span>
     </TerminalTooltip>
