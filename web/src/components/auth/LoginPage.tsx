@@ -1,7 +1,7 @@
 import { BrandLogo } from '../common/BrandLogo'
 import React, { useState, useEffect } from 'react'
 import { Eye, EyeOff, Loader2, ArrowRight } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useAuth } from '../../contexts/AuthContext'
 import { useLanguage } from '../../contexts/LanguageContext'
@@ -288,6 +288,15 @@ export function LoginPage() {
                 )}
               </button>
             </form>
+
+            <div className="mt-5 text-center text-sm">
+              <Link
+                to={ROUTES.register}
+                className="text-nofx-gold hover:text-nofx-gold-highlight underline underline-offset-4"
+              >
+                {t('signUp', language)}
+              </Link>
+            </div>
 
             {/* Footer */}
             <div className="mt-8 pt-5 border-t border-[rgba(25,36,52,0.14)] flex items-center justify-between text-[11px]">
