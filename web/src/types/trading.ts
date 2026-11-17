@@ -75,6 +75,8 @@ export interface DecisionAction {
   timestamp: string
   success: boolean
   error?: string
+  skipped?: boolean
+  skip_reason?: string
 }
 
 export interface AccountSnapshot {

@@ -1,10 +1,30 @@
 package trader
 
 import (
+	"errors"
 	"fmt"
 	"math"
+	"nofx/store"
 	"strings"
 )
+
+type unsupportedOpeningMarket struct{ symbol, exchange string }
+
+func (e *unsupportedOpeningMarket) Error() string {
+	return fmt.Sprintf("opening skipped: %s is not supported on target exchange %s; no order placed", e.symbol, e.exchange)
+}
+
+func applyDecisionExecutionError(record *store.DecisionRecord, action *store.DecisionAction, err error) {
+	var unsupported *unsupportedOpeningMarket
+	if errors.As(err, &unsupported) {
+		action.Skipped = true
+		action.SkipReason = unsupported.Error()
+		record.ExecutionLog = append(record.ExecutionLog, "⚠ "+action.SkipReason)
+		return
+	}
+	action.Error = err.Error()
+	record.ExecutionLog = append(record.ExecutionLog, fmt.Sprintf("❌ %s %s failed: %v", action.Symbol, action.Action, err))
+}
 
 // validateOpeningMarket queries the execution venue, never the shared market
 // data provider (which can return Hyperliquid data for another exchange).
@@ -14,7 +34,7 @@ func (at *AutoTrader) validateOpeningMarket(symbol string) error {
 	price, err := at.trader.GetMarketPrice(symbol)
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "invalid symbol") {
-			return fmt.Errorf("opening skipped: %s is not supported on target exchange %s: %w", symbol, at.exchange, err)
+			return &unsupportedOpeningMarket{symbol: symbol, exchange: at.exchange}
 		}
 		return fmt.Errorf("opening skipped: cannot verify market %s on target exchange %s (symbol unavailable or market query failed): %w", symbol, at.exchange, err)
 	}

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { DecisionRecord, DecisionAction } from '../../types'
 import { t, type Language } from '../../i18n/translations'
 import { formatRequestError } from '../../lib/requestErrors'
+import { decisionForDisplay } from '../../lib/decisionDisplay'
 
 interface DecisionCardProps {
   decision: DecisionRecord
@@ -92,7 +93,7 @@ function ActionCard({ action, language, onSymbolClick }: { action: DecisionActio
           )}
           <div
             className="w-2 h-2 rounded-full"
-            style={{ background: action.success ? '#2E8B57' : '#D6433A' }}
+            style={{ background: action.skipped ? '#c8860b' : action.success ? '#2E8B57' : '#D6433A' }}
           />
         </div>
       </div>
@@ -201,6 +202,11 @@ function ActionCard({ action, language, onSymbolClick }: { action: DecisionActio
       )}
 
       {/* Error Message */}
+      {action.skipped && action.skip_reason && (
+        <div className="mt-3 rounded-sm p-2 text-xs wrap-break-word" style={{ color: '#c8860b', background: 'rgba(200,134,11,0.1)' }}>
+          ⚠ {action.skip_reason}
+        </div>
+      )}
       {action.error && (
         <div
           className="mt-3 rounded-sm p-2 text-xs wrap-break-word"
@@ -217,7 +223,9 @@ function ActionCard({ action, language, onSymbolClick }: { action: DecisionActio
   )
 }
 
-export function DecisionCard({ decision, language, onSymbolClick }: DecisionCardProps) {
+export function DecisionCard({ decision: rawDecision, language, onSymbolClick }: DecisionCardProps) {
+  const decision = decisionForDisplay(rawDecision, language)
+  const hasSkips = decision.decisions?.some((action) => action.skipped)
   const [showSystemPrompt, setShowSystemPrompt] = useState(false)
   const [showInputPrompt, setShowInputPrompt] = useState(false)
   const [showCoT, setShowCoT] = useState(false)
@@ -274,12 +282,14 @@ export function DecisionCard({ decision, language, onSymbolClick }: DecisionCard
         <div
           className="px-4 py-1.5 rounded-full text-xs font-bold tracking-wider"
           style={
-            decision.success
+            decision.success && hasSkips
+              ? { background: 'rgba(200,134,11,0.1)', color: '#c8860b', border: '1px solid rgba(200,134,11,0.3)' }
+              : decision.success
               ? { background: 'rgba(46, 139, 87, 0.15)', color: '#2E8B57', border: '1px solid rgba(46, 139, 87, 0.3)' }
               : { background: 'rgba(214, 67, 58, 0.15)', color: '#D6433A', border: '1px solid rgba(214, 67, 58, 0.3)' }
           }
         >
-          {t(decision.success ? 'success' : 'failed', language)}
+          {decision.success && hasSkips ? (language === 'zh' ? '含跳过' : language === 'id' ? 'Ada yang dilewati' : 'With skips') : t(decision.success ? 'success' : 'failed', language)}
         </div>
       </div>
 

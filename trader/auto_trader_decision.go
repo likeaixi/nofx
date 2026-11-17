@@ -60,7 +60,7 @@ func (at *AutoTrader) saveDecision(record *store.DecisionRecord) error {
 func summarizeDecisionExecution(record *store.DecisionRecord) {
 	failed, attempted := 0, 0
 	for _, action := range record.Decisions {
-		if action.Action == "hold" || action.Action == "wait" {
+		if action.Action == "hold" || action.Action == "wait" || action.Skipped {
 			continue
 		}
 		attempted++

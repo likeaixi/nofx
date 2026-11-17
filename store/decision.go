@@ -93,6 +93,8 @@ type DecisionAction struct {
 	Timestamp  time.Time `json:"timestamp"`
 	Success    bool      `json:"success"`
 	Error      string    `json:"error"`
+	Skipped    bool      `json:"skipped,omitempty"`
+	SkipReason string    `json:"skip_reason,omitempty"`
 }
 
 // Statistics statistics information

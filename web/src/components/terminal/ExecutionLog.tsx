@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { DecisionRecord } from '../../types'
 import { formatRequestError } from '../../lib/requestErrors'
+import { decisionForDisplay } from '../../lib/decisionDisplay'
 
 /**
  * ExecutionLog renders the AI trading agent's real decisions and order results
@@ -54,7 +55,7 @@ type LogTone = 'ok' | 'warn' | 'risk' | 'info'
 function logTone(line: string): LogTone {
   const s = line.toLowerCase()
   if (s.includes('succeed') || s.includes('success') || line.includes('✓')) return 'ok'
-  if (s.includes('throttle') || s.includes('re-entry') || s.includes('cooldown') || s.includes('blocked'))
+  if (s.includes('throttle') || s.includes('re-entry') || s.includes('cooldown') || s.includes('blocked') || s.startsWith('⚠ skipped '))
     return 'warn'
   if (
     s.includes('risk') ||
@@ -171,12 +172,14 @@ interface CycleProps {
   record: DecisionRecord
 }
 
-function Cycle({ record }: CycleProps) {
+function Cycle({ record: rawRecord }: CycleProps) {
+  const record = decisionForDisplay(rawRecord)
   const time = fmtTime(record.timestamp)
   const actions = record.decisions ?? []
   const logs = record.execution_log ?? []
   const count = actions.length
-  const trades = actions.filter((a) => a.action !== 'hold' && a.action !== 'wait')
+  const trades = actions.filter((a) => a.action !== 'hold' && a.action !== 'wait' && !a.skipped)
+  const skipped = actions.filter((a) => a.skipped).length
   const failed = trades.filter((a) => !a.success).length
   // Also correct the display of older records whose aggregate flag was wrong.
   const fault = !record.success || failed > 0
@@ -207,6 +210,7 @@ function Cycle({ record }: CycleProps) {
         {fault ? (
           <span style={{ color: 'var(--tm-dn)', fontWeight: 700 }}>FAULT{failed > 0 ? ` · ${failed}/${trades.length} trades failed/blocked` : ''}</span>
         ) : null}
+        {skipped > 0 && <span style={{ color: C_AMBER }}>{skipped} skipped</span>}
       </div>
 
       {/* AI action lines */}

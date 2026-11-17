@@ -65,3 +65,32 @@ func TestOpeningChecksTargetExchangeBeforeExecution(t *testing.T) {
 		}
 	}
 }
+
+func TestUnsupportedOpeningIsRecordedAsSkipped(t *testing.T) {
+	for _, unsupported := range []bool{true, false} {
+		errText := "timeout"
+		if unsupported {
+			errText = "<APIError> code=-1121, msg=Invalid symbol."
+		}
+		at := &AutoTrader{exchange: "binance", trader: &symbolPreflightTrader{err: errors.New(errText)}}
+		err := at.validateOpeningMarket("xyz:CL")
+		action := store.DecisionAction{Action: "open_long", Symbol: "xyz:CL"}
+		record := &store.DecisionRecord{Success: true}
+		applyDecisionExecutionError(record, &action, err)
+		record.Decisions = []store.DecisionAction{action}
+		summarizeDecisionExecution(record)
+		if action.Skipped != unsupported || record.Success != unsupported {
+			t.Fatalf("incorrect outcome: %+v / %+v", action, record)
+		}
+		if unsupported {
+			if action.Success || action.Error != "" || action.SkipReason == "" || record.ErrorMessage != "" {
+				t.Fatalf("skip must not imply fill or failure: %+v", record)
+			}
+			if strings.Contains(strings.Join(record.ExecutionLog, " "), "APIError") || strings.Contains(strings.Join(record.ExecutionLog, " "), "failed") {
+				t.Fatalf("raw failure leaked: %v", record.ExecutionLog)
+			}
+		} else if !strings.Contains(action.Error, "timeout") {
+			t.Fatalf("query failure hidden: %+v", action)
+		}
+	}
+}
