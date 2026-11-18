@@ -720,7 +720,7 @@ func (c StrategyConfig) MarshalJSON() ([]byte, error) {
 
 	if strategyType == "grid_trading" {
 		out.GridConfig = c.GridConfig
-	} else {
+	} else if strategyType != AllinCrypto {
 		out.AIConfig = &AIStrategyConfig{
 			CoinSource:     c.CoinSource,
 			Indicators:     c.Indicators,

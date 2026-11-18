@@ -24,8 +24,8 @@ func TestCreateDefaultStrategiesUsesOneReadyToRunClaw402Preset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List strategies failed: %v", err)
 	}
-	if len(strategies) != 1 {
-		t.Fatalf("expected 1 default strategy, got %d", len(strategies))
+	if len(strategies) != 2 {
+		t.Fatalf("expected two selectable strategies, got %d", len(strategies))
 	}
 
 	byName := map[string]*store.Strategy{}
@@ -43,6 +43,9 @@ func TestCreateDefaultStrategiesUsesOneReadyToRunClaw402Preset(t *testing.T) {
 		t.Fatalf("expected exactly one active strategy, got %d", activeCount)
 	}
 
+	if copy := byName["AllinCrypto"]; copy == nil || copy.IsActive || !copy.IsAllinCrypto() {
+		t.Fatal("fixed template missing or automatically active")
+	}
 	defaultStrategy := byName["NOFX Auto Strategy"]
 	if defaultStrategy == nil || !defaultStrategy.IsActive {
 		t.Fatalf("NOFX Auto Strategy should exist and be active")

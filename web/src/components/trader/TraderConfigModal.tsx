@@ -77,6 +77,7 @@ interface TraderConfigModalProps {
   isOpen: boolean
   onClose: () => void
   traderData?: TraderConfigData | null
+  initialStrategyId?: string
   isEditMode?: boolean
   availableModels?: AIModel[]
   availableExchanges?: Exchange[]
@@ -87,6 +88,7 @@ export function TraderConfigModal({
   isOpen,
   onClose,
   traderData,
+  initialStrategyId,
   isEditMode = false,
   availableModels = [],
   availableExchanges = [],
@@ -105,6 +107,9 @@ export function TraderConfigModal({
   const [isSaving, setIsSaving] = useState(false)
   const [strategies, setStrategies] = useState<Strategy[]>([])
 
+  const defaultModel = availableModels[0]?.id || ''
+  const defaultExchange = availableExchanges[0]?.id || ''
+
   // Fetch the user's strategy list
   useEffect(() => {
     const fetchStrategies = async () => {
@@ -117,7 +122,7 @@ export function TraderConfigModal({
           setStrategies(strategyList)
           // If no strategy is selected, default to the active strategy
           if (!formData.strategy_id && !isEditMode) {
-            const activeStrategy = strategyList.find((s) => s.is_active)
+            const activeStrategy = strategyList.find((s) => s.id === initialStrategyId) || strategyList.find((s) => s.is_active)
             if (activeStrategy) {
               setFormData((prev) => ({
                 ...prev,
@@ -153,15 +158,15 @@ export function TraderConfigModal({
     } else if (!isEditMode) {
       setFormData({
         trader_name: '',
-        ai_model: availableModels[0]?.id || '',
-        exchange_id: availableExchanges[0]?.id || '',
-        strategy_id: '',
+        ai_model: defaultModel,
+        exchange_id: defaultExchange,
+        strategy_id: initialStrategyId || '',
         is_cross_margin: true,
         show_in_competition: true,
         scan_interval_minutes: 15,
       })
     }
-  }, [traderData, isEditMode, availableModels, availableExchanges])
+  }, [traderData, isEditMode, defaultModel, defaultExchange, initialStrategyId])
 
   if (!isOpen) return null
 
@@ -180,12 +185,12 @@ export function TraderConfigModal({
     try {
       const saveData: CreateTraderRequest = {
         name: formData.trader_name,
-        ai_model_id: formData.ai_model,
+        ai_model_id: fixed ? '' : formData.ai_model,
         exchange_id: formData.exchange_id,
         strategy_id: formData.strategy_id,
-        is_cross_margin: formData.is_cross_margin,
+        is_cross_margin: fixed ? true : formData.is_cross_margin,
         show_in_competition: formData.show_in_competition,
-        scan_interval_minutes: formData.scan_interval_minutes,
+        scan_interval_minutes: fixed ? 1 : formData.scan_interval_minutes,
       }
 
       await onSave(saveData)
@@ -197,6 +202,8 @@ export function TraderConfigModal({
   }
 
   const selectedStrategy = strategies.find((s) => s.id === formData.strategy_id)
+  const fixed = selectedStrategy?.config.strategy_type === 'allincrypto'
+  const eligibleExchanges = fixed ? availableExchanges.filter(e => ['binance','okx'].includes(e.exchange_type || '') && !e.testnet) : availableExchanges
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-xs p-4 overflow-y-auto">
@@ -263,7 +270,7 @@ export function TraderConfigModal({
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div>
+                {!fixed && <div>
                   <label className="text-sm text-nofx-text block mb-2">
                     {t('aiModelRequired', language)}
                   </label>
@@ -276,7 +283,7 @@ export function TraderConfigModal({
                       label: getShortName(model.name || model.id).toUpperCase(),
                     }))}
                   />
-                </div>
+                </div>}
                 <div>
                   <label className="text-sm text-nofx-text block mb-2">
                     {t('exchangeRequired', language)}
@@ -285,7 +292,7 @@ export function TraderConfigModal({
                     value={formData.exchange_id}
                     onChange={handleExchangeChange}
                     className="w-full px-3 py-2 bg-nofx-bg-lighter border border-nofx-gold/20 rounded-sm text-nofx-text"
-                    options={availableExchanges.map((exchange) => ({
+                    options={eligibleExchanges.map((exchange) => ({
                       value: exchange.id,
                       label:
                         getShortName(
@@ -464,7 +471,7 @@ export function TraderConfigModal({
               {t('tradingParams', language)}
             </h3>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              {fixed ? <p className="text-sm text-nofx-text-muted">{language === 'zh' ? '每分钟检查公开成交。OKX 使用全仓，Binance 沿用合约账户保证金模式。' : 'Checks public fills every minute. OKX uses cross margin. Binance retains the contract margin mode.'}</p> : <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm text-nofx-text block mb-2">
                     {t('marginMode', language)}
@@ -519,7 +526,7 @@ export function TraderConfigModal({
                     {t('scanIntervalRecommend', language)}
                   </p>
                 </div>
-              </div>
+              </div>}
 
               {/* Competition visibility */}
               <div>
@@ -596,7 +603,8 @@ export function TraderConfigModal({
               disabled={
                 isSaving ||
                 !formData.trader_name ||
-                !formData.ai_model ||
+                (!fixed && !formData.ai_model) ||
+                (fixed && !eligibleExchanges.some(e => e.id === formData.exchange_id)) ||
                 !formData.exchange_id
               }
               className="px-8 py-3 bg-nofx-gold text-white rounded-lg hover:bg-nofx-gold/90 transition-all duration-200 disabled:bg-nofx-bg-deeper disabled:text-nofx-text-muted disabled:cursor-not-allowed font-medium shadow-lg"

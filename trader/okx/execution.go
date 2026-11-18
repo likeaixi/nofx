@@ -430,9 +430,6 @@ func (t *OKXTrader) LookupOrder(ctx context.Context, o execution.Order) (executi
 			return o, e
 		}
 		if execution.Positive(o.Filled) {
-			if !execution.Positive(execution.Decimal(r.AvgPx)) {
-				return o, errors.New("OKX fill price missing")
-			}
 			o.Average = execution.Decimal(r.AvgPx)
 		}
 	} else {
@@ -450,6 +447,10 @@ func (t *OKXTrader) LookupOrder(ctx context.Context, o execution.Order) (executi
 	}
 	if o.Status == "" {
 		return o, errors.New("unrecognized OKX order state")
+	}
+	if o.Role == "entry" && execution.Positive(o.Filled) && !execution.Positive(o.Average) {
+		o.Average = ""
+		return o, execution.ErrFillAverageUnavailable
 	}
 	if o.Role != "entry" && o.Status == "TRIGGERED" {
 		return t.lookupTriggeredProtection(ctx, o, r, inst, previousFilled)

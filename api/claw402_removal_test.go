@@ -128,7 +128,7 @@ func TestDefaultStrategyNotVergex(t *testing.T) {
 		t.Fatal(err)
 	}
 	var strat store.Strategy
-	if err := st.GormDB().Where("user_id = ?", "user1").First(&strat).Error; err != nil {
+	if err := st.GormDB().Where("user_id = ? AND is_active = ?", "user1", true).First(&strat).Error; err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := strat.ParseConfig()

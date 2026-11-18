@@ -113,7 +113,7 @@ func (s *Server) planningBroker(ctx context.Context, user, id string) (live.Brok
 		if cached, ok := s.planning.brokers.Load(user + "/" + id); ok {
 			v := cached.(planningBrokerCache)
 			if v.stamp == stamp && time.Since(v.created) < 5*time.Minute {
-				return v.broker, accountKey(ex), nil
+				return s.verifiedPlanningBroker(ctx, v.broker, accountKey(ex))
 			}
 		}
 	}
@@ -121,7 +121,7 @@ func (s *Server) planningBroker(ctx context.Context, user, id string) (live.Brok
 		if s.planning != nil {
 			s.planning.brokers.Store(user+"/"+id, planningBrokerCache{stamp: stamp, broker: b, created: time.Now()})
 		}
-		return b, key, nil
+		return s.verifiedPlanningBroker(ctx, b, key)
 	}
 	key := accountKey(ex)
 	switch ex.ExchangeType {
@@ -699,7 +699,13 @@ func (s *Server) lockPlanningAccount(user, id string) (func(), error) {
 		return nil, errors.New("account not found")
 	}
 	_ = p
-	return planning.LockAccount(accountKey(ex)), nil
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	_, key, err := s.planningBroker(ctx, user, ex.ID)
+	if err != nil {
+		return nil, err
+	}
+	return planning.LockAccount(key), nil
 }
 func (s *Server) handlePlanningReadAccount(c *gin.Context) {
 	if !instrument.ValidSymbol(c.Query("symbol")) {

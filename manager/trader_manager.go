@@ -490,6 +490,12 @@ func (tm *TraderManager) LoadUserTradersFromStore(st *store.Store, userID string
 			}
 		}
 
+		if traderCfg.AIModelID == "" && traderCfg.StrategyID != "" {
+			strategy, err := st.Strategy().Get(traderCfg.UserID, traderCfg.StrategyID)
+			if err == nil && strategy.IsAllinCrypto() {
+				aiModelCfg = &store.AIModel{Enabled: true}
+			}
+		}
 		if aiModelCfg == nil {
 			logger.Infof("⚠️ AI model %s for trader %s does not exist, skipping", traderCfg.AIModelID, traderCfg.Name)
 			continue
@@ -590,6 +596,12 @@ func (tm *TraderManager) LoadTradersFromStore(st *store.Store) error {
 			}
 		}
 
+		if traderCfg.AIModelID == "" && traderCfg.StrategyID != "" {
+			strategy, err := st.Strategy().Get(traderCfg.UserID, traderCfg.StrategyID)
+			if err == nil && strategy.IsAllinCrypto() {
+				aiModelCfg = &store.AIModel{Enabled: true}
+			}
+		}
 		if aiModelCfg == nil {
 			logger.Infof("⚠️  AI model %s for trader %s does not exist, skipping", traderCfg.AIModelID, traderCfg.Name)
 			continue
@@ -762,7 +774,9 @@ func (tm *TraderManager) addTraderFromStore(traderCfg *store.Trader, aiModelCfg 
 		traderConfig.CustomAPIKey = string(aiModelCfg.APIKey)
 	}
 
-	traderConfig.Claw402WalletKey = resolveTraderDataWalletKey(st, traderCfg.UserID, aiModelCfg)
+	if strategyConfig.StrategyType != store.AllinCrypto {
+		traderConfig.Claw402WalletKey = resolveTraderDataWalletKey(st, traderCfg.UserID, aiModelCfg)
+	}
 
 	// Create trader instance
 	at, err := trader.NewAutoTrader(traderConfig, st, traderCfg.UserID)
@@ -791,7 +805,9 @@ func (tm *TraderManager) addTraderFromStore(traderCfg *store.Trader, aiModelCfg 
 			if err := trader.Run(); err != nil {
 				logger.Warnf("%s trader stopped with error: %v", traderLogTag(traderID, traderName), err)
 				// Update database to reflect stopped state
-				if st != nil {
+				// A failed fixed-strategy ownership attempt must not overwrite
+				// the running state of another worker holding this account.
+				if st != nil && (traderConfig.StrategyConfig == nil || traderConfig.StrategyConfig.StrategyType != store.AllinCrypto) {
 					_ = st.Trader().UpdateStatus(userID, traderID, false)
 				}
 			}

@@ -59,7 +59,7 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
     else next.delete('view')
     setSearchParams(next, { replace: true })
   }
-  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(Boolean(searchParams.get('strategy')))
   const [showEditModal, setShowEditModal] = useState(false)
   const [showModelModal, setShowModelModal] = useState(false)
   const [showExchangeModal, setShowExchangeModal] = useState(false)
@@ -265,7 +265,7 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
       const model = allModels?.find((m) => m.id === data.ai_model_id)
       const exchange = allExchanges?.find((e) => e.id === data.exchange_id)
 
-      if (!model?.enabled) {
+      if (data.ai_model_id && !model?.enabled) {
         toast.error(t('modelNotConfigured', language))
         return
       }
@@ -303,7 +303,7 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
       const model = enabledModels?.find((m) => m.id === data.ai_model_id)
       const exchange = enabledExchanges?.find((e) => e.id === data.exchange_id)
 
-      if (!model) {
+      if (data.ai_model_id && !model) {
         toast.error(t('modelConfigNotExist', language))
         return
       }
@@ -926,7 +926,6 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
                   onClick={() => setShowCreateModal(true)}
                   disabled={
                     configsLoading ||
-                    !configuredModels.length ||
                     !configuredExchanges.length
                   }
                 >
@@ -961,6 +960,7 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
       {showCreateModal && (
         <TraderConfigModal
           isOpen={showCreateModal}
+          initialStrategyId={searchParams.get('strategy') || undefined}
           isEditMode={false}
           availableModels={enabledModels}
           availableExchanges={enabledExchanges}

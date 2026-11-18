@@ -255,3 +255,14 @@ func TestSignedRequestRejectsRedirects(t *testing.T) {
 		t.Fatalf("unexpected request count: %d", requests)
 	}
 }
+
+func TestVerifiedUnpricedMarketFillPreservesRescueEvidence(t *testing.T) {
+	o := okxIntent()
+	v := okxFixture(t, "net_mode", "[]", func(*http.Request) string {
+		return `[{"ordId":"12","clOrdId":"` + o.ClientID + `","instId":"BTC-USDT-SWAP","sz":"1.23","side":"buy","posSide":"net","ordType":"market","state":"filled","accFillSz":"1.23","avgPx":""}]`
+	})
+	got, err := v.LookupOrder(context.Background(), o)
+	if err != execution.ErrFillAverageUnavailable || got.Filled != "0.0123" || got.Average != "" || got.Status != "FILLED" {
+		t.Fatal(got, err)
+	}
+}

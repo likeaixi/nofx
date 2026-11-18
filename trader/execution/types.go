@@ -7,9 +7,13 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"math/big"
 	"strings"
 )
+
+// ErrFillAverageUnavailable accompanies an otherwise fully verified fill receipt.
+var ErrFillAverageUnavailable = errors.New("verified fill has no valid average")
 
 type Decimal string
 

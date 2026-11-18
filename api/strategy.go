@@ -21,7 +21,7 @@ import (
 // validateStrategyConfig validates strategy configuration and returns warnings
 func validateStrategyConfig(config *store.StrategyConfig) []string {
 	var warnings []string
-	if config.StrategyType == "grid_trading" {
+	if config.StrategyType == "grid_trading" || config.StrategyType == store.AllinCrypto {
 		return warnings
 	}
 
@@ -271,6 +271,10 @@ func (s *Server) handleCreateStrategy(c *gin.Context) {
 func (s *Server) handleUpdateStrategy(c *gin.Context) {
 	userID := c.GetString("user_id")
 	strategyID := c.Param("id")
+	if err := s.guardCopyStrategyMutation(userID, strategyID); err != nil {
+		SafeBadRequest(c, err.Error())
+		return
+	}
 
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -320,6 +324,10 @@ func (s *Server) handleUpdateStrategy(c *gin.Context) {
 			SafeBadRequest(c, "Invalid config JSON")
 			return
 		}
+	}
+	if existing.IsAllinCrypto() != (mergedConfig.StrategyType == store.AllinCrypto) {
+		SafeBadRequest(c, "Select a separate strategy to change between fixed copy trading and AI trading")
+		return
 	}
 	beforeClamp := mergedConfig
 	mergedConfig.ClampLimits()
@@ -390,6 +398,10 @@ func (s *Server) handleUpdateStrategy(c *gin.Context) {
 func (s *Server) handleDeleteStrategy(c *gin.Context) {
 	userID := c.GetString("user_id")
 	strategyID := c.Param("id")
+	if err := s.guardCopyStrategyMutation(userID, strategyID); err != nil {
+		SafeBadRequest(c, err.Error())
+		return
+	}
 
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})

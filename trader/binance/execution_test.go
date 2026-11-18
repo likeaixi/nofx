@@ -427,3 +427,21 @@ func TestAccountMarketClosePreservesModeSideAndBroker(t *testing.T) {
 		}
 	}
 }
+
+func TestRestoredUntriggeredStopHasVerifiedZeroFill(t *testing.T) {
+	o := planningOrder()
+	o.Role = "sl"
+	o.Filled = ""
+	o.Price = "99000"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, `{"algoId":45,"clientAlgoId":%q,"symbol":"BTCUSDT","quantity":"0.001","triggerPrice":"99000","algoStatus":"NEW","side":"SELL","orderType":"STOP_MARKET","positionSide":"BOTH","reduceOnly":true}`, o.VenueClientID)
+	}))
+	defer srv.Close()
+	b := NewExecutionTrader("test", "test", "")
+	b.client.BaseURL = srv.URL
+	b.client.HTTPClient = srv.Client()
+	got, err := b.LookupOrder(context.Background(), o)
+	if err != nil || got.Filled != "0" || got.Status != "NEW" {
+		t.Fatal(got, err)
+	}
+}

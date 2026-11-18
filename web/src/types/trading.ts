@@ -11,7 +11,7 @@ export interface SystemStatus {
   stop_until: string
   last_reset_time: string
   ai_provider: string
-  strategy_type?: 'ai_trading' | 'grid_trading'
+  strategy_type?: 'ai_trading' | 'grid_trading' | 'allincrypto'
   grid_symbol?: string
   /** Runtime health: true when AI failed repeatedly and no new positions open. */
   safe_mode?: boolean

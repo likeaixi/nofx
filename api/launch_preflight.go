@@ -107,7 +107,7 @@ func (s *Server) handleLaunchPreflight(c *gin.Context) {
 		SafeBadRequest(c, "Invalid preflight request")
 		return
 	}
-	if strings.TrimSpace(req.AIModelID) == "" || strings.TrimSpace(req.ExchangeID) == "" {
+	if strings.TrimSpace(req.ExchangeID) == "" {
 		SafeBadRequest(c, "ai_model_id and exchange_id are required")
 		return
 	}
@@ -160,8 +160,15 @@ func (s *Server) runLaunchPreflight(
 	strategy *store.Strategy,
 	strategyRequired bool,
 ) LaunchPreflightResult {
-	checks := []LaunchCheck{checkLaunchAIModel(model)}
-	checks = append(checks, checkLaunchAIWallet(model)...)
+	var checks []LaunchCheck
+	if strategy.IsAllinCrypto() {
+		if exchange != nil && (!store.SupportsAllinCrypto(exchange.ExchangeType) || exchange.Testnet) {
+			checks = append(checks, LaunchCheck{ID: launchCheckExchangeConfig, Status: launchCheckStatusFailed, Message: "AllinCrypto requires Binance or OKX USDT perpetuals"})
+		}
+	} else {
+		checks = append(checks, checkLaunchAIModel(model))
+		checks = append(checks, checkLaunchAIWallet(model)...)
+	}
 	checks = append(checks, checkLaunchStrategy(strategy, strategyRequired))
 	checks = append(checks, s.checkLaunchExchange(userID, exchange)...)
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"nofx/planning"
 	"nofx/planning/live"
 	"strings"
 	"time"
@@ -23,7 +24,7 @@ const (
 // AI trader management related structures
 type CreateTraderRequest struct {
 	Name                string  `json:"name" binding:"required"`
-	AIModelID           string  `json:"ai_model_id" binding:"required"`
+	AIModelID           string  `json:"ai_model_id"`
 	ExchangeID          string  `json:"exchange_id" binding:"required"`
 	StrategyID          string  `json:"strategy_id"` // Strategy ID (new version)
 	InitialBalance      float64 `json:"initial_balance"`
@@ -44,7 +45,7 @@ type CreateTraderRequest struct {
 // UpdateTraderRequest Update trader request
 type UpdateTraderRequest struct {
 	Name                string  `json:"name" binding:"required"`
-	AIModelID           string  `json:"ai_model_id" binding:"required"`
+	AIModelID           string  `json:"ai_model_id"`
 	ExchangeID          string  `json:"exchange_id" binding:"required"`
 	StrategyID          string  `json:"strategy_id"` // Strategy ID (new version)
 	InitialBalance      float64 `json:"initial_balance"`
@@ -352,40 +353,13 @@ func (s *Server) handleCreateTrader(c *gin.Context) {
 		}
 	}
 
-	model, err := s.store.AIModel().Get(userID, req.AIModelID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			SafeBadRequestWithDetails(c, formatTraderCreationError("The AI model you selected was not found", "Please go to \"Settings > Model Config\" to add and enable an available model first, then come back to create the bot"), "trader.create.model_not_found", nil)
-			return
-		}
-		SafeError(c, http.StatusInternalServerError,
-			formatTraderCreationError("Unable to read your AI model configuration for now", "Please retry later; if the problem persists, check whether the local service is running normally"),
-			err,
-		)
-		return
-	}
-	if !model.Enabled {
-		SafeBadRequestWithDetails(c, formatTraderCreationError(
-			fmt.Sprintf("AI model \"%s\" is not enabled yet", model.Name),
-			"Please go to \"Settings > Model Config\" to enable it, then create the bot again",
-		), "trader.create.model_disabled", mapStringPairs("model_name", model.Name))
-		return
-	}
-	if model.APIKey == "" {
-		SafeBadRequestWithDetails(c, formatTraderCreationError(
-			fmt.Sprintf("AI model \"%s\" is missing an API Key or payment credentials", model.Name),
-			"Please go to \"Settings > Model Config\" to complete the model credentials, then create the bot again",
-		), "trader.create.model_missing_credentials", mapStringPairs("model_name", model.Name))
-		return
-	}
-
 	if req.StrategyID == "" {
 		SafeBadRequestWithDetails(c, formatTraderCreationError("You have not selected a trading strategy yet", "Please select a strategy first, then continue creating the bot"), "trader.create.strategy_required", nil)
 		return
 	}
 
-	if req.StrategyID != "" {
-		_, err = s.store.Strategy().Get(userID, req.StrategyID)
+	strategy, err := s.store.Strategy().Get(userID, req.StrategyID)
+	{
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				SafeBadRequestWithDetails(c, formatTraderCreationError("The strategy you selected does not exist or has been deleted", "Please select another available strategy, then continue creating the bot"), "trader.create.strategy_not_found", nil)
@@ -395,6 +369,37 @@ func (s *Server) handleCreateTrader(c *gin.Context) {
 				formatTraderCreationError("Unable to read the strategy configuration you selected for now", "Please retry later; if the problem persists, check whether the local service is running normally"),
 				err,
 			)
+			return
+		}
+	}
+
+	if strategy.IsAllinCrypto() {
+		req.AIModelID = ""
+	} else {
+		model, err := s.store.AIModel().Get(userID, req.AIModelID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				SafeBadRequestWithDetails(c, formatTraderCreationError("The AI model you selected was not found", "Please go to \"Settings > Model Config\" to add and enable an available model first, then come back to create the bot"), "trader.create.model_not_found", nil)
+				return
+			}
+			SafeError(c, http.StatusInternalServerError,
+				formatTraderCreationError("Unable to read your AI model configuration for now", "Please retry later; if the problem persists, check whether the local service is running normally"),
+				err,
+			)
+			return
+		}
+		if !model.Enabled {
+			SafeBadRequestWithDetails(c, formatTraderCreationError(
+				fmt.Sprintf("AI model \"%s\" is not enabled yet", model.Name),
+				"Please go to \"Settings > Model Config\" to enable it, then create the bot again",
+			), "trader.create.model_disabled", mapStringPairs("model_name", model.Name))
+			return
+		}
+		if model.APIKey == "" {
+			SafeBadRequestWithDetails(c, formatTraderCreationError(
+				fmt.Sprintf("AI model \"%s\" is missing an API Key or payment credentials", model.Name),
+				"Please go to \"Settings > Model Config\" to complete the model credentials, then create the bot again",
+			), "trader.create.model_missing_credentials", mapStringPairs("model_name", model.Name))
 			return
 		}
 	}
@@ -466,6 +471,11 @@ func (s *Server) handleCreateTrader(c *gin.Context) {
 		return
 	}
 
+	if strategy.IsAllinCrypto() && (!store.SupportsAllinCrypto(exchangeCfg.ExchangeType) || exchangeCfg.Testnet) {
+		SafeBadRequest(c, "AllinCrypto supports Binance and OKX USDT perpetual accounts")
+		return
+	}
+
 	{
 		tempTrader, createErr := buildExchangeProbeTrader(exchangeCfg, userID)
 		if createErr != nil {
@@ -493,6 +503,12 @@ func (s *Server) handleCreateTrader(c *gin.Context) {
 		}
 	}
 
+	if strategy.IsAllinCrypto() {
+		scanIntervalMinutes = 1
+		isCrossMargin = true
+		btcEthLeverage = 20
+		altcoinLeverage = 20
+	}
 	// Create trader configuration (database entity)
 	logger.Infof("🔧 DEBUG: Starting to create trader config, ID=%s, Name=%s, AIModel=%s, Exchange=%s, StrategyID=%s", traderID, req.Name, req.AIModelID, req.ExchangeID, req.StrategyID)
 	traderRecord := &store.Trader{
@@ -571,6 +587,8 @@ func (s *Server) handleCreateTrader(c *gin.Context) {
 func (s *Server) handleUpdateTrader(c *gin.Context) {
 	userID := c.GetString("user_id")
 	traderID := c.Param("id")
+	unlockMutation := planning.LockAccount("trader-mutation:" + traderID)
+	defer unlockMutation()
 
 	var req UpdateTraderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -598,6 +616,10 @@ func (s *Server) handleUpdateTrader(c *gin.Context) {
 		return
 	}
 
+	if err := s.guardCopyMutation(userID, traderID); err != nil {
+		SafeBadRequest(c, err.Error())
+		return
+	}
 	if errMsg, errCode := validateTraderLeverageRange(req.BTCETHLeverage, req.AltcoinLeverage); errMsg != "" {
 		SafeBadRequestWithDetails(c, errMsg, errCode, nil)
 		return
@@ -646,6 +668,32 @@ func (s *Server) handleUpdateTrader(c *gin.Context) {
 		strategyID = existingTrader.StrategyID
 	}
 
+	selected, err := s.store.Strategy().Get(userID, strategyID)
+	if err != nil {
+		SafeBadRequest(c, "Selected strategy not found")
+		return
+	}
+	previous, _ := s.store.Strategy().Get(userID, existingTrader.StrategyID)
+	if previous.IsAllinCrypto() && (!selected.IsAllinCrypto() || req.ExchangeID != existingTrader.ExchangeID) {
+		SafeBadRequest(c, "Create a separate trader to change the account or strategy of a copy trader")
+		return
+	}
+	if selected.IsAllinCrypto() {
+		ex, err := s.store.Exchange().GetByID(userID, req.ExchangeID)
+		if err != nil || !store.SupportsAllinCrypto(ex.ExchangeType) || ex.Testnet {
+			SafeBadRequest(c, "Unsupported AllinCrypto target account")
+			return
+		}
+		if existingTrader.IsRunning && !previous.IsAllinCrypto() {
+			SafeBadRequest(c, "Stop the trader before changing its execution strategy")
+			return
+		}
+		req.AIModelID = ""
+	} else if req.AIModelID == "" {
+		SafeBadRequest(c, "AI model required")
+		return
+	}
+
 	exchangeChanged := req.ExchangeID != "" && req.ExchangeID != existingTrader.ExchangeID
 	resetInitialBalance := exchangeChanged && req.InitialBalance <= 0
 
@@ -657,6 +705,12 @@ func (s *Server) handleUpdateTrader(c *gin.Context) {
 		initialBalance = 0
 	}
 
+	if selected.IsAllinCrypto() {
+		scanIntervalMinutes = 1
+		isCrossMargin = true
+		btcEthLeverage = 20
+		altcoinLeverage = 20
+	}
 	// Update trader configuration
 	traderRecord := &store.Trader{
 		ID:                   traderID,
@@ -743,7 +797,17 @@ func (s *Server) handleUpdateTrader(c *gin.Context) {
 func (s *Server) handleDeleteTrader(c *gin.Context) {
 	userID := c.GetString("user_id")
 	traderID := c.Param("id")
+	unlockMutation := planning.LockAccount("trader-mutation:" + traderID)
+	defer unlockMutation()
 
+	if err := s.guardCopyMutation(userID, traderID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			SafeNotFound(c, "Trader")
+		} else {
+			SafeBadRequest(c, err.Error())
+		}
+		return
+	}
 	// Delete from database
 	err := s.store.Trader().Delete(userID, traderID)
 	if err != nil {
@@ -775,6 +839,8 @@ func (s *Server) handleDeleteTrader(c *gin.Context) {
 func (s *Server) handleStartTrader(c *gin.Context) {
 	userID := c.GetString("user_id")
 	traderID := c.Param("id")
+	unlockMutation := planning.LockAccount("trader-mutation:" + traderID)
+	defer unlockMutation()
 
 	// Verify trader belongs to current user
 	fullCfg, err := s.store.Trader().GetFullConfig(userID, traderID)
@@ -783,12 +849,6 @@ func (s *Server) handleStartTrader(c *gin.Context) {
 		return
 	}
 	if fullCfg != nil && fullCfg.Exchange != nil {
-		unlock, e := s.lockPlanningAccount(userID, fullCfg.Exchange.ID)
-		if e != nil {
-			SafeBadRequest(c, e.Error())
-			return
-		}
-		defer unlock()
 		var lease live.Lease
 		leaseError := s.store.GormDB().Where("account_key = ?", accountKey(fullCfg.Exchange)).First(&lease).Error
 		if leaseError != nil && !errors.Is(leaseError, gorm.ErrRecordNotFound) {
@@ -846,11 +906,11 @@ func (s *Server) handleStartTrader(c *gin.Context) {
 				return
 			}
 			// Check AI model
-			if fullCfg.AIModel == nil {
+			if fullCfg.AIModel == nil && !fullCfg.Strategy.IsAllinCrypto() {
 				SafeBadRequestWithDetails(c, formatTraderStartError("The AI model associated with this bot does not exist", "Please go to \"Settings > Model Config\" to check, then click start again"), "trader.start.model_not_found", mapStringPairs("trader_name", traderName))
 				return
 			}
-			if !fullCfg.AIModel.Enabled {
+			if fullCfg.AIModel != nil && !fullCfg.AIModel.Enabled {
 				SafeBadRequestWithDetails(c, formatTraderStartError(
 					fmt.Sprintf("The AI model \"%s\" associated with bot \"%s\" is not enabled yet", fullCfg.AIModel.Name, traderName),
 					"Please go to \"Settings > Model Config\" to enable it, then click start again",
@@ -897,18 +957,9 @@ func (s *Server) handleStartTrader(c *gin.Context) {
 		}
 	}
 
-	// Start trader
-	go func() {
-		logger.Infof("▶️  Starting trader %s (%s)", traderID, trader.GetName())
-		if err := trader.Run(); err != nil {
-			logger.Infof("❌ Trader %s runtime error: %v", trader.GetName(), err)
-		}
-	}()
-
-	// Update running status in database
-	err = s.store.Trader().UpdateStatus(userID, traderID, true)
-	if err != nil {
-		logger.Infof("⚠️  Failed to update trader status: %v", err)
+	if err := trader.Start(); err != nil {
+		SafeBadRequest(c, fmt.Sprintf("Trader did not start: %v", err))
+		return
 	}
 
 	logger.Infof("✓ Trader %s started", trader.GetName())
@@ -919,6 +970,9 @@ func (s *Server) handleStartTrader(c *gin.Context) {
 func (s *Server) handleStopTrader(c *gin.Context) {
 	userID := c.GetString("user_id")
 	traderID := c.Param("id")
+
+	unlockMutation := planning.LockAccount("trader-mutation:" + traderID)
+	defer unlockMutation()
 
 	// Verify trader belongs to current user
 	_, err := s.store.Trader().GetFullConfig(userID, traderID)
@@ -940,6 +994,15 @@ func (s *Server) handleStopTrader(c *gin.Context) {
 		return
 	}
 
+	if cfg, e := s.store.Trader().GetFullConfig(userID, traderID); e == nil && cfg.Strategy.IsAllinCrypto() {
+		if err := s.store.Trader().SetCopyStopping(userID, traderID, true); err != nil {
+			SafeInternalError(c, "Failed to persist stop request", err)
+			return
+		}
+		go trader.Stop()
+		c.JSON(http.StatusAccepted, gin.H{"message": "Stopping new entries; reconciling pending orders before releasing runtime", "status": "stopping"})
+		return
+	}
 	// Stop trader
 	trader.Stop()
 

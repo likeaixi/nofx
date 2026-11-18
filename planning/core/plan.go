@@ -66,6 +66,9 @@ type Snapshot struct {
 	Kind          string      `json:"kind"`
 	BaseAsset     string      `json:"base_asset,omitempty"`
 	QuoteAsset    string      `json:"quote_asset,omitempty"`
+	MarketStep    Decimal     `json:"market_step,omitempty"`
+	MarketMin     Decimal     `json:"market_min,omitempty"`
+	MarketMax     Decimal     `json:"market_max,omitempty"`
 	ContractValue Decimal     `json:"contract_value,omitempty"`
 	Bid           Decimal     `json:"bid"`
 	Ask           Decimal     `json:"ask"`

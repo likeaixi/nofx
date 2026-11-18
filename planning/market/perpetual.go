@@ -40,7 +40,7 @@ func (c *Client) binancePerpetual(ctx context.Context, symbol string) (core.Snap
 	var info struct {
 		Symbols []struct {
 			Symbol, Status, ContractType, MarginAsset, QuoteAsset, BaseAsset string
-			Filters                                                          []struct{ FilterType, TickSize, StepSize, MinQty, MinNotional, Notional string }
+			Filters                                                          []struct{ FilterType, TickSize, StepSize, MinQty, MaxQty, MinNotional, Notional string }
 		}
 	}
 	if err := c.request(ctx, "GET", c.BinanceFutures+"/fapi/v1/exchangeInfo", nil, &info); err != nil {
@@ -61,6 +61,10 @@ func (c *Client) binancePerpetual(ctx context.Context, symbol string) (core.Snap
 			switch f.FilterType {
 			case "PRICE_FILTER":
 				s.Tick = core.Decimal(f.TickSize)
+			case "MARKET_LOT_SIZE":
+				s.MarketStep = core.Decimal(f.StepSize)
+				s.MarketMin = core.Decimal(f.MinQty)
+				s.MarketMax = core.Decimal(f.MaxQty)
 			case "LOT_SIZE":
 				s.Step = core.Decimal(f.StepSize)
 				s.MinQty = core.Decimal(f.MinQty)
@@ -137,7 +141,7 @@ func (c *Client) okxPerpetual(ctx context.Context, symbol string) (core.Snapshot
 	}
 	var info struct {
 		Code string
-		Data []struct{ InstId, State, InstType, CtType, CtVal, CtValCcy, CtMult, SettleCcy, TickSz, LotSz, MinSz string }
+		Data []struct{ InstId, State, InstType, CtType, CtVal, CtValCcy, CtMult, SettleCcy, TickSz, LotSz, MinSz, MaxMktSz string }
 	}
 	if err := c.request(ctx, "GET", c.OKX+"/api/v5/public/instruments?instType=SWAP&instId="+url.QueryEscape(symbol), nil, &info); err != nil {
 		return s, err
@@ -164,6 +168,13 @@ func (c *Client) okxPerpetual(ctx context.Context, symbol string) (core.Snapshot
 	if s.MinQty, err = productDecimal(r.MinSz, r.CtVal); err != nil {
 		return s, err
 	}
+	if r.MaxMktSz != "" {
+		if s.MarketMax, err = productDecimal(r.MaxMktSz, r.CtVal); err != nil {
+			return s, err
+		}
+	}
+	s.MarketStep = s.Step
+	s.MarketMin = s.MinQty
 	s.MinNotional = "0.000000000001"
 	var book struct {
 		Code string

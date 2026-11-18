@@ -1,6 +1,7 @@
 package trader
 
 import (
+	"context"
 	"fmt"
 	"github.com/ethereum/go-ethereum/crypto"
 	"nofx/kernel"
@@ -11,6 +12,7 @@ import (
 	"nofx/planning"
 	"nofx/planning/live"
 	"nofx/store"
+	"nofx/trader/allincrypto"
 	"nofx/trader/aster"
 	"nofx/trader/binance"
 	"nofx/trader/bitget"
@@ -236,59 +238,67 @@ func NewAutoTrader(config AutoTraderConfig, st *store.Store, userID string) (*Au
 	if config.Name == "" {
 		config.Name = "Default Trader"
 	}
-	if config.AIModel == "" {
-		if config.UseQwen {
-			config.AIModel = "qwen"
-		} else {
-			config.AIModel = "deepseek"
-		}
+	fixed := config.StrategyConfig != nil && config.StrategyConfig.StrategyType == store.AllinCrypto
+	if fixed && (!store.SupportsAllinCrypto(config.Exchange) || st == nil || config.ExchangeID == "") {
+		return nil, fmt.Errorf("AllinCrypto requires a configured Binance or OKX USDT perpetual account")
 	}
-
-	// Initialize AI client based on provider
 	var mcpClient mcp.AIClient
-	aiModel := config.AIModel
-	if config.UseQwen && aiModel == "" {
-		aiModel = "qwen"
-	}
-
-	// Resolve API key (provider-specific overrides)
-	apiKey := config.CustomAPIKey
-	customURL := config.CustomAPIURL
-	switch aiModel {
-	case "qwen":
-		if config.QwenKey != "" {
-			apiKey = config.QwenKey
+	if !fixed {
+		if config.AIModel == "" {
+			if config.UseQwen {
+				config.AIModel = "qwen"
+			} else {
+				config.AIModel = "deepseek"
+			}
 		}
-	case "deepseek", "":
-		if config.DeepSeekKey != "" {
-			apiKey = config.DeepSeekKey
-		}
-	}
 
-	// Create client via registry (covers all registered providers)
-	if aiModel == "custom" {
-		mcpClient = mcp.New()
-	} else if aiModel == "" {
-		aiModel = "deepseek"
-		mcpClient = mcp.NewAIClientByProvider(aiModel)
+		// Initialize AI client based on provider
+		aiModel := config.AIModel
+		if config.UseQwen && aiModel == "" {
+			aiModel = "qwen"
+		}
+
+		// Resolve API key (provider-specific overrides)
+		apiKey := config.CustomAPIKey
+		customURL := config.CustomAPIURL
+		switch aiModel {
+		case "qwen":
+			if config.QwenKey != "" {
+				apiKey = config.QwenKey
+			}
+		case "deepseek", "":
+			if config.DeepSeekKey != "" {
+				apiKey = config.DeepSeekKey
+			}
+		}
+
+		// Create client via registry (covers all registered providers)
+		if aiModel == "custom" {
+			mcpClient = mcp.New()
+		} else if aiModel == "" {
+			aiModel = "deepseek"
+			mcpClient = mcp.NewAIClientByProvider(aiModel)
+		} else {
+			mcpClient = mcp.NewAIClientByProvider(aiModel)
+		}
+		if mcpClient == nil {
+			mcpClient = mcp.New()
+		}
+
+		// Payment providers (claw402) ignore customURL
+		switch aiModel {
+		case "claw402":
+			mcpClient.SetAPIKey(apiKey, "", config.CustomModelName)
+		default:
+			mcpClient.SetAPIKey(apiKey, customURL, config.CustomModelName)
+		}
+		logger.Infof("🤖 [%s] Using %s AI", config.Name, aiModel)
+
+		if config.CustomAPIURL != "" || config.CustomModelName != "" {
+			logger.Infof("🔧 [%s] Custom config - URL: %s, Model: %s", config.Name, config.CustomAPIURL, config.CustomModelName)
+		}
 	} else {
-		mcpClient = mcp.NewAIClientByProvider(aiModel)
-	}
-	if mcpClient == nil {
-		mcpClient = mcp.New()
-	}
-
-	// Payment providers (claw402) ignore customURL
-	switch aiModel {
-	case "claw402":
-		mcpClient.SetAPIKey(apiKey, "", config.CustomModelName)
-	default:
-		mcpClient.SetAPIKey(apiKey, customURL, config.CustomModelName)
-	}
-	logger.Infof("🤖 [%s] Using %s AI", config.Name, aiModel)
-
-	if config.CustomAPIURL != "" || config.CustomModelName != "" {
-		logger.Infof("🔧 [%s] Custom config - URL: %s, Model: %s", config.Name, config.CustomAPIURL, config.CustomModelName)
+		config.AIModel = ""
 	}
 
 	// Set default trading platform
@@ -310,13 +320,23 @@ func NewAutoTrader(config AutoTraderConfig, st *store.Store, userID string) (*Au
 	switch config.Exchange {
 	case "binance":
 		logger.Infof("🏦 [%s] Using Binance Futures trading", config.Name)
-		trader = binance.NewFuturesTrader(config.BinanceAPIKey, config.BinanceSecretKey, userID)
+		probe, e := binance.NewAccountTrader(context.Background(), config.BinanceAPIKey, config.BinanceSecretKey, userID)
+		if e != nil {
+			return nil, e
+		}
+		trader, err = initializeOwnedAccount(st, config, probe, func() Trader { return binance.NewFuturesTrader(config.BinanceAPIKey, config.BinanceSecretKey, userID) })
+		if err != nil {
+			return nil, err
+		}
 	case "bybit":
 		logger.Infof("🏦 [%s] Using Bybit Futures trading", config.Name)
 		trader = bybit.NewBybitTrader(config.BybitAPIKey, config.BybitSecretKey)
 	case "okx":
 		logger.Infof("🏦 [%s] Using OKX Futures trading", config.Name)
-		trader = okx.NewOKXTrader(config.OKXAPIKey, config.OKXSecretKey, config.OKXPassphrase)
+		trader, err = initializeOwnedAccount(st, config, okx.NewAccountTrader(config.OKXAPIKey, config.OKXSecretKey, config.OKXPassphrase), func() Trader { return okx.NewOKXTrader(config.OKXAPIKey, config.OKXSecretKey, config.OKXPassphrase) })
+		if err != nil {
+			return nil, err
+		}
 	case "bitget":
 		logger.Infof("🏦 [%s] Using Bitget Futures trading", config.Name)
 		trader = bitget.NewBitgetTrader(config.BitgetAPIKey, config.BitgetSecretKey, config.BitgetPassphrase)
@@ -405,7 +425,10 @@ func NewAutoTrader(config AutoTraderConfig, st *store.Store, userID string) (*Au
 	if claw402Key == "" && config.AIModel == "claw402" && config.CustomAPIKey != "" {
 		claw402Key = config.CustomAPIKey
 	}
-	strategyEngine := kernel.NewStrategyEngine(config.StrategyConfig, claw402Key)
+	var strategyEngine *kernel.StrategyEngine
+	if !fixed {
+		strategyEngine = kernel.NewStrategyEngine(config.StrategyConfig, claw402Key)
+	}
 	logger.Infof("✓ [%s] Using strategy engine (strategy configuration loaded)", config.Name)
 
 	return &AutoTrader{
@@ -475,19 +498,50 @@ func (at *AutoTrader) reloadStrategyConfigIfChanged() error {
 }
 
 // Run runs the automatic trading main loop
-func (at *AutoTrader) Run() error {
+func (at *AutoTrader) Run() error { return at.runReady(nil) }
+
+// Start waits for ownership acquisition and persisted runtime state, not the
+// first trading cycle. Rejected starts must never appear successful to callers.
+func (at *AutoTrader) Start() error {
+	ready := make(chan error, 1)
+	go func() {
+		if err := at.runReady(ready); err != nil {
+			at.logWarnf("Trader runtime: %v", err)
+		}
+	}()
+	return <-ready
+}
+func (at *AutoTrader) runReady(ready chan<- error) (runErr error) {
+	notified := false
+	defer func() {
+		if ready != nil && !notified {
+			ready <- runErr
+		}
+	}()
 	// All launch paths (API, restoration and manager) respect a planning lease.
 	var unlock func()
+	var account string
 	if at.store != nil && at.exchangeID != "" {
 		ex, err := at.store.Exchange().GetByID(at.userID, at.exchangeID)
 		if err != nil {
 			return fmt.Errorf("cannot verify planning account ownership: %w", err)
 		}
 		key := planning.AccountIdentity(ex.ExchangeType, string(ex.APIKey), ex.HyperliquidWalletAddr)
-		unlock = planning.LockAccount(key)
+		account = key
+		if native, ok := at.trader.(interface {
+			NativeAccountIdentity(context.Context) (string, error)
+		}); ok {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			account, err = native.NativeAccountIdentity(ctx)
+			cancel()
+			if err != nil {
+				return fmt.Errorf("cannot verify native trading account: %w", err)
+			}
+		}
+		unlock = planning.LockAccount(account)
 		if at.store.GormDB().Migrator().HasTable(&live.Lease{}) {
 			var count int64
-			err = at.store.GormDB().Model(&live.Lease{}).Where("account_key = ?", key).Count(&count).Error
+			err = at.store.GormDB().Model(&live.Lease{}).Where("account_key IN ?", []string{key, account}).Count(&count).Error
 			if err != nil || count != 0 {
 				unlock()
 				return fmt.Errorf("account has an unresolved planning lease or lease lookup failed")
@@ -495,15 +549,96 @@ func (at *AutoTrader) Run() error {
 		}
 	}
 
+	fixed := at.config.StrategyConfig != nil && at.config.StrategyConfig.StrategyType == store.AllinCrypto
+	at.isRunningMutex.RLock()
+	alreadyRunning := at.isRunning
+	at.isRunningMutex.RUnlock()
+	if alreadyRunning {
+		if unlock != nil {
+			unlock()
+		}
+		return fmt.Errorf("trader is already running")
+	}
+	if fixed {
+		processRelease, err := acquireCopyProcessLock(at.store.GormDB(), account)
+		if err != nil {
+			if unlock != nil {
+				unlock()
+			}
+			return err
+		}
+		defer processRelease()
+	}
+	release, err := registerCopyAccount(account, fixed)
+	if err != nil {
+		if unlock != nil {
+			unlock()
+		}
+		return err
+	}
+	defer release()
+	if at.store != nil && account != "" {
+		if err := store.ClaimTradingAccount(at.store.GormDB(), account, at.id, fixed); err != nil {
+			if unlock != nil {
+				unlock()
+			}
+			return err
+		}
+		defer func() {
+			if fixed {
+				outstanding, err := allincrypto.Outstanding(at.store.GormDB(), at.id)
+				if err != nil || outstanding {
+					return
+				}
+			}
+			if err := store.ReleaseTradingAccount(at.store.GormDB(), account, at.id); err != nil {
+				at.logWarnf("Account reservation retained: %v", err)
+			}
+		}()
+	}
 	at.isRunningMutex.Lock()
+	if at.isRunning {
+		at.isRunningMutex.Unlock()
+		if unlock != nil {
+			unlock()
+		}
+		return fmt.Errorf("trader is already running")
+	}
+	at.stopMonitorCh = make(chan struct{})
+	at.monitorWg.Add(1)
 	at.isRunning = true
+	at.startTime = time.Now()
 	at.isRunningMutex.Unlock()
+	defer at.monitorWg.Done()
+	defer func() { at.isRunningMutex.Lock(); at.isRunning = false; at.isRunningMutex.Unlock() }()
 	if unlock != nil {
 		unlock()
 	}
-
-	at.stopMonitorCh = make(chan struct{})
-	at.startTime = time.Now()
+	if at.store != nil {
+		if fixed && ready != nil {
+			if err := at.store.Trader().SetCopyStopping(at.userID, at.id, false); err != nil {
+				return err
+			}
+		}
+		if err := at.store.Trader().UpdateStatus(at.userID, at.id, true); err != nil {
+			at.isRunningMutex.Lock()
+			at.isRunning = false
+			at.isRunningMutex.Unlock()
+			return err
+		}
+		defer func() {
+			if err := at.store.Trader().UpdateStatus(at.userID, at.id, false); err != nil {
+				at.logWarnf("Runtime state update failed: %v", err)
+			}
+		}()
+	}
+	if ready != nil {
+		ready <- nil
+		notified = true
+	}
+	if fixed {
+		return at.runAllinCrypto(account)
+	}
 
 	logger.Info("🚀 AI-driven automatic trading system started")
 	at.logInfof("💰 Initial balance: %.2f USDT", at.initialBalance)
@@ -512,8 +647,6 @@ func (at *AutoTrader) Run() error {
 
 	// Pre-launch checks for claw402 users
 	at.runPreLaunchChecks()
-	at.monitorWg.Add(1)
-	defer at.monitorWg.Done()
 
 	// Start drawdown monitoring
 	at.startDrawdownMonitor()

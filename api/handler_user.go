@@ -541,6 +541,13 @@ func createDefaultStrategiesFor(userID string, lang string, st *store.Store) err
 				setDefaultStrategy(c)
 			},
 		},
+		{
+			name:        "AllinCrypto",
+			description: "熬鹰资本 · Binance public fills · Binance / OKX USDT perpetuals · equity-proportional size · 20× leverage · 2% stop from the target fill.",
+			applyConfig: func(c *store.StrategyConfig) {
+				*c = store.StrategyConfig{StrategyType: store.AllinCrypto, Language: c.Language}
+			},
+		},
 	}
 
 	// GetDefaultStrategyConfig only supports zh/en; map id -> en

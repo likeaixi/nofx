@@ -395,6 +395,15 @@ export function TraderDashboardPage({
     return (
         <DeepVoidBackground className="min-h-screen pb-12" disableAnimation>
             <div className="w-full px-4 md:px-8 relative z-10 pt-6">
+                {status?.strategy_type === 'allincrypto' && (
+                    <div role="status" className="mb-4 text-sm text-nofx-text">
+                        AllinCrypto · {language === 'zh' ? '公开成交源' : 'Public fill source'} ·{' '}
+                        {status.trading_blocked ? status.trading_error : status.trading_checked_at
+                            ? (language === 'zh' ? '最近检查成功' : 'Last check succeeded')
+                            : (language === 'zh' ? '等待首次检查' : 'Awaiting first check')}
+                        {status.trading_checked_at && ` · ${new Date(status.trading_checked_at).toLocaleString()}`}
+                    </div>
+                )}
                 {/* Trader Header */}
                 <div
                     className="mb-6 rounded-lg p-6 animate-scale-in nofx-glass group"

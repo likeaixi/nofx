@@ -79,7 +79,9 @@ func summarizeDecisionExecution(record *store.DecisionRecord) {
 // GetStatus gets system status (for API)
 func (at *AutoTrader) GetStatus() map[string]interface{} {
 	aiProvider := "DeepSeek"
-	if at.config.UseQwen {
+	if at.config.StrategyConfig != nil && at.config.StrategyConfig.StrategyType == store.AllinCrypto {
+		aiProvider = ""
+	} else if at.config.UseQwen {
 		aiProvider = "Qwen"
 	}
 

@@ -16,6 +16,7 @@ import (
 	"gorm.io/gorm"
 	"nofx/planning"
 	"nofx/planning/core"
+	"nofx/store"
 )
 
 type Market interface {
@@ -154,6 +155,9 @@ func (c *Controller) ApproveReplacing(ctx context.Context, user, planID, hash, p
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	e = c.DB.Transaction(func(tx *gorm.DB) error {
+		if err := store.CheckPlanningAccount(tx, account); err != nil {
+			return err
+		}
 		var lease Lease
 		if err := tx.Where("account_key = ?", account).First(&lease).Error; err == nil {
 			var previous Run

@@ -27,6 +27,7 @@ type Trader struct {
 	StrategyID          string    `gorm:"column:strategy_id;default:''" json:"strategy_id"`
 	InitialBalance      float64   `gorm:"column:initial_balance;not null" json:"initial_balance"`
 	ScanIntervalMinutes int       `gorm:"column:scan_interval_minutes;default:15" json:"scan_interval_minutes"`
+	CopyStopping        bool      `gorm:"column:copy_stopping;not null;default:false" json:"copy_stopping"`
 	IsRunning           bool      `gorm:"column:is_running;default:false" json:"is_running"`
 	IsCrossMargin       bool      `gorm:"column:is_cross_margin;default:true" json:"is_cross_margin"`
 	ShowInCompetition   bool      `gorm:"column:show_in_competition;default:true" json:"show_in_competition"`
@@ -63,7 +64,7 @@ func (s *TraderStore) initTables() error {
 		var tableExists int64
 		s.db.Raw(`SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'traders'`).Scan(&tableExists)
 		if tableExists > 0 {
-			return nil
+			return s.db.Exec("ALTER TABLE traders ADD COLUMN IF NOT EXISTS copy_stopping boolean NOT NULL DEFAULT false").Error
 		}
 	}
 	// Use GORM AutoMigrate
@@ -92,9 +93,19 @@ func (s *TraderStore) List(userID string) ([]*Trader, error) {
 
 // UpdateStatus updates trader running status
 func (s *TraderStore) UpdateStatus(userID, id string, isRunning bool) error {
-	return s.db.Model(&Trader{}).
+	result := s.db.Model(&Trader{}).
 		Where("id = ? AND user_id = ?", id, userID).
-		Update("is_running", isRunning).Error
+		Update("is_running", isRunning)
+	return ownedTraderMutationResult(result)
+}
+
+func (s *TraderStore) SetCopyStopping(userID, id string, value bool) error {
+	return ownedTraderMutationResult(s.db.Model(&Trader{}).Where("id = ? AND user_id = ?", id, userID).Update("copy_stopping", value))
+}
+func (s *TraderStore) CopyStopRequested(userID, id string) (bool, error) {
+	var t Trader
+	err := s.db.Select("copy_stopping").Where("id = ? AND user_id = ?", id, userID).Take(&t).Error
+	return t.CopyStopping, err
 }
 
 // UpdateShowInCompetition updates trader competition visibility
@@ -202,13 +213,6 @@ func (s *TraderStore) GetFullConfig(userID, traderID string) (*TraderFullConfig,
 		return nil, err
 	}
 
-	// Get AI model
-	var aiModel AIModel
-	err = s.db.Where("id = ? AND user_id = ?", trader.AIModelID, userID).First(&aiModel).Error
-	if err != nil {
-		return nil, fmt.Errorf("failed to get AI model: %w", err)
-	}
-
 	// Get exchange
 	var exchange Exchange
 	err = s.db.Where("id = ? AND user_id = ?", trader.ExchangeID, userID).First(&exchange).Error
@@ -226,9 +230,17 @@ func (s *TraderStore) GetFullConfig(userID, traderID string) (*TraderFullConfig,
 		strategy, _ = s.getActiveOrDefaultStrategy(userID)
 	}
 
+	var aiModel *AIModel
+	if !strategy.IsAllinCrypto() {
+		aiModel = &AIModel{}
+		if err = s.db.Where("id = ? AND user_id = ?", trader.AIModelID, userID).First(aiModel).Error; err != nil {
+			return nil, fmt.Errorf("failed to get AI model: %w", err)
+		}
+	}
+
 	return &TraderFullConfig{
 		Trader:   &trader,
-		AIModel:  &aiModel,
+		AIModel:  aiModel,
 		Exchange: &exchange,
 		Strategy: strategy,
 	}, nil

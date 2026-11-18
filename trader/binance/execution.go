@@ -298,6 +298,7 @@ func (b *FuturesTrader) LookupOrder(ctx context.Context, o execution.Order) (exe
 			o.Average = execution.Decimal(fill.AvgPrice)
 			return o, nil
 		}
+		o.Filled = "0" // No linked execution order exists for this algo.
 		switch r.AlgoStatus {
 		case "NEW":
 			o.Status = "NEW"

@@ -238,6 +238,12 @@ func (s *Server) handleUpdateExchangeConfigs(c *gin.Context) {
 		logger.Infof("🔓 Decrypted exchange config data (UserID: %s)", userID)
 	}
 
+	for exchangeID := range req.Exchanges {
+		if err := s.guardCopyExchangeMutation(userID, exchangeID); err != nil {
+			SafeBadRequest(c, err.Error())
+			return
+		}
+	}
 	// Update each exchange's configuration and track traders that need reload
 	tradersToReload := make(map[string]bool)
 	for exchangeID, exchangeData := range req.Exchanges {
