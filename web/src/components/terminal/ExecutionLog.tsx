@@ -104,10 +104,16 @@ interface ExecutionLogProps {
 }
 
 export function ExecutionLog({ decisions, height = 440 }: ExecutionLogProps) {
-  // Newest cycle first.
+  // Cycle numbers can restart when a trader changes strategy. Time, not
+  // the strategy-local counter, determines the latest record.
   const cycles = useMemo(() => {
     const list = decisions ?? []
-    return [...list].sort((a, b) => b.cycle_number - a.cycle_number)
+    return [...list].sort((a, b) => {
+      const aTime = Date.parse(a.timestamp)
+      const bTime = Date.parse(b.timestamp)
+      const timeOrder = (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
+      return timeOrder || (b.id ?? 0) - (a.id ?? 0)
+    })
   }, [decisions])
 
   return (
@@ -123,7 +129,7 @@ export function ExecutionLog({ decisions, height = 440 }: ExecutionLogProps) {
         </span>
       </div>
       <div className="tm-sc" style={{ fontSize: 9, marginBottom: 5 }}>
-        Execution log · AI decisions & fills per cycle
+        Execution log · Decisions, fills & runtime checks
       </div>
 
       {/* legend */}
