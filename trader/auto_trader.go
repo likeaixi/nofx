@@ -169,47 +169,48 @@ type AutoTraderConfig struct {
 
 // AutoTrader automatic trader
 type AutoTrader struct {
-	id                    string // Trader unique identifier
-	name                  string // Trader display name
-	aiModel               string // AI model name
-	exchange              string // Trading platform type (binance/bybit/etc)
-	exchangeID            string // Exchange account UUID
-	showInCompetition     bool   // Whether to show in competition page
-	config                AutoTraderConfig
-	trader                Trader // Use Trader interface (supports multiple platforms)
-	mcpClient             mcp.AIClient
-	store                 *store.Store           // Data storage (decision records, etc.)
-	strategyEngine        *kernel.StrategyEngine // Strategy engine (uses strategy configuration)
-	cycleNumber           int                    // Current cycle number
-	initialBalance        float64
-	dailyPnL              float64
-	customPrompt          string // Custom trading strategy prompt
-	overrideBasePrompt    bool   // Whether to override base prompt
-	lastResetTime         time.Time
-	stopUntil             time.Time
-	isRunning             bool
-	isRunningMutex        sync.RWMutex       // Mutex to protect isRunning flag
-	startTime             time.Time          // System start time
-	callCount             int                // AI call count
-	positionFirstSeenTime map[string]int64   // Position first seen time (symbol_side -> timestamp in milliseconds)
-	stopMonitorCh         chan struct{}      // Used to stop monitoring goroutine
-	monitorWg             sync.WaitGroup     // Used to wait for monitoring goroutine to finish
-	peakPnLCache          map[string]float64 // Peak profit cache (symbol -> peak P&L percentage)
-	peakPnLCacheMutex     sync.RWMutex       // Cache read-write lock
-	lastBalanceSyncTime   time.Time          // Last balance sync time
-	userID                string             // User ID
-	gridState             *GridState         // Grid trading state (only used when StrategyType == "grid_trading")
-	claw402WalletAddr     string             // Claw402 wallet address (derived from private key at start)
-	consecutiveAIFailures int                // Consecutive AI call failures
-	runtimeHealthMu       sync.RWMutex       // Guards safe mode + AI wallet health (loop writes, API reads)
-	tradingBlocked        bool
-	tradingError          string
-	tradingCheckedAt      time.Time
-	safeMode              bool      // Safe mode: no new positions, protect existing ones
-	safeModeReason        string    // Why safe mode was activated
-	aiWalletStatus        string    // "ok"|"low"|"empty"|"unknown" — see runtime_health.go
-	aiWalletBalanceUSDC   float64   // Last observed Base USDC balance of the claw402 wallet
-	aiWalletCheckedAt     time.Time // When the balance was last observed
+	id                        string // Trader unique identifier
+	name                      string // Trader display name
+	aiModel                   string // AI model name
+	exchange                  string // Trading platform type (binance/bybit/etc)
+	exchangeID                string // Exchange account UUID
+	showInCompetition         bool   // Whether to show in competition page
+	config                    AutoTraderConfig
+	trader                    Trader // Use Trader interface (supports multiple platforms)
+	mcpClient                 mcp.AIClient
+	store                     *store.Store           // Data storage (decision records, etc.)
+	strategyEngine            *kernel.StrategyEngine // Strategy engine (uses strategy configuration)
+	cycleNumber               int                    // Current cycle number
+	initialBalance            float64
+	dailyPnL                  float64
+	customPrompt              string // Custom trading strategy prompt
+	overrideBasePrompt        bool   // Whether to override base prompt
+	lastResetTime             time.Time
+	stopUntil                 time.Time
+	isRunning                 bool
+	preserveRunningOnShutdown bool
+	isRunningMutex            sync.RWMutex       // Mutex to protect isRunning flag
+	startTime                 time.Time          // System start time
+	callCount                 int                // AI call count
+	positionFirstSeenTime     map[string]int64   // Position first seen time (symbol_side -> timestamp in milliseconds)
+	stopMonitorCh             chan struct{}      // Used to stop monitoring goroutine
+	monitorWg                 sync.WaitGroup     // Used to wait for monitoring goroutine to finish
+	peakPnLCache              map[string]float64 // Peak profit cache (symbol -> peak P&L percentage)
+	peakPnLCacheMutex         sync.RWMutex       // Cache read-write lock
+	lastBalanceSyncTime       time.Time          // Last balance sync time
+	userID                    string             // User ID
+	gridState                 *GridState         // Grid trading state (only used when StrategyType == "grid_trading")
+	claw402WalletAddr         string             // Claw402 wallet address (derived from private key at start)
+	consecutiveAIFailures     int                // Consecutive AI call failures
+	runtimeHealthMu           sync.RWMutex       // Guards safe mode + AI wallet health (loop writes, API reads)
+	tradingBlocked            bool
+	tradingError              string
+	tradingCheckedAt          time.Time
+	safeMode                  bool      // Safe mode: no new positions, protect existing ones
+	safeModeReason            string    // Why safe mode was activated
+	aiWalletStatus            string    // "ok"|"low"|"empty"|"unknown" — see runtime_health.go
+	aiWalletBalanceUSDC       float64   // Last observed Base USDC balance of the claw402 wallet
+	aiWalletCheckedAt         time.Time // When the balance was last observed
 }
 
 // NewAutoTrader creates an automatic trader
@@ -607,6 +608,7 @@ func (at *AutoTrader) runReady(ready chan<- error) (runErr error) {
 	at.stopMonitorCh = make(chan struct{})
 	at.monitorWg.Add(1)
 	at.isRunning = true
+	at.preserveRunningOnShutdown = false
 	at.startTime = time.Now()
 	at.isRunningMutex.Unlock()
 	defer at.monitorWg.Done()
@@ -626,11 +628,8 @@ func (at *AutoTrader) runReady(ready chan<- error) (runErr error) {
 			at.isRunningMutex.Unlock()
 			return err
 		}
-		defer func() {
-			if err := at.store.Trader().UpdateStatus(at.userID, at.id, false); err != nil {
-				at.logWarnf("Runtime state update failed: %v", err)
-			}
-		}()
+		defer at.persistRuntimeExit()
+
 	}
 	if ready != nil {
 		ready <- nil
@@ -778,12 +777,27 @@ func (at *AutoTrader) runReady(ready chan<- error) (runErr error) {
 }
 
 // Stop stops the automatic trading
-func (at *AutoTrader) Stop() {
+func (at *AutoTrader) persistRuntimeExit() {
+	at.isRunningMutex.RLock()
+	preserve := at.preserveRunningOnShutdown
+	at.isRunningMutex.RUnlock()
+	if !preserve && at.store != nil {
+		if err := at.store.Trader().UpdateStatus(at.userID, at.id, false); err != nil {
+			at.logWarnf("Runtime state update failed: %v", err)
+		}
+	}
+}
+
+// Shutdown preserves persisted running intent for restoration after a service restart.
+func (at *AutoTrader) Shutdown() { at.stop(true) }
+func (at *AutoTrader) Stop()     { at.stop(false) }
+func (at *AutoTrader) stop(shutdown bool) {
 	at.isRunningMutex.Lock()
 	if !at.isRunning {
 		at.isRunningMutex.Unlock()
 		return
 	}
+	at.preserveRunningOnShutdown = shutdown
 	at.isRunning = false
 	at.isRunningMutex.Unlock()
 

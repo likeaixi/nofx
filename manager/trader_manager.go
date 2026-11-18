@@ -111,7 +111,7 @@ func (tm *TraderManager) StopAll() {
 
 	logger.Info("⏹  Stopping all traders...")
 	for _, t := range tm.traders {
-		t.Stop()
+		t.Shutdown()
 	}
 }
 
