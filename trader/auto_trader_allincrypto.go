@@ -83,6 +83,11 @@ func (at *AutoTrader) runCopyCycles(runner *allincrypto.Runner) error {
 		} else {
 			err = runner.Reconcile(ctx)
 		}
+		if full {
+			if reportErr := runner.RecordRuntimeStatus(err, false); reportErr != nil {
+				at.logWarnf("AllinCrypto runtime decision log: %v", reportErr)
+			}
+		}
 		at.runtimeHealthMu.Lock()
 		defer at.runtimeHealthMu.Unlock()
 		if full || err != nil {
@@ -115,6 +120,9 @@ func (at *AutoTrader) runCopyCycles(runner *allincrypto.Runner) error {
 		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 		done, err := runner.Drain(ctx)
 		cancel()
+		if reportErr := runner.RecordRuntimeStatus(err, true); reportErr != nil {
+			at.logWarnf("AllinCrypto stopping decision log: %v", reportErr)
+		}
 		if done && err == nil {
 			return nil
 		}

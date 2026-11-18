@@ -45,3 +45,30 @@ func TestRestoredCopyStopDrainsWithoutFetchingNewSignals(t *testing.T) {
 		t.Fatal(src.polls, err)
 	}
 }
+
+func TestCopyCyclePublishesFailedCheckInDecisionFeed(t *testing.T) {
+	st, err := store.New(t.TempDir() + "/copy.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err := st.Trader().Create(&store.Trader{ID: "t", UserID: "u", IsRunning: true}); err != nil {
+		t.Fatal(err)
+	}
+	at := &AutoTrader{id: "t", userID: "u", store: st, stopMonitorCh: make(chan struct{})}
+	src := &stoppedSource{stop: at.stopMonitorCh}
+	r, err := allincrypto.New(st.GormDB(), "t", "account", src, unusedCopyVenue{}, unusedCopyMarket{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := at.runCopyCycles(r); err != nil {
+		t.Fatal(err)
+	}
+	var rows []store.DecisionRecordDB
+	if err := st.GormDB().Where("trader_id = ?", "t").Find(&rows).Error; err != nil {
+		t.Fatal(err)
+	}
+	if src.polls != 1 || len(rows) != 1 || rows[0].Success || rows[0].ErrorMessage != "unexpected source poll" {
+		t.Fatalf("failed check missing from feed: polls=%d records=%+v", src.polls, rows)
+	}
+}

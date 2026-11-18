@@ -54,16 +54,17 @@ type pending struct {
 	Reason                                 string
 }
 type state struct {
-	Waiting     map[string]*pending
-	Last        map[string]binancecopy.Event
-	SourceFault string
-	Lead        map[string]decimal.Decimal
-	Head        string
-	Baseline    int64
-	Positions   map[string]*position
-	Pending     *pending
-	Cycle       int
-	revision    int64
+	LastRuntimeReportAt time.Time
+	Waiting             map[string]*pending
+	Last                map[string]binancecopy.Event
+	SourceFault         string
+	Lead                map[string]decimal.Decimal
+	Head                string
+	Baseline            int64
+	Positions           map[string]*position
+	Pending             *pending
+	Cycle               int
+	revision            int64
 }
 
 func (r *Runner) load() (*state, error) {
