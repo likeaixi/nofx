@@ -36,13 +36,16 @@ func (b *FuturesTrader) nativeAccountIdentityV2(ctx context.Context) (string, er
 		return "", err
 	}
 	query := url.Values{"timestamp": {strconv.FormatInt(time.Now().UnixMilli()-b.client.TimeOffset, 10)}}
-	signature, err := sign(b.client.SecretKey, query.Encode())
+	signedPayload := query.Encode()
+	signature, err := sign(b.client.SecretKey, signedPayload)
 	if err != nil {
 		return "", err
 	}
-	query.Set("signature", *signature)
+	// Match the SDK: sign the exact encoded payload, then append the signature
+	// last. Re-encoding the combined values moves signature before timestamp.
+	signedQuery := signedPayload + "&" + url.Values{"signature": {*signature}}.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		strings.TrimRight(b.client.BaseURL, "/")+"/fapi/v2/balance?"+query.Encode(), nil)
+		strings.TrimRight(b.client.BaseURL, "/")+"/fapi/v2/balance?"+signedQuery, nil)
 	if err != nil {
 		return "", err
 	}

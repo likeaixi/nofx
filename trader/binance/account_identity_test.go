@@ -29,10 +29,17 @@ func TestNativeIdentityUsesV2AndMatchesAccountAcrossKeys(t *testing.T) {
 			return
 		}
 		q := r.URL.Query()
-		signature := q.Get("signature")
-		q.Del("signature")
+		// Verify the exact bytes Binance receives, with signature appended last.
+		// Re-encoding URL values hides signing-order bugs in the request builder.
+		signedPayload, signature, found := strings.Cut(r.URL.RawQuery, "&signature=")
+		if !found || strings.Contains(signature, "&") {
+			t.Error("signature must be the final query parameter")
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, `{"code":-1022,"msg":"invalid signature"}`)
+			return
+		}
 		mac := hmac.New(sha256.New, []byte("test-secret"))
-		mac.Write([]byte(q.Encode()))
+		mac.Write([]byte(signedPayload))
 		if signature != hex.EncodeToString(mac.Sum(nil)) {
 			t.Error("invalid signature")
 		}
