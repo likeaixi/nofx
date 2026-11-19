@@ -829,7 +829,7 @@ export function StrategyStudioPage() {
               <p>{text(language, '来源：币安带单组合「熬鹰资本」5075281354358777856。公开成交可能延迟，首次运行仅建立基线。', 'Source: Binance lead portfolio 熬鹰资本 (5075281354358777856). Public fills may be delayed. The first poll establishes the baseline.')}</p>
               <p>{text(language, '开仓名义金额 = 本账户净权益 ÷ 带单保证金余额 × 源成交金额。固定 20 倍杠杆，跟随加仓、按比例减仓和平仓。', 'Entry notional = account equity ÷ lead margin balance × lead fill notional. Uses 20× leverage and follows adds, proportional reductions and closes.')}</p>
               <p>{text(language, '目标账户实际成交均价反向 2% 设置交易所止损。支持 Binance、OKX 已核实的 USDT 线性永续合约。运行状态见交易员面板。', 'The exchange stop sits 2% from your actual average fill. Supports verified Binance and OKX USDT linear perpetuals. Check source status on the trader dashboard.')}</p>
-              <p>BTC · ETH · SOL · XRP · DOGE · BNB · ADA · AVAX · LINK · LTC</p>
+              <p>{text(language, '跟随带单组合新成交的品种，逐笔核实目标交易所合约及计价单位；不支持或无法核实的品种会跳过并记录原因，不补跟历史信号。', 'Follows symbols in new lead fills after verifying the target contract and units. Unsupported or unverifiable markets are skipped with a recorded reason; historical signals are not replayed.')}</p>
             </section>
           ) : selectedStrategy && aiConfig && coinSource && indicators && risk ? (
             <div className="mx-auto max-w-7xl space-y-4">

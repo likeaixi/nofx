@@ -3,6 +3,7 @@ package allincrypto
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -139,8 +140,14 @@ func (r *Runner) save(s *state, events []binancecopy.Event, record *store.Decisi
 }
 func (r *Runner) record(p *pending, reason string, success bool) *store.DecisionRecord {
 	detail, _ := json.Marshal(p)
-	action := store.DecisionAction{Action: "allincrypto", Symbol: p.Symbol, Leverage: 20, Success: success, Reasoning: reason}
+	symbol := p.Symbol
+	if symbol == "" {
+		symbol = p.Event.Symbol
+	}
+	action := store.DecisionAction{Action: "allincrypto", Symbol: symbol, Leverage: 20, Success: success, Reasoning: reason}
+	outcome := "已记录"
 	if !success {
+		outcome = "跳过或未完成"
 		action.Skipped = true
 		action.SkipReason = reason
 	}
@@ -157,7 +164,7 @@ func (r *Runner) record(p *pending, reason string, success bool) *store.Decision
 			action.StopLoss, _ = sl.Float64()
 		}
 	}
-	return &store.DecisionRecord{TraderID: r.id, Timestamp: time.Now().UTC(), DecisionJSON: string(detail), ExecutionLog: []string{reason}, Success: success, Decisions: []store.DecisionAction{action}}
+	return &store.DecisionRecord{TraderID: r.id, Timestamp: time.Now().UTC(), DecisionJSON: string(detail), ExecutionLog: []string{fmt.Sprintf("源信号：%s %s %s；目标交易所：%s；目标合约：%s", p.Event.Symbol, p.Event.PositionSide, p.Event.Side, r.venue.Venue(), symbol), "结果：" + outcome + "；原因：" + reason}, Success: success, Decisions: []store.DecisionAction{action}}
 }
 
 // Outstanding is a read-only guard for administrative changes. Unknown orders

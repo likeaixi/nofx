@@ -11,6 +11,7 @@ import (
 	_ "nofx/mcp/provider"
 	"nofx/store"
 	"nofx/telemetry"
+	"nofx/trader"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -102,6 +103,11 @@ func main() {
 	// logger.Info("📊 WebSocket market monitor started")
 	// time.Sleep(500 * time.Millisecond)
 	logger.Info("📊 Using CoinAnk API for all market data (WebSocket cache disabled)")
+
+	// Convert collision-prone Binance V3 identities before restoring workers.
+	if err := trader.UpgradeBinanceAccountIdentities(st); err != nil {
+		logger.Fatalf("❌ Account identity upgrade refused: %v", err)
+	}
 
 	// Create TraderManager
 	traderManager := manager.NewTraderManager()

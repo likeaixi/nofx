@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"nofx/store"
@@ -29,7 +30,7 @@ func (r *Runner) RecordRuntimeStatus(checkErr error, stopping bool) error {
 	if s.Pending != nil {
 		waiting++
 	}
-	status := "检查正常，按固定规则继续跟踪带单信号"
+	status := "轮询检查通过；跟单执行结果以最近信号记录为准"
 	if waiting > 0 {
 		status = "订单对账处理中，等待确认后继续跟单"
 	}
@@ -45,6 +46,47 @@ func (r *Runner) RecordRuntimeStatus(checkErr error, stopping bool) error {
 		"运行状态：" + status,
 		fmt.Sprintf("已记录跟单持仓：%d；待处理订单流程：%d", len(s.Positions), waiting),
 		"检查频率：带单信号每 1 分钟；订单和止损每 5 秒。交易事件仍实时单独记录。",
+	}
+	// Keep the latest actual signal outcome visible even after many heartbeats.
+	var recent store.DecisionRecordDB
+	q := r.db.Where("trader_id = ? AND decisions LIKE ?", r.id, `%"action":"allincrypto"%`).Order("id desc").Limit(1).Find(&recent)
+	if q.Error != nil {
+		return q.Error
+	}
+	if q.RowsAffected > 0 {
+		var actions []store.DecisionAction
+		var eventLogs []string
+		if err := json.Unmarshal([]byte(recent.Decisions), &actions); err != nil {
+			return err
+		}
+		if err := json.Unmarshal([]byte(recent.ExecutionLog), &eventLogs); err != nil {
+			return err
+		}
+		outcome := "已记录"
+		if len(actions) > 0 && actions[0].Skipped {
+			outcome = "跳过或未完成"
+		}
+		logs = append(logs, "最近信号结果（"+recent.Timestamp.UTC().Format(time.RFC3339)+"）："+outcome)
+		hasSignalMetadata := false
+		for _, line := range eventLogs {
+			if strings.HasPrefix(line, "源信号：") {
+				hasSignalMetadata = true
+				break
+			}
+		}
+		if !hasSignalMetadata {
+			// Older skipped records omitted action.Symbol and all signal context
+			// from their visible logs, but retained the source event in the detail.
+			var historical pending
+			if json.Unmarshal([]byte(recent.DecisionJSON), &historical) == nil && historical.Event.Symbol != "" {
+				target := historical.Symbol
+				if target == "" {
+					target = "未记录（未核实映射）"
+				}
+				logs = append(logs, fmt.Sprintf("源信号：%s %s %s；目标交易所（当前配置）：%s；历史目标合约：%s", historical.Event.Symbol, historical.Event.PositionSide, historical.Event.Side, r.venue.Venue(), target))
+			}
+		}
+		logs = append(logs, eventLogs...)
 	}
 	message := ""
 	if checkErr != nil {

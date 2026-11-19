@@ -56,16 +56,11 @@ func New(db *gorm.DB, id, account string, source Source, venue Venue, markets Ma
 	return &Runner{db: db, id: id, account: account, source: source, venue: venue, markets: markets, now: time.Now}, nil
 }
 
-// An explicit underlying-asset list prevents similarly named stocks, aliases,
-// and scaled tokens from being interpreted as interchangeable base units.
+// Build only an exact-unit candidate. Live target metadata must verify it before
+// account queries or execution; never strip scaled-token prefixes or guess aliases.
 func targetSymbol(venue string, e binancecopy.Event) (string, error) {
-	if e.QuoteAsset != "USDT" || e.Symbol != e.BaseAsset+"USDT" {
+	if e.BaseAsset == "" || e.QuoteAsset != "USDT" || e.Symbol != e.BaseAsset+"USDT" {
 		return "", errors.New("unsupported source currency or contract units")
-	}
-	switch e.BaseAsset {
-	case "BTC", "ETH", "SOL", "XRP", "DOGE", "BNB", "ADA", "AVAX", "LINK", "LTC":
-	default:
-		return "", errors.New("no verified underlying asset mapping")
 	}
 	switch venue {
 	case "binance":
@@ -143,13 +138,27 @@ func (r *Runner) Poll(ctx context.Context) error {
 		s.Last[e.Symbol+"/"+e.PositionSide] = e
 		validDirection := (p.Side == "long" || p.Side == "short") && (e.Side == "BUY" || e.Side == "SELL")
 		pos := s.Positions[e.Symbol]
-		_, mappingErr := targetSymbol(r.venue.Venue(), e)
+		p.Symbol, err = targetSymbol(r.venue.Venue(), e)
+		mappingErr := err
 		if validDirection && mappingErr == nil {
 			key := e.Symbol + "/" + p.Side
 			if _, known := s.Lead[key]; !known {
+				// Explain missing target markets before attempting historical proof.
+				if _, marketErr := r.targetMarket(ctx, p); marketErr != nil {
+					if err = r.save(s, []binancecopy.Event{e}, r.record(p, marketErr.Error(), false)); err != nil {
+						return err
+					}
+					continue
+				}
 				before, proofErr := r.source.PositionBefore(ctx, e)
 				if proofErr != nil || before.IsNegative() {
-					if err = r.save(s, []binancecopy.Event{e}, r.record(p, "unable to establish lead position from a verified flat boundary", false)); err != nil {
+					reason := "unable to establish lead position from a verified flat boundary"
+					if proofErr != nil {
+						reason += ": " + proofErr.Error()
+					} else {
+						reason += ": negative reconstructed position"
+					}
+					if err = r.save(s, []binancecopy.Event{e}, r.record(p, reason, false)); err != nil {
 						return err
 					}
 					continue
@@ -344,9 +353,16 @@ func (r *Runner) plan(ctx context.Context, s *state, p *pending) error {
 			return errors.New("lead fill outside five-minute entry window")
 		}
 		p.Balance, err = r.source.Balance(ctx)
-		if err != nil || !p.Balance.IsPositive() {
-			return errors.New("lead USDT margin balance unavailable")
+		if err != nil {
+			return fmt.Errorf("lead USDT margin balance unavailable: %w", err)
 		}
+		if !p.Balance.IsPositive() {
+			return errors.New("lead USDT margin balance unavailable: non-positive balance")
+		}
+	}
+	m, err := r.targetMarket(ctx, p)
+	if err != nil {
+		return err
 	}
 	a, err := r.venue.AccountSnapshot(ctx, symbol)
 	if err != nil {
@@ -363,16 +379,6 @@ func (r *Runner) plan(ctx context.Context, s *state, p *pending) error {
 	}
 	if err = r.venue.VerifyCopyPosition(ctx, symbol, p.Side, local.String(), e.Opening() && pos != nil); err != nil {
 		return err
-	}
-	m, err := r.markets.SnapshotKind(ctx, r.venue.Venue(), symbol, "perpetual")
-	if err != nil {
-		return err
-	}
-	if err = m.Validate(r.now()); err != nil {
-		return err
-	}
-	if m.SourceTime.IsZero() || m.Venue != r.venue.Venue() || m.Symbol != symbol || m.Kind != "perpetual" || m.BaseAsset != e.BaseAsset || m.QuoteAsset != "USDT" || (m.Venue == "okx" && !core.Positive(m.ContractValue)) {
-		return errors.New("target asset, units, timestamp or quote currency not verified")
 	}
 	side := p.Side
 	if !e.Opening() {
@@ -397,8 +403,11 @@ func (r *Runner) plan(ctx context.Context, s *state, p *pending) error {
 		}
 		var free string
 		p.Equity, free, err = r.equity(ctx, p)
-		if err != nil || !p.Equity.IsPositive() {
-			return errors.New("target equity unavailable")
+		if err != nil {
+			return fmt.Errorf("target equity unavailable: %w", err)
+		}
+		if !p.Equity.IsPositive() {
+			return errors.New("target equity unavailable: non-positive equity")
 		}
 		p.Ratio = p.Equity.Div(p.Balance)
 		nom := p.Equity.Mul(e.ExecutedQty).Mul(e.AvgPrice)
@@ -454,6 +463,21 @@ func (r *Runner) plan(ctx context.Context, s *state, p *pending) error {
 	p.Order, err = r.order(symbol, side, "entry", qty, price, !e.Opening())
 	return err
 }
+func (r *Runner) targetMarket(ctx context.Context, p *pending) (core.Snapshot, error) {
+	e := p.Event
+	m, err := r.markets.SnapshotKind(ctx, r.venue.Venue(), p.Symbol, "perpetual")
+	if err != nil {
+		return core.Snapshot{}, fmt.Errorf("target market verification failed: %w", err)
+	}
+	if err = m.Validate(r.now()); err != nil {
+		return core.Snapshot{}, fmt.Errorf("target market verification failed: %w", err)
+	}
+	if m.SourceTime.IsZero() || m.Venue != r.venue.Venue() || m.Symbol != p.Symbol || m.Kind != "perpetual" || m.BaseAsset != e.BaseAsset || m.QuoteAsset != "USDT" || (m.Venue == "okx" && !core.Positive(m.ContractValue)) {
+		return core.Snapshot{}, errors.New("target asset, units, timestamp or quote currency not verified")
+	}
+	return m, nil
+}
+
 func opposite(side string) string {
 	if side == "long" {
 		return "short"
