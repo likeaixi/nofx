@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import useSWR from 'swr'
+import { StrategyStatusBadges } from '../components/strategy/StrategyStatusBadges'
 import {
   Bot,
   Check,
@@ -23,6 +25,7 @@ import type {
   RiskControlConfig,
   Strategy,
   StrategyConfig,
+  TraderInfo,
 } from '../types'
 import { launchAutopilot } from '../lib/launch/launchAutopilot'
 import type { MarketSymbol } from '../lib/api/data'
@@ -277,6 +280,11 @@ export function StrategyStudioPage() {
   const { token } = useAuth()
   const { language } = useLanguage()
   const navigate = useNavigate()
+  const { data: strategyTraders, error: strategyUsageError } = useSWR<TraderInfo[]>(
+    token ? ['strategy-trader-usage', token] : null,
+    () => api.getTraders(true),
+    { refreshInterval: 30000, revalidateOnFocus: true }
+  )
   const [strategies, setStrategies] = useState<Strategy[]>([])
   const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(
     null
@@ -506,8 +514,8 @@ export function StrategyStudioPage() {
           (activateAfter
             ? text(
                 language,
-                'Strategy saved and activated',
-                'Strategy saved and activated'
+                '策略已保存并设为默认',
+                'Strategy saved and set as default'
               )
             : text(language, 'Strategy saved', 'Strategy saved'))
       )
@@ -616,7 +624,7 @@ export function StrategyStudioPage() {
     if (!selectedStrategy) return
     try {
       await api.activateStrategy(selectedStrategy.id)
-      notify.success(text(language, 'Strategy activated', 'Strategy activated'))
+      notify.success(text(language, '已设为默认策略', 'Default strategy updated'))
       await loadStrategies(selectedStrategy.id)
     } catch (err) {
       notify.error(
@@ -786,6 +794,16 @@ export function StrategyStudioPage() {
               {text(language, 'New', 'New')}
             </button>
           </div>
+          <p className="mb-3 px-2 text-xs leading-relaxed text-nofx-text-muted">
+            {text(language, '默认策略不代表正在运行；“正在使用”显示绑定此策略的运行中 trader 数量。', 'Default does not mean running. “In use” counts running traders assigned to this strategy.')}
+          </p>
+          {(strategyUsageError || !strategyTraders) && (
+            <p role="status" className="mb-3 px-2 text-xs text-nofx-text-muted">
+              {strategyUsageError
+                ? text(language, '暂时无法确认策略使用状态', 'Strategy usage is temporarily unavailable')
+                : text(language, '正在读取策略使用状态…', 'Loading strategy usage…')}
+            </p>
+          )}
           <div className="space-y-2">
             {strategies.map((strategy) => (
               <button
@@ -806,11 +824,12 @@ export function StrategyStudioPage() {
                   <span className="line-clamp-2 text-sm font-medium text-nofx-text">
                     {strategy.name}
                   </span>
-                  {strategy.is_active ? (
-                    <span className="rounded-sm bg-nofx-success/15 px-1.5 py-0.5 text-[10px] text-nofx-success">
-                      {text(language, 'Active', 'Active')}
-                    </span>
-                  ) : null}
+                  <StrategyStatusBadges
+                    strategyId={strategy.id}
+                    isDefault={strategy.is_active}
+                    traders={strategyUsageError ? undefined : strategyTraders}
+                    language={language}
+                  />
                 </div>
                 {strategy.description ? (
                   <div className="mt-1 line-clamp-2 text-xs text-nofx-text-muted">
@@ -881,7 +900,7 @@ export function StrategyStudioPage() {
                       ) : (
                         <Check className="h-4 w-4" />
                       )}
-                      {text(language, 'Save and use', 'Save and use')}
+                      {text(language, '保存并设为默认', 'Save and set as default')}
                     </button>
                     <button
                       type="button"
@@ -903,7 +922,7 @@ export function StrategyStudioPage() {
                         className="inline-flex items-center gap-2 rounded-lg border border-nofx-success/30 bg-nofx-success/10 px-3 py-2 text-sm text-nofx-success hover:bg-nofx-success/15"
                       >
                         <Check className="h-4 w-4" />
-                        {text(language, 'Activate only', 'Activate only')}
+                        {text(language, '设为默认', 'Set as default')}
                       </button>
                     ) : null}
                     {!selectedStrategy.is_active ? (
