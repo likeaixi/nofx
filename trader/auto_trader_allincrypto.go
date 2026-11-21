@@ -13,6 +13,9 @@ import (
 	"nofx/trader/allincrypto"
 )
 
+// All fixed-strategy traders read the same public source; coalesce near-simultaneous reads.
+var sharedAoyingSource = binancecopy.NewShared(binancecopy.New())
+
 // Prevent simultaneous automatic runners from changing the same account
 // underneath a copy position's ownership checks (including duplicate configs).
 var copyAccounts = struct {
@@ -53,7 +56,7 @@ func (at *AutoTrader) runAllinCrypto(account string) error {
 	if !ok {
 		return errors.New("target lacks exact copy execution capability")
 	}
-	runner, err := allincrypto.New(at.store.GormDB(), at.id, account, binancecopy.New(), venue, market.New())
+	runner, err := allincrypto.New(at.store.GormDB(), at.id, account, sharedAoyingSource, venue, market.New())
 	if err != nil {
 		return err
 	}

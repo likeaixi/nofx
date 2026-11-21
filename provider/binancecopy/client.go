@@ -126,6 +126,7 @@ func (c *Client) Snapshot(ctx context.Context, anchor string) (Snapshot, error) 
 	var out Snapshot
 	seen := map[string]bool{}
 	var first []Event
+	last := int64(1<<63 - 1)
 	for n := 1; n <= 12; n++ {
 		page, err := c.page(ctx, n)
 		if err != nil {
@@ -137,6 +138,10 @@ func (c *Client) Snapshot(ctx context.Context, anchor string) (Snapshot, error) 
 		}
 		found := anchor == ""
 		for _, e := range page {
+			if e.OrderUpdateTime > last {
+				return Snapshot{}, errors.New("unordered lead history")
+			}
+			last = e.OrderUpdateTime
 			if seen[e.Key()] {
 				return Snapshot{}, errors.New("ambiguous lead identity or shifted pagination")
 			}
