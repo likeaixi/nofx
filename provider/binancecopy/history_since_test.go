@@ -57,3 +57,21 @@ func TestHistorySinceRequiresCoverageAndStablePages(t *testing.T) {
 		})
 	}
 }
+
+func TestHistorySinceSinglePageDoesNotRequireSecondRead(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls > 1 {
+			fmt.Fprint(w, `{"code":"11012005","success":false,"data":null}`)
+			return
+		}
+		fmt.Fprint(w, `{"code":"000000","success":true,"data":{"list":[{"symbol":"BTCUSDT","baseAsset":"BTC","quoteAsset":"USDT","side":"BUY","positionSide":"LONG","executedQty":1,"avgPrice":100,"orderTime":20,"orderUpdateTime":20},{"symbol":"BTCUSDT","baseAsset":"BTC","quoteAsset":"USDT","side":"BUY","positionSide":"LONG","executedQty":1,"avgPrice":100,"orderTime":9,"orderUpdateTime":9}]}}`)
+	}))
+	defer srv.Close()
+	c := Client{srv.URL, srv.Client(), 50}
+	got, err := c.HistorySince(context.Background(), 10)
+	if err != nil || len(got.Events) != 2 {
+		t.Fatal("one complete response is already consistent", got, err)
+	}
+}

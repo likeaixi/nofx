@@ -38,16 +38,19 @@ func (c *Client) HistorySince(ctx context.Context, since int64) (Snapshot, error
 			}
 		}
 		if crossed {
-			again, err := c.page(ctx, 1)
-			if err != nil {
-				return Snapshot{}, err
-			}
-			if len(again) != len(first) {
-				return Snapshot{}, errors.New("source history changed during baseline reconstruction")
-			}
-			for i := range first {
-				if first[i].Fingerprint() != again[i].Fingerprint() {
+			// One response cannot shift between pages. Recheck only multi-page reads.
+			if n > 1 {
+				again, err := c.page(ctx, 1)
+				if err != nil {
+					return Snapshot{}, err
+				}
+				if len(again) != len(first) {
 					return Snapshot{}, errors.New("source history changed during baseline reconstruction")
+				}
+				for i := range first {
+					if first[i].Fingerprint() != again[i].Fingerprint() {
+						return Snapshot{}, errors.New("source history changed during baseline reconstruction")
+					}
 				}
 			}
 			sort.SliceStable(out.Events, func(i, j int) bool { return out.Events[i].OrderUpdateTime < out.Events[j].OrderUpdateTime })

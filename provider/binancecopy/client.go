@@ -78,7 +78,7 @@ func (c *Client) request(ctx context.Context, method, path string, body []byte, 
 		return err
 	}
 	if json.Unmarshal(b, &envelope) != nil || !envelope.Success || envelope.Code != "000000" || len(envelope.Data) == 0 || string(envelope.Data) == "null" {
-		return errors.New("invalid lead data response")
+		return fmt.Errorf("invalid lead data response from %s (code=%s)", path, envelope.Code)
 	}
 	return json.Unmarshal(envelope.Data, out)
 }

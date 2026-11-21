@@ -322,7 +322,7 @@ export function TerminalDashboard({
           <div role="alert" className="tm-mono" style={{ margin: '8px 14px 0', padding: '12px', fontSize: 12, border: '1px solid var(--tm-dn)', color: 'var(--tm-dn)', background: 'rgba(200,60,40,0.06)' }}>
             <strong>Trading blocked / 交易已阻断</strong>
             <div className="tm-error">{formatRequestError(status.trading_error)}</div>
-            <div>自动开仓、平仓不可用；请用主钱包重新签名授权。修复前不会为此决策轮次调用付费 AI 或数据。</div>
+            <div>自动交易当前受阻，请根据上方具体错误排查。若提示带单数据或源账本初始化失败，表示公开成交读取或校验未通过，系统会在后续轮询重试；这不代表钱包需要重新授权。</div>
           </div>
         )}
         {/* runtime health banner — repeated AI failures would otherwise
