@@ -3,6 +3,8 @@ package trader
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -54,6 +56,13 @@ func (at *AutoTrader) runAllinCrypto(account string) error {
 	runner, err := allincrypto.New(at.store.GormDB(), at.id, account, binancecopy.New(), venue, market.New())
 	if err != nil {
 		return err
+	}
+	if value := os.Getenv("NOFX_AOYING_FLAT_BASELINE"); value != "" {
+		baseline, parseErr := time.Parse(time.RFC3339, value)
+		if parseErr != nil {
+			return fmt.Errorf("invalid NOFX_AOYING_FLAT_BASELINE: %w", parseErr)
+		}
+		runner.ConfirmedSourceBaseline = baseline
 	}
 	return at.runCopyCycles(runner)
 }

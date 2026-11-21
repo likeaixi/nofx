@@ -37,20 +37,21 @@ type Venue interface {
 	CancelExecutionOrder(context.Context, execution.Order) error
 }
 type Runner struct {
-	Stopping    func() bool
-	db          *gorm.DB
-	id, account string
-	source      Source
-	venue       Venue
-	markets     Markets
-	now         func() time.Time
+	ConfirmedSourceBaseline time.Time
+	Stopping                func() bool
+	db                      *gorm.DB
+	id, account             string
+	source                  Source
+	venue                   Venue
+	markets                 Markets
+	now                     func() time.Time
 }
 
 func New(db *gorm.DB, id, account string, source Source, venue Venue, markets Markets) (*Runner, error) {
 	if db == nil || id == "" || account == "" || source == nil || venue == nil || markets == nil {
 		return nil, errors.New("missing fixed strategy dependency")
 	}
-	if err := db.AutoMigrate(&checkpoint{}, &signal{}); err != nil {
+	if err := db.AutoMigrate(&checkpoint{}, &signal{}, &sourceLedgerEntry{}); err != nil {
 		return nil, err
 	}
 	return &Runner{db: db, id: id, account: account, source: source, venue: venue, markets: markets, now: time.Now}, nil
@@ -75,13 +76,38 @@ func (r *Runner) Poll(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if err = r.reconcile(ctx, s); err != nil {
-		return err
+	if !r.ConfirmedSourceBaseline.IsZero() {
+		if s.LedgerBaseline == 0 {
+			return r.bootstrapSourceLedger(ctx, s)
+		}
+		if s.LedgerBaseline != r.ConfirmedSourceBaseline.UnixMilli() {
+			return errors.New("confirmed source baseline differs from persisted ledger")
+		}
 	}
+	reconcileErr := r.reconcile(ctx, s)
 	if s.SourceFault != "" {
-		return errors.New(s.SourceFault)
+		return errors.Join(reconcileErr, errors.New(s.SourceFault))
 	}
-	batch, err := r.source.Snapshot(ctx, s.Head)
+	var batch binancecopy.Snapshot
+	if s.LedgerBaseline > 0 {
+		// Reload after reconciliation: it may have committed target state before an error.
+		if s, err = r.load(); err != nil {
+			return errors.Join(reconcileErr, err)
+		}
+		if err = r.syncSourceLedger(ctx, s); err != nil {
+			return errors.Join(reconcileErr, err)
+		}
+		if reconcileErr != nil {
+			return reconcileErr
+		}
+		batch, err = r.sourceLedgerBacklog(s)
+	} else {
+		if reconcileErr != nil {
+			return reconcileErr
+		}
+		batch, err = r.source.Snapshot(ctx, s.Head)
+	}
+
 	if err != nil {
 		return err
 	}
@@ -129,6 +155,16 @@ func (r *Runner) Poll(ctx context.Context) error {
 			return nil
 		}
 		p := &pending{Event: e, Side: strings.ToLower(e.PositionSide)}
+		if s.LedgerBaseline > 0 {
+			var entry sourceLedgerEntry
+			if err = r.db.First(&entry, "trader_id = ? AND key = ?", r.id, e.Key()).Error; err != nil {
+				return err
+			}
+			p.SourceAfter, err = decimal.NewFromString(entry.After)
+			if err != nil {
+				return err
+			}
+		}
 		if e.OrderUpdateTime <= s.Baseline {
 			if err = r.save(s, []binancecopy.Event{e}, nil); err != nil {
 				return err
@@ -140,7 +176,7 @@ func (r *Runner) Poll(ctx context.Context) error {
 		pos := s.Positions[e.Symbol]
 		p.Symbol, err = targetSymbol(r.venue.Venue(), e)
 		mappingErr := err
-		if validDirection && mappingErr == nil {
+		if s.LedgerBaseline == 0 && validDirection && mappingErr == nil {
 			key := e.Symbol + "/" + p.Side
 			if _, known := s.Lead[key]; !known {
 				// Explain missing target markets before attempting historical proof.

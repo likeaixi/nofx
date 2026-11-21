@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -46,6 +47,17 @@ func (r *Runner) RecordRuntimeStatus(checkErr error, stopping bool) error {
 		"运行状态：" + status,
 		fmt.Sprintf("已记录跟单持仓：%d；待处理订单流程：%d", len(s.Positions), waiting),
 		"检查频率：带单信号每 1 分钟；订单和止损每 5 秒。交易事件仍实时单独记录。",
+	}
+	if s.LedgerBaseline > 0 {
+		logs = append(logs, "源仓位零基线（用户确认）："+time.UnixMilli(s.LedgerBaseline).UTC().Format(time.RFC3339))
+		keys := make([]string, 0, len(s.Lead))
+		for key := range s.Lead {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			logs = append(logs, fmt.Sprintf("源账本仓位：%s = %s（非机器人实际持仓）", key, s.Lead[key]))
+		}
 	}
 	// Keep the latest actual signal outcome visible even after many heartbeats.
 	var recent store.DecisionRecordDB

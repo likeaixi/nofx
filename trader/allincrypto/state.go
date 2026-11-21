@@ -55,6 +55,11 @@ type pending struct {
 	Reason                                 string
 }
 type state struct {
+	LedgerSequence      int64
+	LedgerHead          string
+	LedgerLast          map[string]binancecopy.Event
+	LedgerBaseline      int64
+	ledgerWrites        []sourceLedgerEntry
 	LastRuntimeReportAt time.Time
 	Waiting             map[string]*pending
 	Last                map[string]binancecopy.Event
@@ -97,6 +102,9 @@ func (r *Runner) load() (*state, error) {
 	if s.Waiting == nil {
 		s.Waiting = map[string]*pending{}
 	}
+	if s.LedgerLast == nil {
+		s.LedgerLast = map[string]binancecopy.Event{}
+	}
 	if s.Last == nil {
 		s.Last = map[string]binancecopy.Event{}
 	}
@@ -123,6 +131,11 @@ func (r *Runner) save(s *state, events []binancecopy.Event, record *store.Decisi
 		if q.RowsAffected != 1 {
 			return errors.New("concurrent follow cycle; refresh required")
 		}
+		for _, entry := range s.ledgerWrites {
+			if err := tx.Create(&entry).Error; err != nil {
+				return err
+			}
+		}
 		for _, e := range events {
 			if err := tx.Create(&signal{r.id, e.Key(), e.Fingerprint()}).Error; err != nil {
 				return err
@@ -135,6 +148,7 @@ func (r *Runner) save(s *state, events []binancecopy.Event, record *store.Decisi
 	})
 	if err == nil {
 		s.revision++
+		s.ledgerWrites = nil
 	}
 	return err
 }
