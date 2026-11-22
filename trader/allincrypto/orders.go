@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -73,7 +74,12 @@ func (r *Runner) advance(ctx context.Context, s *state, receipt *execution.Order
 	}
 	var o execution.Order
 	var err error
-	if p.Stage == "stop" {
+	if p.Stage == "stop" && r.venue.Venue() == "binance" && completeStopReceipt(p.Order, receipt) {
+		// The adapter verified the native creation response. Persist it without
+		// immediately querying an eventually visible order index.
+		o = *receipt
+		s.Positions[p.Event.Symbol].StopCheckAfter = r.now().Add(5 * time.Second)
+	} else if p.Stage == "stop" {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -531,4 +537,21 @@ func (r *Runner) lookup(ctx context.Context, o execution.Order) (execution.Order
 		return receipt, nil
 	}
 	return receipt, err
+}
+
+// Only a complete, matching creation receipt can bypass immediate lookup.
+// Native status, side, position mode and trigger semantics are checked by the
+// Binance adapter before it returns this normalized receipt without an error.
+func completeStopReceipt(intent execution.Order, receipt *execution.Order) bool {
+	if receipt == nil {
+		return false
+	}
+	id, err := strconv.ParseInt(receipt.OrderID, 10, 64)
+	return err == nil && id > 0 && receipt.Role == "sl" && receipt.Role == intent.Role &&
+		receipt.ClientID == intent.ClientID && receipt.VenueClientID == intent.VenueClientID &&
+		receipt.Symbol == intent.Symbol && receipt.Side == intent.Side && receipt.Type == intent.Type &&
+		receipt.ReduceOnly == intent.ReduceOnly && receipt.Status == "NEW" &&
+		execution.Equal(string(receipt.Filled), "0") &&
+		execution.Equal(string(receipt.Quantity), string(intent.Quantity)) &&
+		execution.Equal(string(receipt.Price), string(intent.Price))
 }

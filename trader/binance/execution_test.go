@@ -36,7 +36,7 @@ func TestPlanningBinanceExactLimitAndProtection(t *testing.T) {
 			fmt.Fprintf(w, `{"orderId":123,"clientOrderId":%q,"symbol":"BTCUSDT","price":"100000","origQty":"0.001","side":"BUY","positionSide":"BOTH","type":"LIMIT","timeInForce":"GTC","status":"NEW","executedQty":"0","avgPrice":"0"}`, r.Form.Get("newClientOrderId"))
 		case "/fapi/v1/algoOrder":
 			sent = append(sent, r.Form)
-			fmt.Fprintf(w, `{"algoId":456,"clientAlgoId":%q,"symbol":"BTCUSDT","quantity":"0.001","triggerPrice":"99000","side":"SELL","orderType":"STOP_MARKET","reduceOnly":true}`, r.Form.Get("clientAlgoId"))
+			fmt.Fprintf(w, `{"algoId":456,"clientAlgoId":%q,"symbol":"BTCUSDT","quantity":"0.001","triggerPrice":"99000","side":"SELL","orderType":"STOP_MARKET","reduceOnly":true,"algoStatus":"NEW","positionSide":"BOTH","workingType":"CONTRACT_PRICE","algoType":"CONDITIONAL"}`, r.Form.Get("clientAlgoId"))
 		default:
 			t.Error(r.URL.Path)
 		}
@@ -459,5 +459,43 @@ func TestProtectionLookupPreservesSafeErrorCode(t *testing.T) {
 	_, err := b.LookupOrder(context.Background(), o)
 	if err == nil || !strings.Contains(err.Error(), "-2013") || strings.Contains(err.Error(), "sensitive") {
 		t.Fatalf("expected safe upstream code, got %v", err)
+	}
+}
+
+func TestProtectiveReceiptMustConfirmActiveMatchingProtection(t *testing.T) {
+	for _, bad := range []string{"status", "position", "working", "algo", "close"} {
+		t.Run(bad, func(t *testing.T) {
+			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/fapi/v1/positionSide/dual" {
+					fmt.Fprint(w, `{"dualSidePosition":false}`)
+					return
+				}
+				_ = r.ParseForm()
+				status, position, working, algo, closePosition := "NEW", "BOTH", "CONTRACT_PRICE", "CONDITIONAL", false
+				switch bad {
+				case "status":
+					status = "REJECTED"
+				case "position":
+					position = "SHORT"
+				case "working":
+					working = "MARK_PRICE"
+				case "algo":
+					algo = ""
+				case "close":
+					closePosition = true
+				}
+				fmt.Fprintf(w, `{"algoId":456,"clientAlgoId":%q,"symbol":"BTCUSDT","quantity":"0.001","triggerPrice":"99000","side":"SELL","orderType":"STOP_MARKET","reduceOnly":true,"algoStatus":%q,"positionSide":%q,"workingType":%q,"algoType":%q,"closePosition":%t}`, r.Form.Get("clientAlgoId"), status, position, working, algo, closePosition)
+			}))
+			defer s.Close()
+			b := NewExecutionTrader("test", "test", "")
+			b.client.BaseURL = s.URL
+			b.client.HTTPClient = s.Client()
+			o := planningOrder()
+			o.Role = "sl"
+			o.Price = "99000"
+			if _, err := b.SubmitOrder(context.Background(), o); err == nil {
+				t.Fatal("incomplete or mismatched protection receipt accepted")
+			}
+		})
 	}
 }

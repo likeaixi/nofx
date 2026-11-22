@@ -298,7 +298,7 @@ func (b *FuturesTrader) SubmitOrder(ctx context.Context, o execution.Order) (exe
 		b.invalidateExecutionConfig()
 		return o, binanceReadError("submit the Binance protective order; outcome is unconfirmed", e)
 	}
-	if r.AlgoId <= 0 || r.ClientAlgoId != nativeID || r.Symbol != o.Symbol || !sameNativeDecimal(r.Quantity, string(o.Quantity)) || !sameNativeDecimal(r.TriggerPrice, string(o.Price)) || r.Side != side || r.OrderType != typ || (!mode.DualSidePosition && !r.ReduceOnly) {
+	if r.AlgoId <= 0 || r.ClientAlgoId != nativeID || r.Symbol != o.Symbol || !sameNativeDecimal(r.Quantity, string(o.Quantity)) || !sameNativeDecimal(r.TriggerPrice, string(o.Price)) || r.Side != side || r.OrderType != typ || (!mode.DualSidePosition && !r.ReduceOnly) || r.AlgoStatus != "NEW" || r.PositionSide != executionPosition(o.Side, mode.DualSidePosition) || r.WorkingType != futures.WorkingTypeContractPrice || r.AlgoType != futures.OrderAlgoTypeConditional || r.ClosePosition {
 		return o, errors.New("invalid Binance protection receipt")
 	}
 	o.OrderID = fmt.Sprint(r.AlgoId)

@@ -330,6 +330,9 @@ func (r *Runner) monitorStop(ctx context.Context, s *state, key string, pos *pos
 	if pos.Stop == nil {
 		return errors.New("tracked position lacks protective intent")
 	}
+	if r.now().Before(pos.StopCheckAfter) {
+		return nil
+	}
 	o, err := r.lookup(ctx, *pos.Stop)
 	if err != nil {
 		return err

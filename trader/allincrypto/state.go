@@ -36,6 +36,7 @@ type position struct {
 	Symbol, Side                 string
 	Source, Local, Average, Tick decimal.Decimal
 	Stop                         *execution.Order
+	StopCheckAfter               time.Time
 }
 type pending struct {
 	DustAfter                              decimal.Decimal
