@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/shopspring/decimal"
 	"nofx/trader/execution"
@@ -15,8 +16,17 @@ func (r *Runner) submit(ctx context.Context, s *state) error {
 		s.Pending = nil
 		return r.save(s, nil, r.record(p, "trader stopped before order submission", false))
 	}
-	o, err := r.venue.SubmitOrder(ctx, s.Pending.Order)
+	submitCtx := ctx
+	if s.Pending.Stage == "stop" {
+		var cancel context.CancelFunc
+		submitCtx, cancel = context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+	}
+	o, err := r.venue.SubmitOrder(submitCtx, s.Pending.Order)
 	if err != nil {
+		if s.Pending.Stage == "stop" && r.venue.Venue() == "binance" {
+			s.Pending.StopSubmitError = err.Error()
+		}
 		return r.advance(ctx, s, nil)
 	}
 	return r.advance(ctx, s, &o)
@@ -63,15 +73,40 @@ func (r *Runner) advance(ctx context.Context, s *state, receipt *execution.Order
 	}
 	var o execution.Order
 	var err error
-	if receipt != nil {
+	if p.Stage == "stop" {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		now := r.now()
+		if p.StopConfirmStarted.IsZero() {
+			p.StopConfirmStarted = now
+		}
+		remaining := p.StopConfirmStarted.Add(15 * time.Second).Sub(now)
+		if remaining <= 0 || p.StopConfirmAttempts >= 3 {
+			err = errors.New("protective stop confirmation deadline or attempt limit reached")
+		} else {
+			if now.Before(p.StopConfirmNext) {
+				return errors.New("protective stop confirmation backoff")
+			}
+			p.StopConfirmAttempts++
+			p.StopConfirmNext = now.Add(5 * time.Second)
+			if err = r.save(s, nil, nil); err != nil {
+				return err
+			}
+			timeout := 3 * time.Second
+			if remaining < timeout {
+				timeout = remaining
+			}
+			readCtx, cancel := context.WithTimeout(ctx, timeout)
+			o, err = r.lookup(readCtx, p.Order)
+			cancel()
+		}
+	} else if receipt != nil {
 		o = *receipt
 	} else {
 		o, err = r.lookup(ctx, p.Order)
 	}
 	if p.Stage == "stop" {
-		if receipt != nil && err == nil {
-			o, err = r.lookup(ctx, o)
-		}
 		if err == nil && o.Status == "NEW" && execution.Equal(string(o.Filled), "0") {
 			s.Positions[p.Event.Symbol].Stop = &o
 			p.Stage = "cleanup"
@@ -80,11 +115,42 @@ func (r *Runner) advance(ctx context.Context, s *state, receipt *execution.Order
 			}
 			return r.cleanup(ctx, s)
 		}
+		var retry *execution.RetryableError
+		if errors.As(err, &retry) && p.StopConfirmAttempts < 3 {
+			delay := retry.Delay
+			if delay < 5*time.Second {
+				delay = 5 * time.Second
+			}
+			now := r.now()
+			deadline := p.StopConfirmStarted.Add(15 * time.Second)
+			if now.Before(deadline) {
+				p.StopConfirmNext = now.Add(delay)
+				// Reconciliation at the deadline rescues even if server cooldown is longer.
+				if p.StopConfirmNext.After(deadline) {
+					p.StopConfirmNext = deadline
+				}
+				reason := fmt.Sprintf("protective stop confirmation pending; attempt=%d/3; %s", p.StopConfirmAttempts, retry.Error())
+				if saveErr := r.save(s, nil, r.record(p, reason, false)); saveErr != nil {
+					return saveErr
+				}
+				return errors.New(reason)
+			}
+		}
 		// A stop could have been accepted despite a timeout. Keep its exact ID
 		// until it is confirmed inactive. Never reuse this market in that window.
 		failedStop := p.Order
 		p.FaultStop = &failedStop
 		p.Reason = "replacement stop not confirmed; closing owned exposure"
+		if r.venue.Venue() == "binance" && p.StopSubmitError != "" {
+			p.Reason += "; submit: " + p.StopSubmitError
+		}
+		if err != nil {
+			if r.venue.Venue() == "binance" {
+				p.Reason += "; lookup: " + err.Error()
+			}
+		} else {
+			p.Reason += fmt.Sprintf("; observed status=%q filled=%q", o.Status, o.Filled)
+		}
 		p.Stage = "rescue"
 		if err = r.save(s, nil, r.record(p, p.Reason, false)); err != nil {
 			return err
@@ -239,10 +305,17 @@ func (r *Runner) advance(ctx context.Context, s *state, receipt *execution.Order
 		return err
 	}
 	p.Stage = "stop"
+	p.StopConfirmStarted = r.now()
+	p.StopConfirmNext = time.Time{}
+	p.StopConfirmAttempts = 0
+	p.StopSubmitError = ""
 	if err = r.save(s, nil, r.record(p, "target fill reconciled; exchange stop intent persisted", true)); err != nil {
 		return err
 	}
-	if err = r.venue.VerifyCopyPosition(ctx, pos.Symbol, pos.Side, pos.Local.String(), false); err != nil {
+	verifyCtx, verifyCancel := context.WithTimeout(ctx, 3*time.Second)
+	err = r.venue.VerifyCopyPosition(verifyCtx, pos.Symbol, pos.Side, pos.Local.String(), false)
+	verifyCancel()
+	if err != nil {
 		p.Stage = "rescue"
 		p.Reason = "position changed before replacement stop submission"
 		if err = r.save(s, nil, nil); err != nil {

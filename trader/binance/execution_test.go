@@ -445,3 +445,19 @@ func TestRestoredUntriggeredStopHasVerifiedZeroFill(t *testing.T) {
 		t.Fatal(got, err)
 	}
 }
+
+func TestProtectionLookupPreservesSafeErrorCode(t *testing.T) {
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, `{"code":-2013,"msg":"sensitive upstream details"}`)
+	}))
+	defer s.Close()
+	b := NewExecutionTrader("test", "test", "")
+	b.client.BaseURL, b.client.HTTPClient = s.URL, s.Client()
+	o := planningOrder()
+	o.Role = "sl"
+	_, err := b.LookupOrder(context.Background(), o)
+	if err == nil || !strings.Contains(err.Error(), "-2013") || strings.Contains(err.Error(), "sensitive") {
+		t.Fatalf("expected safe upstream code, got %v", err)
+	}
+}

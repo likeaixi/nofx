@@ -46,7 +46,8 @@ func getBrOrderID() string {
 
 // FuturesTrader Binance futures trader
 type FuturesTrader struct {
-	client *futures.Client
+	client      *futures.Client
+	configCache executionConfigCache
 
 	// Balance cache
 	cachedBalance     map[string]interface{}
@@ -78,6 +79,7 @@ func NewFuturesTrader(apiKey, secretKey string, userId string) *FuturesTrader {
 
 // setDualSidePosition sets dual-side position mode (called during initialization)
 func (t *FuturesTrader) setDualSidePosition() error {
+	defer t.invalidateExecutionConfig()
 	// Try to set dual-side position mode
 	err := t.client.NewChangePositionModeService().
 		DualSide(true). // true = dual-side position (Hedge Mode)

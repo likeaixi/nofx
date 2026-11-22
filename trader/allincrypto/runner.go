@@ -364,6 +364,9 @@ func lots(value, divisor, step decimal.Decimal) decimal.Decimal {
 var errBelowStep = errors.New("proportional reduction below target lot minimum")
 
 func (r *Runner) plan(ctx context.Context, s *state, p *pending) error {
+	if !p.Event.Opening() {
+		ctx = execution.WithProtectivePriority(ctx)
+	}
 	e := p.Event
 	if (p.Side != "long" && p.Side != "short") || (e.Side != "BUY" && e.Side != "SELL") {
 		return errors.New("unknown source side")

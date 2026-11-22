@@ -11,6 +11,7 @@ import (
 // VerifyCopyPosition reads current native size, direction and (for an add)
 // leverage instead of adopting the cache used by the dashboard.
 func (b *FuturesTrader) VerifyCopyPosition(ctx context.Context, symbol, side, qty string, checkLeverage bool) error {
+	ctx = execution.WithProtectivePriority(ctx)
 	rows, err := b.client.NewGetPositionRiskService().Symbol(symbol).Do(ctx)
 	if err != nil {
 		return binanceReadError("verify followed position", err)

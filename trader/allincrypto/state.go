@@ -53,6 +53,10 @@ type pending struct {
 	FaultStop                              *execution.Order
 	Balance, Equity, Ratio, Notional, Tick decimal.Decimal
 	Reason                                 string
+	StopConfirmStarted                     time.Time
+	StopConfirmNext                        time.Time
+	StopConfirmAttempts                    int
+	StopSubmitError                        string `json:",omitempty"`
 }
 type state struct {
 	LedgerSequence      int64

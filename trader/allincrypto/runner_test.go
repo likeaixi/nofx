@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -581,5 +582,61 @@ func TestDelayedPreStartFillOnlyUpdatesSourceAndOverCloseBlocks(t *testing.T) {
 	add("SELL", "11")
 	if err := r.Poll(ctx); err == nil || v.held.String() != "1" {
 		t.Fatal(v.held, err)
+	}
+}
+
+type diagnosticBinanceFixture struct{ *venueFixture }
+
+func (v diagnosticBinanceFixture) Venue() string { return "binance" }
+
+func TestStopFailureDecisionRetainsLookupCause(t *testing.T) {
+	r, v, _, add := setup(t)
+	r.venue = diagnosticBinanceFixture{v}
+	ctx := context.Background()
+	if err := r.Poll(ctx); err != nil {
+		t.Fatal(err)
+	}
+	v.stopFails = true
+	add("BUY", "10")
+	_ = r.Poll(ctx)
+	var rows []store.DecisionRecordDB
+	if err := r.db.Order("id").Find(&rows).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range rows {
+		if strings.Contains(row.ExecutionLog, "replacement stop not confirmed") {
+			if !strings.Contains(row.ExecutionLog, "lookup: unconfirmed") || !strings.Contains(row.ExecutionLog, "submit: stop fault") {
+				t.Fatalf("lost stop lookup cause: %s", row.ExecutionLog)
+			}
+			return
+		}
+	}
+	t.Fatal("missing stop failure decision")
+}
+
+func TestStopFailureDoesNotPersistUntrustedVenueErrors(t *testing.T) {
+	r, v, _, add := setup(t)
+	ctx := context.Background()
+	if err := r.Poll(ctx); err != nil {
+		t.Fatal(err)
+	}
+	v.stopFails = true
+	add("BUY", "10")
+	_ = r.Poll(ctx)
+	var rows []store.DecisionRecordDB
+	if err := r.db.Find(&rows).Error; err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, row := range rows {
+		if strings.Contains(row.ExecutionLog, "replacement stop not confirmed") {
+			found = true
+		}
+		if strings.Contains(row.ExecutionLog, "submit: stop fault") || strings.Contains(row.ExecutionLog, "lookup: unconfirmed") {
+			t.Fatal("untrusted venue diagnostics persisted")
+		}
+	}
+	if !found {
+		t.Fatal("missing failure decision")
 	}
 }

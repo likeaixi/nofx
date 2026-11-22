@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/adshao/go-binance/v2/common"
 	"github.com/adshao/go-binance/v2/futures"
+	"io"
 	"math/big"
+	"net"
 	"net/http"
 	"nofx/hook"
 	"nofx/trader/execution"
@@ -45,6 +48,7 @@ func NewExecutionTrader(key, secret, userID string) *FuturesTrader {
 	if result := hook.HookExec[hook.NewBinanceTraderResult](hook.NEW_BINANCE_TRADER, userID, c); result != nil && result.GetResult() != nil {
 		c = result.GetResult()
 	}
+	c.HTTPClient = protectBinanceHTTP(c.HTTPClient)
 	return &FuturesTrader{client: c, cacheDuration: 15 * time.Second}
 }
 
@@ -70,8 +74,22 @@ func (b *FuturesTrader) calibrateClock(ctx context.Context) error {
 
 // Never expose signed request URLs or upstream credential-bearing errors.
 func binanceReadError(action string, err error) error {
+	var retry *execution.RetryableError
+	if errors.As(err, &retry) {
+		return retry
+	}
+	var httpErr *binanceHTTPError
+	if errors.As(err, &httpErr) {
+		return fmt.Errorf("Could not %s (%s).", action, httpErr.Error())
+	}
 	var apiErr *common.APIError
 	if errors.As(err, &apiErr) {
+		meta := safeHTTPMetadata(apiErr.Message, apiErr.Code)
+		if meta != nil {
+			if meta.status == 429 || meta.status == 418 || meta.status == 408 || meta.status >= 500 {
+				return &execution.RetryableError{Message: meta.Error(), Delay: meta.delay}
+			}
+		}
 		switch apiErr.Code {
 		case -1021:
 			return errors.New("Binance rejected the request timestamp. Refresh the connection to synchronize the server clock (code -1021).")
@@ -80,8 +98,22 @@ func binanceReadError(action string, err error) error {
 		case -1022:
 			return errors.New("Binance rejected the API signature. Check the saved API secret (code -1022).")
 		default:
+			if meta != nil {
+				return fmt.Errorf("Could not %s (%s).", action, meta.Error())
+			}
 			return fmt.Errorf("Could not %s (Binance code %d).", action, apiErr.Code)
 		}
+	}
+	var typeErr *json.UnmarshalTypeError
+	var syntaxErr *json.SyntaxError
+	if errors.As(err, &typeErr) || errors.As(err, &syntaxErr) {
+		return fmt.Errorf("Could not %s (invalid Binance JSON response).", action)
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("Could not %s (request timeout).", action)
+	}
+	if errors.Is(err, context.Canceled) {
+		return fmt.Errorf("Could not %s (request canceled).", action)
 	}
 	return fmt.Errorf("Could not %s. Check the NOFX server connection and try again.", action)
 }
@@ -132,7 +164,7 @@ func (b *FuturesTrader) AccountSnapshot(ctx context.Context, symbol string) (exe
 		return out, binanceReadError("read Binance protective orders", e)
 	}
 	out.OpenOrders = len(orders) + len(algos)
-	fee, e := b.client.NewCommissionRateService().Symbol(symbol).Do(ctx)
+	fee, e := b.executionCommission(ctx, symbol)
 	if e != nil {
 		return out, binanceReadError("read Binance actual fees", e)
 	}
@@ -157,7 +189,7 @@ func (b *FuturesTrader) PrepareExecutionLeverage(ctx context.Context, symbol str
 	if leverage < 1 || leverage > 20 {
 		return errors.New("unsupported planning leverage")
 	}
-	_, e := b.client.NewGetPositionModeService().Do(ctx)
+	_, e := b.executionMode(ctx)
 	if e != nil {
 		return errors.New("cannot verify Binance position mode")
 	}
@@ -177,6 +209,9 @@ func executionPosition(side string, hedge bool) futures.PositionSideType {
 	return futures.PositionSideTypeShort
 }
 func (b *FuturesTrader) SubmitOrder(ctx context.Context, o execution.Order) (execution.Order, error) {
+	if o.Role != "entry" || o.ReduceOnly {
+		ctx = execution.WithProtectivePriority(ctx)
+	}
 	if o.Type != "" && (o.Type != "market" || o.Role != "entry" || o.PostOnly) {
 		return o, errors.New("unsupported execution order type")
 	}
@@ -191,7 +226,7 @@ func (b *FuturesTrader) SubmitOrder(ctx context.Context, o execution.Order) (exe
 	if len(o.ClientID) != 32 || !execution.ValidOrderPrice(o) || !execution.Positive(o.Quantity) || (o.Side != "long" && o.Side != "short") {
 		return o, errors.New("invalid locked order")
 	}
-	mode, e := b.client.NewGetPositionModeService().Do(ctx)
+	mode, e := b.executionMode(ctx)
 	if e != nil {
 		return o, errors.New("position mode unavailable")
 	}
@@ -235,6 +270,7 @@ func (b *FuturesTrader) SubmitOrder(ctx context.Context, o execution.Order) (exe
 		}
 		r, e := service.Do(ctx)
 		if e != nil {
+			b.invalidateExecutionConfig()
 			return o, errors.New("Binance entry submission is unconfirmed; reconcile by client ID")
 		}
 		limitMismatch := o.Type != "market" && (!sameNativeDecimal(r.Price, string(o.Price)) || r.TimeInForce != tif)
@@ -259,7 +295,8 @@ func (b *FuturesTrader) SubmitOrder(ctx context.Context, o execution.Order) (exe
 	}
 	r, e := service.Do(ctx)
 	if e != nil {
-		return o, errors.New("Binance protective order submission is unconfirmed")
+		b.invalidateExecutionConfig()
+		return o, binanceReadError("submit the Binance protective order; outcome is unconfirmed", e)
 	}
 	if r.AlgoId <= 0 || r.ClientAlgoId != nativeID || r.Symbol != o.Symbol || !sameNativeDecimal(r.Quantity, string(o.Quantity)) || !sameNativeDecimal(r.TriggerPrice, string(o.Price)) || r.Side != side || r.OrderType != typ || (!mode.DualSidePosition && !r.ReduceOnly) {
 		return o, errors.New("invalid Binance protection receipt")
@@ -270,6 +307,7 @@ func (b *FuturesTrader) SubmitOrder(ctx context.Context, o execution.Order) (exe
 	return o, nil
 }
 func (b *FuturesTrader) LookupOrder(ctx context.Context, o execution.Order) (execution.Order, error) {
+	ctx = execution.WithProtectivePriority(ctx)
 	nativeID, err := b.nativeClientID(o)
 	if err != nil {
 		return o, err
@@ -278,7 +316,7 @@ func (b *FuturesTrader) LookupOrder(ctx context.Context, o execution.Order) (exe
 	if o.Role != "entry" {
 		r, e := b.client.NewGetAlgoOrderService().ClientAlgoID(nativeID).Do(ctx)
 		if e != nil {
-			return o, errors.New("Binance protective order lookup is unconfirmed")
+			return o, protectiveLookupError(e)
 		}
 		if r.AlgoId <= 0 || r.ClientAlgoId != nativeID || r.Symbol != o.Symbol || !sameNativeDecimal(r.Quantity, string(o.Quantity)) || !sameNativeDecimal(r.TriggerPrice, string(o.Price)) {
 			return o, errors.New("protection identity mismatch")
@@ -291,7 +329,7 @@ func (b *FuturesTrader) LookupOrder(ctx context.Context, o execution.Order) (exe
 			}
 			fill, e := b.client.NewGetOrderService().Symbol(o.Symbol).OrderID(id.Int64()).Do(ctx)
 			if e != nil {
-				return o, errors.New("triggered fill not yet confirmed")
+				return o, binanceReadError("query the triggered Binance order; fill is unconfirmed", e)
 			}
 			o.Status = string(fill.Status)
 			o.Filled = execution.Decimal(fill.ExecutedQuantity)
@@ -329,6 +367,7 @@ func (b *FuturesTrader) LookupOrder(ctx context.Context, o execution.Order) (exe
 	return o, nil
 }
 func (b *FuturesTrader) CancelExecutionOrder(ctx context.Context, o execution.Order) error {
+	ctx = execution.WithProtectivePriority(ctx)
 	nativeID, err := b.nativeClientID(o)
 	if err != nil {
 		return err
@@ -349,3 +388,34 @@ func (b *FuturesTrader) CancelExecutionOrder(ctx context.Context, o execution.Or
 }
 
 var _ execution.Trader = (*FuturesTrader)(nil)
+
+// Retry only read failures with known transient semantics. Identity/JSON/auth
+// failures remain terminal; absent orders get a bounded propagation grace.
+func protectiveLookupError(err error) error {
+	var retry *execution.RetryableError
+	if errors.As(err, &retry) {
+		return retry
+	}
+	var api *common.APIError
+	var native *binanceHTTPError
+	code := int64(0)
+	if errors.As(err, &api) {
+		code = api.Code
+		native = safeHTTPMetadata(api.Message, api.Code)
+		if native != nil && (native.status == 429 || native.status == 418 || native.status == 408 || native.status >= 500) {
+			return &execution.RetryableError{Message: native.Error(), Delay: native.delay}
+		}
+	}
+	if errors.As(err, &native) {
+		code = int64(native.code)
+	}
+	switch code {
+	case -2013, -1001, -1003, -1006, -1007, -1008:
+		return &execution.RetryableError{Message: fmt.Sprintf("Binance protective lookup temporarily unavailable (code %d)", code), Delay: 5 * time.Second}
+	}
+	var network net.Error
+	if !errors.Is(err, context.Canceled) && (errors.Is(err, context.DeadlineExceeded) || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || (errors.As(err, &network) && (network.Timeout() || network.Temporary()))) {
+		return &execution.RetryableError{Message: "Binance protective lookup network failure", Delay: 5 * time.Second}
+	}
+	return binanceReadError("query the Binance protective order; outcome is unconfirmed", err)
+}
