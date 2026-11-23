@@ -45,6 +45,7 @@ func (r *Runner) RecordRuntimeStatus(checkErr error, stopping bool) error {
 		"AllinCrypto · 15 分钟运行决策日志（固定规则）",
 		"本次检查：" + now.Format(time.RFC3339),
 		"运行状态：" + status,
+		fmt.Sprintf("固定规则：%d 倍杠杆；实际成交均价反向 %d%% 止损", store.AllinCryptoLeverage, store.AllinCryptoStopPercent),
 		fmt.Sprintf("已记录跟单持仓：%d；待处理订单流程：%d", len(s.Positions), waiting),
 		"检查频率：带单信号每 1 分钟；订单和止损每 5 秒。交易事件仍实时单独记录。",
 	}

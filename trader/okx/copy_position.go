@@ -3,6 +3,8 @@ package okx
 import (
 	"context"
 	"errors"
+	"nofx/store"
+	"strconv"
 
 	"nofx/trader/execution"
 )
@@ -43,8 +45,8 @@ func (t *OKXTrader) VerifyCopyPosition(ctx context.Context, symbol, side, qty st
 		if err != nil {
 			return err
 		}
-		if found || held != side || !execution.Equal(string(base), qty) || checkLeverage && (p.MgnMode != "cross" || !execution.Equal(p.Lever, "20")) {
-			return errors.New("OKX position ownership, margin mode or 20x leverage mismatch")
+		if found || held != side || !execution.Equal(string(base), qty) || checkLeverage && (p.MgnMode != "cross" || !execution.Equal(p.Lever, strconv.Itoa(store.AllinCryptoLeverage))) {
+			return errors.New("OKX position ownership, margin mode or 10x leverage mismatch")
 		}
 		found = true
 	}

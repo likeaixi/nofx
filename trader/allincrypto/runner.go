@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"nofx/store"
 	"strings"
 	"time"
 
@@ -463,9 +464,9 @@ func (r *Runner) plan(ctx context.Context, s *state, p *pending) error {
 		if err != nil || fees.IsNegative() {
 			return errors.New("target fee unavailable")
 		}
-		needed := qty.Mul(price).Mul(decimal.New(5, -2).Add(fees.Shift(-4)))
+		needed := qty.Mul(price).Mul(decimal.NewFromInt(1).Div(decimal.NewFromInt(store.AllinCryptoLeverage)).Add(fees.Shift(-4)))
 		if needed.GreaterThan(available) {
-			return errors.New("insufficient free margin for 20x entry and fee")
+			return errors.New("insufficient free margin for 10x entry and fee")
 		}
 	} else if p.Outstanding.IsPositive() {
 		qty = p.Outstanding
@@ -494,7 +495,7 @@ func (r *Runner) plan(ctx context.Context, s *state, p *pending) error {
 		return errors.New("lead entry expired during preflight")
 	}
 	if e.Opening() && pos == nil {
-		if err = r.venue.PrepareExecutionLeverage(ctx, symbol, 20); err != nil {
+		if err = r.venue.PrepareExecutionLeverage(ctx, symbol, store.AllinCryptoLeverage); err != nil {
 			return err
 		}
 	}

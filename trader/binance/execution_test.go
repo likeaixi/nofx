@@ -499,3 +499,27 @@ func TestProtectiveReceiptMustConfirmActiveMatchingProtection(t *testing.T) {
 		})
 	}
 }
+
+func TestCopyPositionRequiresTenTimesForAdds(t *testing.T) {
+	for _, leverage := range []string{"10", "20"} {
+		t.Run(leverage, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet || r.URL.Path != "/fapi/v2/positionRisk" {
+					t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+				}
+				fmt.Fprintf(w, `[{"symbol":"BTCUSDT","positionAmt":"0.5","positionSide":"LONG","leverage":%q}]`, leverage)
+			}))
+			defer server.Close()
+			b := NewExecutionTrader("test-key", "test-secret", "")
+			b.client.BaseURL = server.URL
+			b.client.HTTPClient = server.Client()
+			err := b.VerifyCopyPosition(context.Background(), "BTCUSDT", "long", "0.5", true)
+			if (err == nil) != (leverage == "10") {
+				t.Fatalf("leverage %s: %v", leverage, err)
+			}
+			if err = b.VerifyCopyPosition(context.Background(), "BTCUSDT", "long", "0.5", false); err != nil {
+				t.Fatalf("reductions must remain possible: %v", err)
+			}
+		})
+	}
+}

@@ -41,6 +41,7 @@ type venueFixture struct {
 	delayedOriginal                           bool
 	reads                                     int
 	stableBalance, fx                         string
+	available                                 string
 	leverageErr, stale                        bool
 	held                                      decimal.Decimal
 	orders                                    []execution.Order
@@ -58,13 +59,17 @@ type venueFixture struct {
 func (v *venueFixture) Venue() string                           { return "okx" }
 func (v *venueFixture) RouteClientID(id string) (string, error) { return id, nil }
 func (v *venueFixture) PrepareExecutionLeverage(_ context.Context, _ string, l int) error {
-	if v.leverageErr || l != 20 {
+	if v.leverageErr || l != 10 {
 		return errors.New("wrong leverage")
 	}
 	return nil
 }
 func (v *venueFixture) CopyCollateral(context.Context) (map[string]string, string, error) {
-	return map[string]string{"USDT": "1000", "USDC": v.stableBalance}, "1000", nil
+	available := v.available
+	if available == "" {
+		available = "1000"
+	}
+	return map[string]string{"USDT": "1000", "USDC": v.stableBalance}, available, nil
 }
 func (v *venueFixture) AccountSnapshot(context.Context, string) (execution.Account, error) {
 	return execution.Account{Equity: "1000", Available: "1000", FeeBPS: "5", Position: execution.Decimal(v.held.String()), OpenOrders: v.stops}, nil
@@ -220,7 +225,7 @@ func TestBaselineAddsReductionsAndClose(t *testing.T) {
 			t.Fatal(v.held, step)
 		}
 	}
-	if v.orders[0].Symbol != "BTC-USDT-SWAP" || v.orders[1].Price != "98.2" || v.orders[1].Quantity != "2" {
+	if v.orders[0].Symbol != "BTC-USDT-SWAP" || v.orders[1].Price != "96.2" || v.orders[1].Quantity != "2" {
 		t.Fatal(v.orders)
 	}
 	n := len(v.orders)
@@ -372,7 +377,7 @@ func TestShortAndMarketEligibility(t *testing.T) {
 				t.Fatal("revision accepted")
 			}
 			if mode == "short" {
-				if len(v.orders) != 2 || v.orders[0].Side != "short" || v.orders[1].Price != "102.2" {
+				if len(v.orders) != 2 || v.orders[0].Side != "short" || v.orders[1].Price != "104.2" {
 					t.Fatal(v.orders)
 				}
 			} else if len(v.orders) != 0 {
@@ -638,5 +643,25 @@ func TestStopFailureDoesNotPersistUntrustedVenueErrors(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("missing failure decision")
+	}
+}
+
+func TestTenTimesEntryMarginIncludesFee(t *testing.T) {
+	for _, tc := range []struct {
+		available  string
+		wantOrders int
+	}{{"15", 0}, {"20", 0}, {"20.1", 2}} {
+		t.Run(tc.available, func(t *testing.T) {
+			r, v, _, add := setup(t)
+			if err := r.Poll(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			v.available = tc.available
+			add("BUY", "10")
+			_ = r.Poll(context.Background())
+			if len(v.orders) != tc.wantOrders {
+				t.Fatalf("available=%s orders=%d, want %d", tc.available, len(v.orders), tc.wantOrders)
+			}
+		})
 	}
 }

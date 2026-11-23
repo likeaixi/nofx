@@ -163,7 +163,7 @@ func (r *Runner) record(p *pending, reason string, success bool) *store.Decision
 	if symbol == "" {
 		symbol = p.Event.Symbol
 	}
-	action := store.DecisionAction{Action: "allincrypto", Symbol: symbol, Leverage: 20, Success: success, Reasoning: reason}
+	action := store.DecisionAction{Action: "allincrypto", Symbol: symbol, Leverage: store.AllinCryptoLeverage, Success: success, Reasoning: reason}
 	outcome := "已记录"
 	if !success {
 		outcome = "跳过或未完成"

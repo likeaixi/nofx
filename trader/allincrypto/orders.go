@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"nofx/store"
 	"strconv"
 	"time"
 
@@ -289,9 +290,9 @@ func (r *Runner) advance(ctx context.Context, s *state, receipt *execution.Order
 		return r.cleanup(ctx, s)
 	}
 	pos.Tick = p.Tick
-	price = pos.Average.Mul(decimal.New(98, -2))
+	price = pos.Average.Mul(decimal.New(100-store.AllinCryptoStopPercent, -2))
 	if pos.Side == "short" {
-		price = pos.Average.Mul(decimal.New(102, -2))
+		price = pos.Average.Mul(decimal.New(100+store.AllinCryptoStopPercent, -2))
 	}
 	units, rem := price.QuoRem(pos.Tick, 0)
 	if pos.Side == "long" && !rem.IsZero() {
@@ -377,8 +378,8 @@ func (r *Runner) flatten(ctx context.Context, s *state) error {
 				return err
 			}
 			// Preserve the old lot only when its confirmed stop still protects
-			// the aggregate fill basis at least as tightly as the fixed 2%.
-			if pos.Side == "long" && !price.LessThan(pos.Average.Mul(decimal.New(98, -2))) || pos.Side == "short" && !price.GreaterThan(pos.Average.Mul(decimal.New(102, -2))) {
+			// the aggregate fill basis at least as tightly as the fixed stop distance.
+			if pos.Side == "long" && !price.LessThan(pos.Average.Mul(decimal.New(100-store.AllinCryptoStopPercent, -2))) || pos.Side == "short" && !price.GreaterThan(pos.Average.Mul(decimal.New(100+store.AllinCryptoStopPercent, -2))) {
 				p.Keep = decimal.RequireFromString(string(seen.Quantity))
 			}
 		}

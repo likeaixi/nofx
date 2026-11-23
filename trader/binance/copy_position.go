@@ -3,6 +3,8 @@ package binance
 import (
 	"context"
 	"errors"
+	"nofx/store"
+	"strconv"
 	"strings"
 
 	"nofx/trader/execution"
@@ -39,8 +41,8 @@ func (b *FuturesTrader) VerifyCopyPosition(ctx context.Context, symbol, side, qt
 		if err != nil {
 			return err
 		}
-		if found || held != side || !execution.Equal(string(size), qty) || checkLeverage && !execution.Equal(p.Leverage, "20") {
-			return errors.New("Binance position ownership or 20x leverage mismatch")
+		if found || held != side || !execution.Equal(string(size), qty) || checkLeverage && !execution.Equal(p.Leverage, strconv.Itoa(store.AllinCryptoLeverage)) {
+			return errors.New("Binance position ownership or 10x leverage mismatch")
 		}
 		found = true
 	}

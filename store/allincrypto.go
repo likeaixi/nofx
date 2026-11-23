@@ -4,6 +4,9 @@ import "encoding/json"
 
 const AllinCrypto = "allincrypto"
 
+const AllinCryptoLeverage = 10
+const AllinCryptoStopPercent = 4
+
 func (s *Strategy) IsAllinCrypto() bool {
 	if s == nil {
 		return false
