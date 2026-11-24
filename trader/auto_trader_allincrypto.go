@@ -67,6 +67,9 @@ func (at *AutoTrader) runAllinCrypto(account string) error {
 		}
 		runner.ConfirmedSourceBaseline = baseline
 	}
+	equityCtx, cancelEquity := context.WithCancel(context.Background())
+	defer cancelEquity()
+	go at.runCopyEquity(equityCtx)
 	return at.runCopyCycles(runner)
 }
 

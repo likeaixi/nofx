@@ -478,7 +478,7 @@ export function ComparisonChart({ traders }: ComparisonChartProps) {
                 dataKey={`${trader.trader_id}_pnl_pct`}
                 stroke={traderColor(trader.trader_id)}
                 strokeWidth={idx === 0 ? 3 : 2}
-                dot={false}
+                dot={traderHistories[idx]?.data?.length === 1 ? { r: 4 } : false}
                 activeDot={{
                   r: 6,
                   fill: traderColor(trader.trader_id),
