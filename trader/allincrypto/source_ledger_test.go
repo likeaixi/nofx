@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"sort"
 	"testing"
@@ -280,5 +281,101 @@ func TestSourceLedgerPreservesAccountingOrderForSameTimestamp(t *testing.T) {
 	}
 	if v.held.String() != "3" {
 		t.Fatal("half reduction used wrong denominator", v.held)
+	}
+}
+
+func TestBootstrapReusesVerifiedHistoryWithoutTrading(t *testing.T) {
+	for _, corrupt := range []bool{false, true} {
+		t.Run(fmt.Sprint(corrupt), func(t *testing.T) {
+			r, v, src, add := setup(t)
+			r.source = &ledgerSourceFixture{sourceFixture: src}
+			r.ConfirmedSourceBaseline = time.UnixMilli(src.events[0].OrderTime - 1)
+			if err := r.Poll(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			donorState, _ := r.load()
+			donorState.Positions["OTHERUSDT"] = &position{Symbol: "OTHERUSDT", Local: decimal.NewFromInt(7)}
+			if err := r.save(donorState, nil, nil); err != nil {
+				t.Fatal(err)
+			}
+			if corrupt {
+				r.db.Model(&sourceLedgerEntry{}).Where("trader_id = ?", r.id).Update("after", "1")
+			}
+			add("BUY", "10")
+			rr, err := New(r.db, "new-trader", "new-account", &ledgerSourceFixture{sourceFixture: src, fail: true}, v, v)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rr.now = r.now
+			rr.ConfirmedSourceBaseline = r.ConfirmedSourceBaseline
+			err = rr.Poll(context.Background())
+			if corrupt {
+				if err == nil {
+					t.Fatal("accepted corrupt donor")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			s, _ := rr.load()
+			if s.Lead["BTCUSDT/long"].String() != "109" || len(s.Positions) != 0 || s.Pending != nil || len(v.orders) != 0 {
+				t.Fatal("unsafe bootstrap", s, v.orders)
+			}
+			if err = rr.Poll(context.Background()); err != nil || len(v.orders) != 0 {
+				t.Fatal("historical replay", err)
+			}
+			add("BUY", "10")
+			if err = rr.Poll(context.Background()); err != nil || v.held.String() != "2" {
+				t.Fatal("new signal", err, v.held)
+			}
+		})
+	}
+}
+
+func TestSharedBootstrapRejectsMissingJournalAndRevisedOverlap(t *testing.T) {
+	for _, mode := range []string{"missing", "revision", "baseline", "before-baseline"} {
+		t.Run(mode, func(t *testing.T) {
+			r, v, src, add := setup(t)
+			add("BUY", "1")
+			r.source = &ledgerSourceFixture{sourceFixture: src}
+			r.ConfirmedSourceBaseline = time.UnixMilli(src.events[0].OrderTime - 1)
+			if err := r.Poll(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			switch mode {
+			case "missing":
+				r.db.Where("trader_id = ? AND sequence = ?", r.id, 1).Delete(&sourceLedgerEntry{})
+			case "before-baseline":
+				e := src.events[0]
+				e.OrderTime = r.ConfirmedSourceBaseline.UnixMilli() - 2
+				e.OrderUpdateTime = e.OrderTime
+				raw, _ := json.Marshal(e)
+				r.db.Model(&sourceLedgerEntry{}).Where("trader_id = ? AND sequence = ?", r.id, 1).Updates(map[string]any{"key": e.Key(), "fingerprint": e.Fingerprint(), "event_json": string(raw), "order_update_time": e.OrderUpdateTime})
+			case "revision":
+				src.events[0].AvgPrice = decimal.NewFromInt(101)
+			}
+			rr, err := New(r.db, "new-trader", "other-account", &ledgerSourceFixture{sourceFixture: src, fail: true}, v, v)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rr.now = r.now
+			rr.ConfirmedSourceBaseline = r.ConfirmedSourceBaseline
+			if mode == "baseline" {
+				rr.ConfirmedSourceBaseline = rr.ConfirmedSourceBaseline.Add(-time.Second)
+			}
+			if err = rr.Poll(context.Background()); err == nil {
+				t.Fatal("accepted invalid history")
+			}
+			s, _ := rr.load()
+			if s.LedgerBaseline != 0 || len(s.Positions) != 0 || len(v.orders) != 0 {
+				t.Fatal("failed bootstrap changed state")
+			}
+			var count int64
+			rr.db.Model(&sourceLedgerEntry{}).Where("trader_id = ?", rr.id).Count(&count)
+			if count != 0 {
+				t.Fatal("partial journal committed")
+			}
+		})
 	}
 }

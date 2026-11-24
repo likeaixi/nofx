@@ -48,7 +48,10 @@ func (r *Runner) bootstrapSourceLedger(ctx context.Context, s *state) error {
 	if baseline <= 0 || baseline > r.now().UnixMilli() {
 		return errors.New("confirmed source baseline must be in the past")
 	}
-	batch, err := source.HistorySince(ctx, baseline)
+	batch, err := r.sharedSourceHistory(ctx, baseline)
+	if err != nil {
+		batch, err = source.HistorySince(ctx, baseline)
+	}
 	if err != nil {
 		return fmt.Errorf("confirmed source ledger bootstrap: %w", err)
 	}
