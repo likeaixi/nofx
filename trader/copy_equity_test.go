@@ -1,6 +1,7 @@
 package trader
 
 import (
+	"context"
 	"errors"
 	"nofx/store"
 	"testing"
@@ -46,4 +47,11 @@ func TestCopyEquityRecordsAccountAndSkipsReadFailure(t *testing.T) {
 	if len(rows) != 1 {
 		t.Fatal("failed read wrote a snapshot")
 	}
+}
+
+func TestCanceledCopyEquityDoesNotReadOrWrite(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	// No trader/store: a canceled sampler must return without accessing either.
+	(&AutoTrader{}).runCopyEquity(ctx)
 }
