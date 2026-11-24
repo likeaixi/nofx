@@ -97,12 +97,18 @@ func (t *OKXTrader) frontierOrders(symbol string) ([]types.OpenOrder, error) {
 				trigger = r.SlTriggerPx
 			}
 			if r.TpTriggerPx != "" {
+				// OCO contains two protective legs under one native order ID.
+				// Preserve the SL leg before emitting the TP leg below.
+				if r.SlTriggerPx != "" {
+					sl, _ := strconv.ParseFloat(r.SlTriggerPx, 64)
+					out = append(out, types.OpenOrder{OrderID: id, Symbol: symbol, Side: strings.ToUpper(r.Side), PositionSide: strings.ToUpper(r.PosSide), Type: "STOP_MARKET", StopPrice: sl, Quantity: qty, Status: "NEW", ReduceOnly: string(r.ReduceOnly) == "true" || string(r.ReduceOnly) == `"true"`})
+				}
 				kind = "TAKE_PROFIT_MARKET"
 				trigger = r.TpTriggerPx
 			}
 		}
 		stop, _ := strconv.ParseFloat(trigger, 64)
-		out = append(out, types.OpenOrder{OrderID: id, Symbol: symbol, Side: strings.ToUpper(r.Side), PositionSide: strings.ToUpper(r.PosSide), Type: kind, Price: price, StopPrice: stop, Quantity: qty, Status: "NEW"})
+		out = append(out, types.OpenOrder{ReduceOnly: string(r.ReduceOnly) == "true" || string(r.ReduceOnly) == `"true"`, OrderID: id, Symbol: symbol, Side: strings.ToUpper(r.Side), PositionSide: strings.ToUpper(r.PosSide), Type: kind, Price: price, StopPrice: stop, Quantity: qty, Status: "NEW"})
 	}
 	return out, nil
 }

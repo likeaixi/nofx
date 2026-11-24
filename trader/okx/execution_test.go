@@ -281,3 +281,24 @@ func TestCopyPositionRequiresTenTimesForAdds(t *testing.T) {
 		})
 	}
 }
+
+func TestFrontierOrdersKeepsBothOCOTriggers(t *testing.T) {
+	b := NewAccountTrader("key", "secret", "pass")
+	b.httpClient = &http.Client{Transport: executionTransport(func(r *http.Request) (*http.Response, error) {
+		data := `[]`
+		if r.URL.Path == okxInstrumentsPath {
+			data = okxInstrumentFixture
+		}
+		if r.URL.Path == okxAlgoPendingPath && r.URL.Query().Get("ordType") == "oco" {
+			data = `[{"algoId":"123","instId":"BTC-USDT-SWAP","side":"sell","posSide":"net","ordType":"oco","sz":"2","slTriggerPx":"90","tpTriggerPx":"110","reduceOnly":true,"state":"live"}]`
+		}
+		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"code":"0","data":` + data + `}`))}, nil
+	})}
+	orders, err := b.GetOpenOrders("BTC-USDT-SWAP")
+	if err != nil || len(orders) != 2 {
+		t.Fatal(orders, err)
+	}
+	if orders[0].Type != "STOP_MARKET" || orders[0].StopPrice != 90 || !orders[0].ReduceOnly || orders[1].Type != "TAKE_PROFIT_MARKET" || orders[1].StopPrice != 110 {
+		t.Fatal(orders)
+	}
+}

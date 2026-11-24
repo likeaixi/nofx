@@ -174,7 +174,17 @@ func (s *Server) handlePositions(c *gin.Context) {
 	if positions == nil {
 		positions = make([]map[string]interface{}, 0)
 	}
+	// Enrich response copies; exchange adapters may cache their position maps.
+	copied := make([]map[string]interface{}, len(positions))
+	for i, p := range positions {
+		copied[i] = make(map[string]interface{}, len(p)+2)
+		for k, v := range p {
+			copied[i][k] = v
+		}
+	}
+	positions = copied
 	normalizePositionFields(positions)
+	enrichPositionStops(positions, trader)
 	c.JSON(http.StatusOK, positions)
 }
 

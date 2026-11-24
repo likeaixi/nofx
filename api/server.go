@@ -414,7 +414,8 @@ Returns: {"balance":<float>,"equity":<float>,"unrealized_pnl":<float>,"initial_b
 				s.handleAccount)
 			s.routeWithSchema(protected, "GET", "/positions", "Current open positions",
 				`Query: ?trader_id=<EXACT trader_id from GET /api/my-traders>
-Returns: [{"symbol":"<string>","side":"long|short","size":<float>,"entry_price":<float>,"mark_price":<float>,"unrealized_pnl":<float>,"leverage":<int>}]`,
+Returns: [{"symbol":"<string>","side":"long|short","quantity":<float>,"entry_price":<float>,"mark_price":<float>,"unrealized_pnl":<float>,"leverage":<int>,"stop_loss_status":"available|none|unknown","stop_loss_orders":[{"order_id":"<string>","symbol":"<string>","side":"BUY|SELL","position_side":"LONG|SHORT|BOTH|NET","type":"STOP_MARKET|STOP|STOP_LOSS|STOP_LOSS_LIMIT","stop_price":<float>,"quantity":<float>,"status":"<string>","reduce_only":<bool>,"close_position":<bool>}]}]
+stop_loss_status: available = matching live orders found (not a guarantee of full quantity coverage); none = successful query found no matching stop; unknown = lookup failed or closing intent could not be verified. Orders are a separate exchange snapshot from positions.`,
 				s.handlePositions)
 			s.routeWithSchema(protected, "GET", "/positions/history", "Closed position history",
 				`Query: ?trader_id=<EXACT trader_id from GET /api/my-traders>&limit=<int, default 20>`,

@@ -523,3 +523,27 @@ func TestCopyPositionRequiresTenTimesForAdds(t *testing.T) {
 		})
 	}
 }
+
+func TestOpenOrdersPreservesProtectiveClosingFlags(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/fapi/v1/openOrders":
+			fmt.Fprint(w, `[]`)
+		case "/fapi/v1/openAlgoOrders":
+			fmt.Fprint(w, `[{"algoId":123,"symbol":"BTCUSDT","side":"BUY","positionSide":"BOTH","orderType":"STOP_MARKET","triggerPrice":"110","quantity":"2","reduceOnly":true,"closePosition":false,"algoStatus":"NEW"}]`)
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+	b := NewExecutionTrader("key", "secret", "")
+	b.client.BaseURL = server.URL
+	b.client.HTTPClient = server.Client()
+	orders, err := b.GetOpenOrders("BTCUSDT")
+	if err != nil || len(orders) != 1 {
+		t.Fatal(orders, err)
+	}
+	if !orders[0].ReduceOnly || orders[0].ClosePosition || orders[0].StopPrice != 110 {
+		t.Fatal(orders)
+	}
+}

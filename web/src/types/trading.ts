@@ -36,6 +36,8 @@ export interface AccountInfo {
 }
 
 export interface Position {
+  stop_loss_orders?: OpenOrder[]
+  stop_loss_status?: 'available' | 'none' | 'unknown'
   symbol: string
   side: string
   entry_price: number
@@ -50,6 +52,8 @@ export interface Position {
 
 // Mirrors backend trader/types.OpenOrder (GET /api/open-orders).
 export interface OpenOrder {
+  reduce_only?: boolean
+  close_position?: boolean
   order_id: string
   symbol: string
   side: string // BUY/SELL

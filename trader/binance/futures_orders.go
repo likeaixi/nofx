@@ -587,7 +587,8 @@ func (t *FuturesTrader) GetOpenOrders(symbol string) ([]types.OpenOrder, error) 
 		quantity, _ := strconv.ParseFloat(order.OrigQuantity, 64)
 
 		result = append(result, types.OpenOrder{
-			OrderID:      fmt.Sprintf("%d", order.OrderID),
+			OrderID:    fmt.Sprintf("%d", order.OrderID),
+			ReduceOnly: order.ReduceOnly, ClosePosition: order.ClosePosition,
 			Symbol:       order.Symbol,
 			Side:         string(order.Side),
 			PositionSide: string(order.PositionSide),
@@ -613,7 +614,8 @@ func (t *FuturesTrader) GetOpenOrders(symbol string) ([]types.OpenOrder, error) 
 			quantity, _ := strconv.ParseFloat(algoOrder.Quantity, 64)
 
 			result = append(result, types.OpenOrder{
-				OrderID:      fmt.Sprintf("%d", algoOrder.AlgoId),
+				OrderID:    fmt.Sprintf("%d", algoOrder.AlgoId),
+				ReduceOnly: algoOrder.ReduceOnly, ClosePosition: algoOrder.ClosePosition,
 				Symbol:       algoOrder.Symbol,
 				Side:         string(algoOrder.Side),
 				PositionSide: string(algoOrder.PositionSide),
