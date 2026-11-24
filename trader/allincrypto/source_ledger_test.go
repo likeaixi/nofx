@@ -379,3 +379,9 @@ func TestSharedBootstrapRejectsMissingJournalAndRevisedOverlap(t *testing.T) {
 		})
 	}
 }
+
+func TestSharedPositionComparisonUsesNumericEquality(t *testing.T) {
+	if !equalSourcePositions(map[string]decimal.Decimal{"BTC": decimal.RequireFromString("0.00")}, map[string]decimal.Decimal{"BTC": decimal.Zero}) {
+		t.Fatal("decimal scales must not invalidate durable history")
+	}
+}

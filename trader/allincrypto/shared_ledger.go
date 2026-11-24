@@ -56,7 +56,7 @@ func (r *Runner) sharedSourceHistory(ctx context.Context, baseline int64) (binan
 				}
 				events = append(events, e)
 			}
-			if !valid || len(events) == 0 || events[len(events)-1].Fingerprint() != donor.LedgerHead || !reflect.DeepEqual(replay.Lead, donor.Lead) || !reflect.DeepEqual(replay.LedgerLast, donor.LedgerLast) {
+			if !valid || len(events) == 0 || events[len(events)-1].Fingerprint() != donor.LedgerHead || !equalSourcePositions(replay.Lead, donor.Lead) || !reflect.DeepEqual(replay.LedgerLast, donor.LedgerLast) {
 				continue
 			}
 			if len(events) > len(history.Events) {
@@ -111,4 +111,17 @@ func (r *Runner) sharedSourceHistory(ctx context.Context, baseline int64) (binan
 	}
 	history.Head = latest.Head
 	return history, nil
+}
+
+func equalSourcePositions(a, b map[string]decimal.Decimal) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for key, qty := range a {
+		other, ok := b[key]
+		if !ok || !qty.Equal(other) {
+			return false
+		}
+	}
+	return true
 }
