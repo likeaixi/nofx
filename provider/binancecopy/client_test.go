@@ -83,7 +83,7 @@ func TestPositionBeforeRequiresClosedBoundaryAndContinuousFills(t *testing.T) {
 		fmt.Fprint(w, `]}}`)
 	}))
 	defer srv.Close()
-	c := Client{srv.URL, srv.Client(), 50}
+	c := Client{BaseURL: srv.URL, HTTP: srv.Client(), PageSize: 50}
 	batch, err := c.Snapshot(context.Background(), "")
 	if err != nil {
 		t.Fatal(err)

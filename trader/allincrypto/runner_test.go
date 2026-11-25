@@ -74,7 +74,7 @@ func (v *venueFixture) CopyCollateral(context.Context) (map[string]string, strin
 func (v *venueFixture) AccountSnapshot(context.Context, string) (execution.Account, error) {
 	return execution.Account{Equity: "1000", Available: "1000", FeeBPS: "5", Position: execution.Decimal(v.held.String()), OpenOrders: v.stops}, nil
 }
-func (v *venueFixture) VerifyCopyPosition(_ context.Context, _, side, qty string, _ bool) error {
+func (v *venueFixture) VerifyCopyPosition(_ context.Context, _, side, qty string, _ int) error {
 	if !v.held.Equal(decimal.RequireFromString(qty)) || !v.held.IsZero() && side != v.side {
 		return errors.New("foreign position")
 	}

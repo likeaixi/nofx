@@ -21,7 +21,7 @@ func TestSharedSourceReusesCompleteSnapshotForConcurrentBootstrap(t *testing.T) 
 		fmt.Fprint(w, `{"code":"000000","success":true,"data":{"list":[{"symbol":"BTCUSDT","baseAsset":"BTC","quoteAsset":"USDT","side":"BUY","positionSide":"LONG","executedQty":1,"avgPrice":100,"orderTime":20,"orderUpdateTime":20},{"symbol":"BTCUSDT","baseAsset":"BTC","quoteAsset":"USDT","side":"BUY","positionSide":"LONG","executedQty":1,"avgPrice":100,"orderTime":9,"orderUpdateTime":9}]}}`)
 	}))
 	defer srv.Close()
-	c := NewShared(&Client{srv.URL, srv.Client(), 50})
+	c := NewShared(&Client{BaseURL: srv.URL, HTTP: srv.Client(), PageSize: 50})
 	first, err := c.Snapshot(context.Background(), "")
 	if err != nil {
 		t.Fatal(err)
@@ -62,7 +62,7 @@ func TestSharedHistoryDoesNotHideUnorderedPublicPage(t *testing.T) {
 		fmt.Fprint(w, `]}}`)
 	}))
 	defer srv.Close()
-	c := NewShared(&Client{srv.URL, srv.Client(), 50})
+	c := NewShared(&Client{BaseURL: srv.URL, HTTP: srv.Client(), PageSize: 50})
 	_, _ = c.Snapshot(context.Background(), "")
 	if _, err := c.HistorySince(context.Background(), 10); err == nil {
 		t.Fatal("cached Snapshot bypassed historical ordering validation")

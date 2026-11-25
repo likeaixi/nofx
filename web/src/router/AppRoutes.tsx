@@ -25,6 +25,7 @@ import { DataPage } from '../pages/DataPage'
 import { SettingsPage } from '../pages/SettingsPage'
 import { StrategyStudioPage } from '../pages/StrategyStudioPage'
 import { TradingPlanningPage } from '../pages/TradingPlanningPage'
+import { TradeLedgerPage } from '../pages/TradeLedgerPage'
 import { TraderDetails } from '../components/trader/TraderDetails'
 import { TerminalDashboard } from '../components/terminal/TerminalDashboard'
 import { useAuth } from '../contexts/AuthContext'
@@ -604,6 +605,18 @@ export function AppRoutes() {
               >
                 <TraderLaunchGuestPage />
               </AppChrome>
+            )
+          }
+        />
+        <Route
+          path={ROUTES.tradeLedger}
+          element={
+            isAuthenticated ? (
+              <AppChrome currentPage="trade-ledger">
+                <TradeLedgerPage />
+              </AppChrome>
+            ) : (
+              <Navigate to={ROUTES.login} replace />
             )
           }
         />

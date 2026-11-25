@@ -60,6 +60,7 @@ type pending struct {
 	StopSubmitError                        string `json:",omitempty"`
 }
 type state struct {
+	SourceID            string
 	LedgerSequence      int64
 	LedgerHead          string
 	LedgerLast          map[string]binancecopy.Event
@@ -82,7 +83,7 @@ func (r *Runner) load() (*state, error) {
 	var row checkpoint
 	err := r.db.First(&row, "trader_id = ?", r.id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		s := state{Positions: map[string]*position{}}
+		s := state{SourceID: r.sourceID(), Positions: map[string]*position{}}
 		b, _ := json.Marshal(s)
 		row = checkpoint{TraderID: r.id, Account: r.account, Body: string(b)}
 		if err = r.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error; err != nil {
@@ -101,6 +102,17 @@ func (r *Runner) load() (*state, error) {
 	if err = json.Unmarshal([]byte(row.Body), &s); err != nil {
 		return nil, err
 	}
+	if r.leverage() < 1 || r.leverage() > 20 {
+		return nil, errors.New("invalid copy leverage")
+	}
+	sourceID := s.SourceID
+	if sourceID == "" {
+		sourceID = store.DefaultCopyPortfolioID
+	}
+	if sourceID != r.sourceID() {
+		return nil, errors.New("copy source differs from persisted history; create a new trader")
+	}
+	s.SourceID = sourceID
 	if s.Positions == nil {
 		return nil, errors.New("invalid follow state")
 	}
@@ -163,7 +175,7 @@ func (r *Runner) record(p *pending, reason string, success bool) *store.Decision
 	if symbol == "" {
 		symbol = p.Event.Symbol
 	}
-	action := store.DecisionAction{Action: "allincrypto", Symbol: symbol, Leverage: store.AllinCryptoLeverage, Success: success, Reasoning: reason}
+	action := store.DecisionAction{Action: "allincrypto", Symbol: symbol, Leverage: r.leverage(), Success: success, Reasoning: reason}
 	outcome := "已记录"
 	if !success {
 		outcome = "跳过或未完成"

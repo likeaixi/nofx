@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useSWR from 'swr'
+import { CopyStrategyEditor } from '../components/strategy/CopyStrategyEditor'
+import { GeneralStrategyFields } from '../components/strategy/GeneralStrategyFields'
 import { StrategyStatusBadges } from '../components/strategy/StrategyStatusBadges'
 import {
   Bot,
@@ -34,7 +36,13 @@ import { buildDashboardPath, ROUTES } from '../router/paths'
 const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 type Scope =
-  'all' | 'crypto' | 'stock' | 'commodity' | 'index' | 'forex' | 'pre_ipo'
+  | 'all'
+  | 'crypto'
+  | 'stock'
+  | 'commodity'
+  | 'index'
+  | 'forex'
+  | 'pre_ipo'
 
 const scopeOptions: Array<{ value: Scope; zh: string; en: string }> = [
   { value: 'all', zh: 'All Markets', en: 'All Markets' },
@@ -47,7 +55,7 @@ const scopeOptions: Array<{ value: Scope; zh: string; en: string }> = [
 ]
 
 const timeframeOptions = ['5m', '15m', '30m', '1h', '4h', '1d']
-const barCountOptions = [20, 30, 50]
+const barCountOptions = [10, 20, 30]
 const topNOptions = [5, 6, 7, 8, 9, 10]
 const confidenceOptions = [65, 75, 82]
 
@@ -230,17 +238,23 @@ function defaultRisk(risk?: Partial<RiskControlConfig>): RiskControlConfig {
   }
 }
 
-function simplifyConfig(
+export function simplifyConfig(
   config: StrategyConfig | null | undefined
 ): StrategyConfig {
+  if (
+    config?.strategy_type === 'allincrypto' ||
+    config?.strategy_type === 'grid_trading'
+  )
+    return structuredClone(config)
   const ai = config ? getAIConfig(config) : null
   return {
+    ...config,
     strategy_type: 'ai_trading',
     language: config?.language || 'zh',
     ai_config: {
-      coin_source: defaultCoinSource(ai?.coin_source),
-      indicators: defaultIndicators(ai?.indicators),
-      risk_control: defaultRisk(ai?.risk_control),
+      coin_source: { ...defaultCoinSource(), ...ai?.coin_source },
+      indicators: { ...defaultIndicators(), ...ai?.indicators },
+      risk_control: { ...defaultRisk(), ...ai?.risk_control },
       custom_prompt: ai?.custom_prompt || '',
       prompt_sections: ai?.prompt_sections,
     },
@@ -280,7 +294,9 @@ export function StrategyStudioPage() {
   const { token } = useAuth()
   const { language } = useLanguage()
   const navigate = useNavigate()
-  const { data: strategyTraders, error: strategyUsageError } = useSWR<TraderInfo[]>(
+  const { data: strategyTraders, error: strategyUsageError } = useSWR<
+    TraderInfo[]
+  >(
     token ? ['strategy-trader-usage', token] : null,
     () => api.getTraders(true),
     { refreshInterval: 30000, revalidateOnFocus: true }
@@ -298,6 +314,7 @@ export function StrategyStudioPage() {
   const [symbolsLoading, setSymbolsLoading] = useState(false)
   const [symbolsError, setSymbolsError] = useState('')
   const [hasChanges, setHasChanges] = useState(false)
+  const [showCopyCreate, setShowCopyCreate] = useState(false)
 
   const aiConfig = editingConfig?.ai_config || null
   const coinSource = aiConfig?.coin_source
@@ -390,28 +407,31 @@ export function StrategyStudioPage() {
 
   const patchCoinSource = (patch: Partial<CoinSourceConfig>) => {
     patchAI({
-      coin_source: defaultCoinSource({
+      coin_source: {
+        ...defaultCoinSource(),
         ...coinSource,
         ...patch,
-      }),
+      },
     })
   }
 
   const patchIndicators = (patch: Partial<IndicatorConfig>) => {
     patchAI({
-      indicators: defaultIndicators({
+      indicators: {
+        ...defaultIndicators(),
         ...indicators,
         ...patch,
-      }),
+      },
     })
   }
 
   const patchRisk = (patch: Partial<RiskControlConfig>) => {
     patchAI({
-      risk_control: defaultRisk({
+      risk_control: {
+        ...defaultRisk(),
         ...risk,
         ...patch,
-      }),
+      },
     })
   }
 
@@ -428,13 +448,15 @@ export function StrategyStudioPage() {
       defaultConfig.language = language as 'zh' | 'en'
       defaultConfig.ai_config = {
         ...defaultConfig.ai_config!,
-        coin_source: defaultCoinSource({
+        coin_source: {
+          ...defaultCoinSource(),
           ...defaultConfig.ai_config?.coin_source,
           static_coins: [],
           hyper_rank_category: 'all',
           oi_top_limit: 10,
-        }),
-        indicators: defaultIndicators({
+        },
+        indicators: {
+          ...defaultIndicators(),
           ...defaultConfig.ai_config?.indicators,
           klines: {
             primary_timeframe: '15m',
@@ -442,8 +464,9 @@ export function StrategyStudioPage() {
             enable_multi_timeframe: false,
             selected_timeframes: ['15m'],
           },
-        }),
-        risk_control: defaultRisk({
+        },
+        risk_control: {
+          ...defaultRisk(),
           ...defaultConfig.ai_config?.risk_control,
           max_positions: 8,
           btc_eth_max_leverage: 10,
@@ -453,7 +476,7 @@ export function StrategyStudioPage() {
           max_margin_usage: 1.0,
           min_confidence: 78,
           min_risk_reward_ratio: 3,
-        }),
+        },
         custom_prompt:
           'NOFX Autopilot scans the OI-top market ranking each cycle, loads per-symbol structure, and holds each position while that structure stays supportive.',
         prompt_sections: undefined,
@@ -504,7 +527,9 @@ export function StrategyStudioPage() {
           }),
         }
       )
-      if (!response.ok) throw new Error('Failed to save strategy')
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Failed to save strategy')
+      if (Array.isArray(result.warnings) && result.warnings.length) notify.warning(result.warnings.join('\n'))
       if (activateAfter) {
         await api.activateStrategy(selectedStrategy.id)
       }
@@ -529,50 +554,17 @@ export function StrategyStudioPage() {
     }
   }
 
-  const buildAutopilotConfig = (): StrategyConfig => {
-    const base = simplifyConfig(editingConfig)
-    base.language = language as 'zh' | 'en'
-    base.ai_config = {
-      ...base.ai_config!,
-      coin_source: defaultCoinSource({
-        ...base.ai_config?.coin_source,
-        static_coins: [],
-        hyper_rank_category: 'all',
-        oi_top_limit: 10,
-        use_oi_top: true,
-      }),
-      indicators: defaultIndicators({
-        ...base.ai_config?.indicators,
-        klines: {
-          primary_timeframe: '15m',
-          primary_count: 30,
-          enable_multi_timeframe: false,
-          selected_timeframes: ['15m'],
-        },
-      }),
-      risk_control: defaultRisk({
-        ...base.ai_config?.risk_control,
-        max_positions: 8,
-        btc_eth_max_leverage: 10,
-        altcoin_max_leverage: 10,
-        // Five times equity is the hard per-position cap; allocation is dynamic.
-        btc_eth_max_position_value_ratio: 5,
-        altcoin_max_position_value_ratio: 5,
-        max_margin_usage: 1.0,
-        min_confidence: 78,
-        min_risk_reward_ratio: 3,
-      }),
-      custom_prompt:
-        'Run NOFX Autopilot: use the OI-top ranking as the candidate universe, open in the direction the analysis supports, and hold while that structure remains intact.',
-      prompt_sections: undefined,
-    }
-    return base
-  }
+  const buildAutopilotConfig = (): StrategyConfig => ({
+    ...simplifyConfig(editingConfig),
+    language: language as 'zh' | 'en',
+  })
 
   const startAutopilotAgent = async () => {
     if (!selectedStrategy) return
     if (selectedStrategy.config.strategy_type === 'allincrypto') {
-      navigate(`${ROUTES.traders}?strategy=${encodeURIComponent(selectedStrategy.id)}`)
+      navigate(
+        `${ROUTES.traders}?strategy=${encodeURIComponent(selectedStrategy.id)}`
+      )
       return
     }
 
@@ -624,7 +616,9 @@ export function StrategyStudioPage() {
     if (!selectedStrategy) return
     try {
       await api.activateStrategy(selectedStrategy.id)
-      notify.success(text(language, '已设为默认策略', 'Default strategy updated'))
+      notify.success(
+        text(language, '已设为默认策略', 'Default strategy updated')
+      )
       await loadStrategies(selectedStrategy.id)
     } catch (err) {
       notify.error(
@@ -709,11 +703,11 @@ export function StrategyStudioPage() {
         language: language as 'zh' | 'en',
         ai_config: {
           ...currentAI,
-          coin_source: defaultCoinSource({
+          coin_source: {
             ...currentAI.coin_source,
             oi_top_limit: profile.topN,
-          }),
-          indicators: defaultIndicators({
+          },
+          indicators: {
             ...currentAI.indicators,
             klines: {
               primary_timeframe: profile.timeframe,
@@ -721,15 +715,15 @@ export function StrategyStudioPage() {
               enable_multi_timeframe: false,
               selected_timeframes: [profile.timeframe],
             },
-          }),
-          risk_control: defaultRisk({
+          },
+          risk_control: {
             ...currentAI.risk_control,
             max_positions: profile.maxPositions,
             btc_eth_max_leverage: profile.leverage,
             altcoin_max_leverage: profile.leverage,
             max_margin_usage: profile.margin,
             min_confidence: profile.confidence,
-          }),
+          },
           custom_prompt: text(language, profile.promptZh, profile.promptEn),
           prompt_sections: undefined,
         },
@@ -752,29 +746,32 @@ export function StrategyStudioPage() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <h1 className="text-xl font-semibold text-nofx-text">
-              {text(language, 'Strategy', 'Strategy')}
+              {text(language, '策略配置', 'Strategies')}
             </h1>
             <p className="mt-1 text-sm text-nofx-text-muted">
               {text(
                 language,
-                'Autonomous market selection powered by the OI-top ranking.',
-                'Autonomous market selection powered by the OI-top ranking.'
+                '配置影子实盘跟单，或自定义通用 AI 策略参数。',
+                'Configure live shadow copying or tune a general AI strategy.'
               )}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={startAutopilotAgent}
-            disabled={saving || !selectedStrategy}
-            className="inline-flex items-center gap-2 rounded-lg bg-nofx-gold px-4 py-2 text-sm font-semibold text-nofx-bg hover:bg-nofx-gold-highlight"
-          >
-            {saving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Bot className="h-4 w-4" />
+          {!showCopyCreate &&
+            selectedStrategy?.config.strategy_type !== 'allincrypto' && (
+              <button
+                type="button"
+                onClick={startAutopilotAgent}
+                disabled={saving || !selectedStrategy}
+                className="inline-flex items-center gap-2 rounded-lg bg-nofx-gold px-4 py-2 text-sm font-semibold text-nofx-bg hover:bg-nofx-gold-highlight"
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Bot className="h-4 w-4" />
+                )}
+                {text(language, '启动此策略', 'Launch strategy')}
+              </button>
             )}
-            {selectedStrategy?.config.strategy_type === 'allincrypto' ? text(language,'配置跟单账户','Configure copy trader') : text(language, 'Launch Autopilot', 'Launch Autopilot')}
-          </button>
         </div>
       </div>
 
@@ -787,21 +784,43 @@ export function StrategyStudioPage() {
             <button
               type="button"
               title={text(language, 'New strategy', 'New strategy')}
-              onClick={() => void createStrategy()}
+              onClick={() => {
+                setShowCopyCreate(false)
+                void createStrategy()
+              }}
               className="inline-flex items-center gap-1 rounded-md border border-[rgba(25,36,52,0.14)] bg-nofx-bg-lighter px-2 py-1 text-[11px] font-semibold text-nofx-gold hover:border-nofx-gold/40"
             >
               <Plus className="h-3 w-3" />
-              {text(language, 'New', 'New')}
+              {text(language, '+ 通用策略', '+ General')}
             </button>
           </div>
+          <button
+            type="button"
+            className="copy-create-entry"
+            onClick={() => setShowCopyCreate(true)}
+          >
+            {text(language, '+ 影子跟单策略', '+ Shadow Copy')}
+          </button>
           <p className="mb-3 px-2 text-xs leading-relaxed text-nofx-text-muted">
-            {text(language, '默认策略不代表正在运行；“正在使用”显示绑定此策略的运行中 trader 数量。', 'Default does not mean running. “In use” counts running traders assigned to this strategy.')}
+            {text(
+              language,
+              '默认策略不代表正在运行；“正在使用”显示绑定此策略的运行中 trader 数量。',
+              'Default does not mean running. “In use” counts running traders assigned to this strategy.'
+            )}
           </p>
           {(strategyUsageError || !strategyTraders) && (
             <p role="status" className="mb-3 px-2 text-xs text-nofx-text-muted">
               {strategyUsageError
-                ? text(language, '暂时无法确认策略使用状态', 'Strategy usage is temporarily unavailable')
-                : text(language, '正在读取策略使用状态…', 'Loading strategy usage…')}
+                ? text(
+                    language,
+                    '暂时无法确认策略使用状态',
+                    'Strategy usage is temporarily unavailable'
+                  )
+                : text(
+                    language,
+                    '正在读取策略使用状态…',
+                    'Loading strategy usage…'
+                  )}
             </p>
           )}
           <div className="space-y-2">
@@ -810,6 +829,7 @@ export function StrategyStudioPage() {
                 key={strategy.id}
                 type="button"
                 onClick={() => {
+                  setShowCopyCreate(false)
                   setSelectedStrategy(strategy)
                   setEditingConfig(simplifyConfig(strategy.config))
                   setHasChanges(false)
@@ -842,16 +862,34 @@ export function StrategyStudioPage() {
         </aside>
 
         <main className="overflow-y-auto p-5">
-          {selectedStrategy?.config.strategy_type === 'allincrypto' ? (
-            <section className="rounded-lg border border-nofx-gold/20 bg-nofx-bg-lighter p-5 space-y-3">
-              <h2 className="text-lg font-semibold">AllinCrypto</h2>
-              <p>{text(language, '来源：币安带单组合「熬鹰资本」5075281354358777856。公开成交可能延迟，首次运行仅建立基线。', 'Source: Binance lead portfolio 熬鹰资本 (5075281354358777856). Public fills may be delayed. The first poll establishes the baseline.')}</p>
-              <p>{text(language, '开仓名义金额 = 本账户净权益 ÷ 带单保证金余额 × 源成交金额。固定 10 倍杠杆，跟随加仓、按比例减仓和平仓。', 'Entry notional = account equity ÷ lead margin balance × lead fill notional. Uses 10× leverage and follows adds, proportional reductions and closes.')}</p>
-              <p>{text(language, '目标账户实际成交均价反向 4% 设置交易所止损。支持 Binance、OKX 已核实的 USDT 线性永续合约。运行状态见交易员面板。', 'The exchange stop sits 4% from your actual average fill. Supports verified Binance and OKX USDT linear perpetuals. Check source status on the trader dashboard.')}</p>
-              <p>{text(language, '跟随带单组合新成交的品种，逐笔核实目标交易所合约及计价单位；不支持或无法核实的品种会跳过并记录原因，不补跟历史信号。', 'Follows symbols in new lead fills after verifying the target contract and units. Unsupported or unverifiable markets are skipped with a recorded reason; historical signals are not replayed.')}</p>
-            </section>
-          ) : selectedStrategy && aiConfig && coinSource && indicators && risk ? (
+          {showCopyCreate ||
+          selectedStrategy?.config.strategy_type === 'allincrypto' ? (
+            <CopyStrategyEditor
+              key={showCopyCreate ? 'new-copy' : selectedStrategy?.id}
+              strategy={
+                showCopyCreate ? undefined : selectedStrategy || undefined
+              }
+              onSaved={async (id) => {
+                setShowCopyCreate(false)
+                await loadStrategies(id)
+              }}
+            />
+          ) : selectedStrategy &&
+            aiConfig &&
+            coinSource &&
+            indicators &&
+            risk ? (
             <div className="mx-auto max-w-7xl space-y-4">
+              <GeneralStrategyFields
+                config={aiConfig}
+                onChange={(patch) => {
+                  setEditingConfig((prev) => ({
+                    ...simplifyConfig(prev),
+                    ai_config: { ...aiConfig, ...patch },
+                  }))
+                  setHasChanges(true)
+                }}
+              />
               <section className="rounded-lg border border-[rgba(25,36,52,0.14)] bg-nofx-bg-lighter p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
@@ -888,7 +926,7 @@ export function StrategyStudioPage() {
                       </div>
                     ) : null}
                   </div>
-                  <div className="hidden flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => saveStrategy(true)}
@@ -900,7 +938,11 @@ export function StrategyStudioPage() {
                       ) : (
                         <Check className="h-4 w-4" />
                       )}
-                      {text(language, '保存并设为默认', 'Save and set as default')}
+                      {text(
+                        language,
+                        '保存并设为默认',
+                        'Save and set as default'
+                      )}
                     </button>
                     <button
                       type="button"

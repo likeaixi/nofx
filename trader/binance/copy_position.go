@@ -3,7 +3,6 @@ package binance
 import (
 	"context"
 	"errors"
-	"nofx/store"
 	"strconv"
 	"strings"
 
@@ -12,7 +11,7 @@ import (
 
 // VerifyCopyPosition reads current native size, direction and (for an add)
 // leverage instead of adopting the cache used by the dashboard.
-func (b *FuturesTrader) VerifyCopyPosition(ctx context.Context, symbol, side, qty string, checkLeverage bool) error {
+func (b *FuturesTrader) VerifyCopyPosition(ctx context.Context, symbol, side, qty string, expectedLeverage int) error {
 	ctx = execution.WithProtectivePriority(ctx)
 	rows, err := b.client.NewGetPositionRiskService().Symbol(symbol).Do(ctx)
 	if err != nil {
@@ -41,8 +40,8 @@ func (b *FuturesTrader) VerifyCopyPosition(ctx context.Context, symbol, side, qt
 		if err != nil {
 			return err
 		}
-		if found || held != side || !execution.Equal(string(size), qty) || checkLeverage && !execution.Equal(p.Leverage, strconv.Itoa(store.AllinCryptoLeverage)) {
-			return errors.New("Binance position ownership or 10x leverage mismatch")
+		if found || held != side || !execution.Equal(string(size), qty) || expectedLeverage > 0 && !execution.Equal(p.Leverage, strconv.Itoa(expectedLeverage)) {
+			return errors.New("Binance position ownership or configured leverage mismatch")
 		}
 		found = true
 	}

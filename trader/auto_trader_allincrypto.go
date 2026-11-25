@@ -10,11 +10,26 @@ import (
 
 	"nofx/planning/market"
 	"nofx/provider/binancecopy"
+	"nofx/store"
 	"nofx/trader/allincrypto"
 )
 
 // All fixed-strategy traders read the same public source; coalesce near-simultaneous reads.
-var sharedAoyingSource = binancecopy.NewShared(binancecopy.New())
+var copySources = struct {
+	sync.Mutex
+	clients map[string]*binancecopy.SharedClient
+}{clients: map[string]*binancecopy.SharedClient{}}
+
+func sharedCopySource(id string) *binancecopy.SharedClient {
+	copySources.Lock()
+	defer copySources.Unlock()
+	if c := copySources.clients[id]; c != nil {
+		return c
+	}
+	c := binancecopy.NewShared(binancecopy.NewForPortfolio(id))
+	copySources.clients[id] = c
+	return c
+}
 
 // Prevent simultaneous automatic runners from changing the same account
 // underneath a copy position's ownership checks (including duplicate configs).
@@ -56,11 +71,25 @@ func (at *AutoTrader) runAllinCrypto(account string) error {
 	if !ok {
 		return errors.New("target lacks exact copy execution capability")
 	}
-	runner, err := allincrypto.New(at.store.GormDB(), at.id, account, sharedAoyingSource, venue, market.New())
+	cfg := at.config.StrategyConfig
+	if cfg == nil {
+		return errors.New("copy strategy config missing")
+	}
+	if err := cfg.ValidateCopyConfig(); err != nil {
+		return err
+	}
+	settings := cfg.CopySettings()
+	sourceID, err := store.ParseCopySourceURL(settings.SourceURL)
 	if err != nil {
 		return err
 	}
-	if value := os.Getenv("NOFX_AOYING_FLAT_BASELINE"); value != "" {
+	runner, err := allincrypto.New(at.store.GormDB(), at.id, account, sharedCopySource(sourceID), venue, market.New())
+	if err != nil {
+		return err
+	}
+	runner.SourceID = sourceID
+	runner.Leverage = settings.Leverage
+	if value := os.Getenv("NOFX_AOYING_FLAT_BASELINE"); value != "" && sourceID == store.DefaultCopyPortfolioID {
 		baseline, parseErr := time.Parse(time.RFC3339, value)
 		if parseErr != nil {
 			return fmt.Errorf("invalid NOFX_AOYING_FLAT_BASELINE: %w", parseErr)

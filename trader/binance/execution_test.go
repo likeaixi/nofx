@@ -513,11 +513,11 @@ func TestCopyPositionRequiresTenTimesForAdds(t *testing.T) {
 			b := NewExecutionTrader("test-key", "test-secret", "")
 			b.client.BaseURL = server.URL
 			b.client.HTTPClient = server.Client()
-			err := b.VerifyCopyPosition(context.Background(), "BTCUSDT", "long", "0.5", true)
+			err := b.VerifyCopyPosition(context.Background(), "BTCUSDT", "long", "0.5", 10)
 			if (err == nil) != (leverage == "10") {
 				t.Fatalf("leverage %s: %v", leverage, err)
 			}
-			if err = b.VerifyCopyPosition(context.Background(), "BTCUSDT", "long", "0.5", false); err != nil {
+			if err = b.VerifyCopyPosition(context.Background(), "BTCUSDT", "long", "0.5", 0); err != nil {
 				t.Fatalf("reductions must remain possible: %v", err)
 			}
 		})

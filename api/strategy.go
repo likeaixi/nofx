@@ -210,6 +210,10 @@ func (s *Server) handleCreateStrategy(c *gin.Context) {
 		defaultCfg := store.GetDefaultStrategyConfig(lang)
 		req.Config = &defaultCfg
 	}
+	if err := req.Config.ValidateCopyConfig(); err != nil {
+		SafeBadRequest(c, err.Error())
+		return
+	}
 	beforeClamp := *req.Config
 	req.Config.ClampLimits()
 	hadPublishConfig := req.Config.PublishConfig != nil
@@ -271,6 +275,16 @@ func (s *Server) handleCreateStrategy(c *gin.Context) {
 func (s *Server) handleUpdateStrategy(c *gin.Context) {
 	userID := c.GetString("user_id")
 	strategyID := c.Param("id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	unlock, lockErr := s.lockStrategyTraders(userID, strategyID)
+	if lockErr != nil {
+		SafeInternalError(c, "Lock strategy traders", lockErr)
+		return
+	}
+	defer unlock()
 	if err := s.guardCopyStrategyMutation(userID, strategyID); err != nil {
 		SafeBadRequest(c, err.Error())
 		return
@@ -328,6 +342,33 @@ func (s *Server) handleUpdateStrategy(c *gin.Context) {
 	if existing.IsAllinCrypto() != (mergedConfig.StrategyType == store.AllinCrypto) {
 		SafeBadRequest(c, "Select a separate strategy to change between fixed copy trading and AI trading")
 		return
+	}
+	if err := mergedConfig.ValidateCopyConfig(); err != nil {
+		SafeBadRequest(c, err.Error())
+		return
+	}
+	if existing.IsAllinCrypto() {
+		var old store.StrategyConfig
+		if err := json.Unmarshal([]byte(existing.Config), &old); err != nil {
+			SafeInternalError(c, "Read copy configuration", err)
+			return
+		}
+		oldID, _ := store.ParseCopySourceURL(old.CopySettings().SourceURL)
+		newID, _ := store.ParseCopySourceURL(mergedConfig.CopySettings().SourceURL)
+		if oldID != newID {
+			var count int64
+			if s.store.GormDB().Migrator().HasTable("allincrypto_checkpoints") {
+				err := s.store.GormDB().Table("allincrypto_checkpoints").Where("trader_id IN (?)", s.store.GormDB().Table("traders").Select("id").Where("user_id = ? AND strategy_id = ?", userID, strategyID)).Count(&count).Error
+				if err != nil {
+					SafeInternalError(c, "Check source history", err)
+					return
+				}
+			}
+			if count > 0 {
+				SafeBadRequest(c, "已有跟单历史，请为新来源创建独立策略和 trader / Create a new strategy and trader for a different source")
+				return
+			}
+		}
 	}
 	beforeClamp := mergedConfig
 	mergedConfig.ClampLimits()

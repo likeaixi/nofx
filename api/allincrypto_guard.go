@@ -2,8 +2,10 @@ package api
 
 import (
 	"errors"
+	"nofx/planning"
 	"nofx/store"
 	"nofx/trader/allincrypto"
+	"sort"
 )
 
 func (s *Server) guardCopyMutation(user, id string) error {
@@ -63,4 +65,30 @@ func (s *Server) guardCopyExchangeMutation(user, exchange string) error {
 		}
 	}
 	return nil
+}
+
+// Strategy edits must not race start/reload of one of their bound traders.
+func (s *Server) lockStrategyTraders(user, strategy string) (func(), error) {
+	traders, err := s.store.Trader().List(user)
+	if err != nil {
+		return nil, err
+	}
+	var ids []string
+	for _, tr := range traders {
+		if tr.StrategyID == strategy {
+			ids = append(ids, tr.ID)
+		}
+	}
+	sort.Strings(ids)
+	var release []func()
+	for _, id := range ids {
+		release = append(release, planning.LockAccount("trader-mutation:"+id))
+	}
+	// Also cover a trader attached after the initial binding snapshot.
+	release = append(release, planning.LockAccount("strategy-mutation:"+strategy))
+	return func() {
+		for i := len(release) - 1; i >= 0; i-- {
+			release[i]()
+		}
+	}, nil
 }

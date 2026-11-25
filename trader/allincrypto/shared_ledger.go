@@ -9,6 +9,7 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 	"nofx/provider/binancecopy"
+	"nofx/store"
 )
 
 // Reuse only the fixed portfolio's source journal. Never copy account state,
@@ -23,6 +24,13 @@ func (r *Runner) sharedSourceHistory(ctx context.Context, baseline int64) (binan
 		for _, row := range donors {
 			var donor state
 			if json.Unmarshal([]byte(row.Body), &donor) != nil || donor.SourceFault != "" || donor.LedgerBaseline != baseline || donor.LedgerSequence <= 0 {
+				continue
+			}
+			donorID := donor.SourceID
+			if donorID == "" {
+				donorID = store.DefaultCopyPortfolioID
+			}
+			if donorID != r.sourceID() {
 				continue
 			}
 			var entries []sourceLedgerEntry

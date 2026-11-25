@@ -53,7 +53,7 @@ func (r *Runner) advance(ctx context.Context, s *state, receipt *execution.Order
 				}
 				return r.flatten(ctx, s)
 			}
-			if stop.Status == "FILLED" && r.venue.VerifyCopyPosition(ctx, pos.Symbol, pos.Side, "0", false) == nil {
+			if stop.Status == "FILLED" && r.venue.VerifyCopyPosition(ctx, pos.Symbol, pos.Side, "0", 0) == nil {
 				delete(s.Positions, p.Event.Symbol)
 				s.Pending = nil
 				return r.save(s, nil, r.record(p, "exchange stop already closed the position", true))
@@ -320,7 +320,7 @@ func (r *Runner) advance(ctx context.Context, s *state, receipt *execution.Order
 		return err
 	}
 	verifyCtx, verifyCancel := context.WithTimeout(ctx, 3*time.Second)
-	err = r.venue.VerifyCopyPosition(verifyCtx, pos.Symbol, pos.Side, pos.Local.String(), false)
+	err = r.venue.VerifyCopyPosition(verifyCtx, pos.Symbol, pos.Side, pos.Local.String(), 0)
 	verifyCancel()
 	if err != nil {
 		p.Stage = "rescue"
@@ -387,7 +387,7 @@ func (r *Runner) flatten(ctx context.Context, s *state) error {
 	if remaining.IsNegative() {
 		return errors.New("protective fills exceed owned exposure")
 	}
-	if err := r.venue.VerifyCopyPosition(ctx, pos.Symbol, pos.Side, remaining.String(), false); err != nil {
+	if err := r.venue.VerifyCopyPosition(ctx, pos.Symbol, pos.Side, remaining.String(), 0); err != nil {
 		return errors.New("position ownership changed during stop reconciliation")
 	}
 	pos.Local = remaining

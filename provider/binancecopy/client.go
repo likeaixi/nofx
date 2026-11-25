@@ -24,10 +24,19 @@ type Client struct {
 	BaseURL  string
 	HTTP     *http.Client
 	PageSize int
+	LeadID   string
+}
+
+func NewForPortfolio(id string) *Client { c := New(); c.LeadID = id; return c }
+func (c *Client) portfolioID() string {
+	if c.LeadID == "" {
+		return PortfolioID
+	}
+	return c.LeadID
 }
 
 func New() *Client {
-	return &Client{"https://www.binance.com/bapi/futures/v1/friendly/future/copy-trade/lead-portfolio", &http.Client{Timeout: 10 * time.Second}, 50}
+	return &Client{"https://www.binance.com/bapi/futures/v1/friendly/future/copy-trade/lead-portfolio", &http.Client{Timeout: 10 * time.Second}, 50, PortfolioID}
 }
 
 type Event struct {
@@ -59,7 +68,7 @@ func (c *Client) request(ctx context.Context, method, path string, body []byte, 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("clienttype", "web")
 	req.Header.Set("User-Agent", "Mozilla/5.0")
-	req.Header.Set("Referer", "https://www.binance.com/en/copy-trading/lead-details/"+PortfolioID)
+	req.Header.Set("Referer", "https://www.binance.com/en/copy-trading/lead-details/"+c.portfolioID())
 	res, err := c.HTTP.Do(req)
 	if err != nil {
 		return err
@@ -84,16 +93,16 @@ func (c *Client) request(ctx context.Context, method, path string, body []byte, 
 }
 func (c *Client) Balance(ctx context.Context) (decimal.Decimal, error) {
 	var d struct{ LeadPortfolioId, FuturesType, InitInvestAsset, Status, MarginBalance string }
-	if err := c.request(ctx, "GET", "/detail?portfolioId="+PortfolioID, nil, &d); err != nil {
+	if err := c.request(ctx, "GET", "/detail?portfolioId="+c.portfolioID(), nil, &d); err != nil {
 		return decimal.Zero, err
 	}
-	if d.LeadPortfolioId != PortfolioID || d.FuturesType != "UM" || d.InitInvestAsset != "USDT" || d.Status != "ACTIVE" || !execution.Positive(execution.Decimal(d.MarginBalance)) {
+	if d.LeadPortfolioId != c.portfolioID() || d.FuturesType != "UM" || d.InitInvestAsset != "USDT" || d.Status != "ACTIVE" || !execution.Positive(execution.Decimal(d.MarginBalance)) {
 		return decimal.Zero, errors.New("active lead USDT margin balance unavailable")
 	}
 	return decimal.NewFromString(d.MarginBalance)
 }
 func (c *Client) page(ctx context.Context, n int) ([]Event, error) {
-	payload, _ := json.Marshal(map[string]any{"portfolioId": PortfolioID, "pageNumber": n, "pageSize": c.PageSize})
+	payload, _ := json.Marshal(map[string]any{"portfolioId": c.portfolioID(), "pageNumber": n, "pageSize": c.PageSize})
 	// Validate raw numbers before converting. In particular, never accept a large exponent.
 	var page struct {
 		List []struct {
@@ -188,7 +197,7 @@ func (c *Client) PositionBefore(ctx context.Context, e Event) (decimal.Decimal, 
 				Opened, Closed             int64
 			}
 		}
-		payload, _ := json.Marshal(map[string]any{"portfolioId": PortfolioID, "pageNumber": n, "pageSize": c.PageSize})
+		payload, _ := json.Marshal(map[string]any{"portfolioId": c.portfolioID(), "pageNumber": n, "pageSize": c.PageSize})
 		if err := c.request(ctx, "POST", "/position-history", payload, &data); err != nil {
 			return decimal.Zero, err
 		}

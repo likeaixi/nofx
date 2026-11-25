@@ -848,6 +848,18 @@ func (s *Server) handleStartTrader(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Trader does not exist or no access permission"})
 		return
 	}
+	// Take this after the trader lock, matching strategy-edit lock ordering.
+	// Reload under it so a concurrent edit cannot leave a newly started runner
+	// executing a source/leverage that differs from its persisted strategy.
+	if fullCfg != nil && fullCfg.Trader != nil {
+		unlockStrategy := planning.LockAccount("strategy-mutation:" + fullCfg.Trader.StrategyID)
+		defer unlockStrategy()
+		fullCfg, err = s.store.Trader().GetFullConfig(userID, traderID)
+		if err != nil {
+			SafeNotFound(c, "Trader")
+			return
+		}
+	}
 	if fullCfg != nil && fullCfg.Exchange != nil {
 		var lease live.Lease
 		leaseError := s.store.GormDB().Where("account_key = ?", accountKey(fullCfg.Exchange)).First(&lease).Error

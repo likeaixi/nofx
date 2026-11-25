@@ -30,7 +30,7 @@ type Venue interface {
 	Venue() string
 	AccountSnapshot(context.Context, string) (execution.Account, error)
 	CopyCollateral(context.Context) (map[string]string, string, error)
-	VerifyCopyPosition(context.Context, string, string, string, bool) error
+	VerifyCopyPosition(context.Context, string, string, string, int) error
 	PrepareExecutionLeverage(context.Context, string, int) error
 	RouteClientID(string) (string, error)
 	SubmitOrder(context.Context, execution.Order) (execution.Order, error)
@@ -38,6 +38,8 @@ type Venue interface {
 	CancelExecutionOrder(context.Context, execution.Order) error
 }
 type Runner struct {
+	SourceID                string
+	Leverage                int
 	ConfirmedSourceBaseline time.Time
 	Stopping                func() bool
 	db                      *gorm.DB
@@ -420,7 +422,12 @@ func (r *Runner) plan(ctx context.Context, s *state, p *pending) error {
 	if !execution.Equal(string(a.Position), local.String()) || a.OpenOrders != expectedOrders {
 		return errors.New("target position or pending orders conflict with tracked exposure")
 	}
-	if err = r.venue.VerifyCopyPosition(ctx, symbol, p.Side, local.String(), e.Opening() && pos != nil); err != nil {
+	if err = r.venue.VerifyCopyPosition(ctx, symbol, p.Side, local.String(), func() int {
+		if e.Opening() && pos != nil {
+			return r.leverage()
+		}
+		return 0
+	}()); err != nil {
 		return err
 	}
 	side := p.Side
@@ -464,9 +471,9 @@ func (r *Runner) plan(ctx context.Context, s *state, p *pending) error {
 		if err != nil || fees.IsNegative() {
 			return errors.New("target fee unavailable")
 		}
-		needed := qty.Mul(price).Mul(decimal.NewFromInt(1).Div(decimal.NewFromInt(store.AllinCryptoLeverage)).Add(fees.Shift(-4)))
+		needed := qty.Mul(price).Mul(decimal.NewFromInt(1).Div(decimal.NewFromInt(int64(r.leverage()))).Add(fees.Shift(-4)))
 		if needed.GreaterThan(available) {
-			return errors.New("insufficient free margin for 10x entry and fee")
+			return fmt.Errorf("insufficient free margin for %dx entry and fee", r.leverage())
 		}
 	} else if p.Outstanding.IsPositive() {
 		qty = p.Outstanding
@@ -495,7 +502,7 @@ func (r *Runner) plan(ctx context.Context, s *state, p *pending) error {
 		return errors.New("lead entry expired during preflight")
 	}
 	if e.Opening() && pos == nil {
-		if err = r.venue.PrepareExecutionLeverage(ctx, symbol, store.AllinCryptoLeverage); err != nil {
+		if err = r.venue.PrepareExecutionLeverage(ctx, symbol, r.leverage()); err != nil {
 			return err
 		}
 	}
@@ -596,4 +603,17 @@ func (r *Runner) Drain(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	return s.Pending == nil && len(s.Waiting) == 0, nil
+}
+
+func (r *Runner) leverage() int {
+	if r.Leverage == 0 {
+		return store.AllinCryptoLeverage
+	}
+	return r.Leverage
+}
+func (r *Runner) sourceID() string {
+	if r.SourceID == "" {
+		return store.DefaultCopyPortfolioID
+	}
+	return r.SourceID
 }

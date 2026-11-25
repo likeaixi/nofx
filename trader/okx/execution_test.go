@@ -271,11 +271,11 @@ func TestCopyPositionRequiresTenTimesForAdds(t *testing.T) {
 	for _, leverage := range []string{"10", "20"} {
 		t.Run(leverage, func(t *testing.T) {
 			trader := okxFixture(t, "net_mode", `[{"instId":"BTC-USDT-SWAP","pos":"50","posSide":"net","mgnMode":"cross","lever":"`+leverage+`"}]`, nil)
-			err := trader.VerifyCopyPosition(context.Background(), "BTC-USDT-SWAP", "long", "0.5", true)
+			err := trader.VerifyCopyPosition(context.Background(), "BTC-USDT-SWAP", "long", "0.5", 10)
 			if (err == nil) != (leverage == "10") {
 				t.Fatalf("leverage %s: %v", leverage, err)
 			}
-			if err = trader.VerifyCopyPosition(context.Background(), "BTC-USDT-SWAP", "long", "0.5", false); err != nil {
+			if err = trader.VerifyCopyPosition(context.Background(), "BTC-USDT-SWAP", "long", "0.5", 0); err != nil {
 				t.Fatalf("reductions must remain possible: %v", err)
 			}
 		})

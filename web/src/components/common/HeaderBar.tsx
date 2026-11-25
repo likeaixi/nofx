@@ -81,9 +81,9 @@ export default function HeaderBar({
       auth: true,
     },
     {
-      page: 'trade-details',
-      path: ROUTES.tradeDetails,
-      label: language === 'zh' ? '交易详情' : 'Trade Details',
+      page: 'trade-ledger',
+      path: ROUTES.tradeLedger,
+      label: language === 'zh' ? '交易明细' : 'Trade Ledger',
       auth: true,
     },
     {
@@ -175,6 +175,17 @@ export default function HeaderBar({
                     }}
                   >
                     <Settings size={16} /> Account settings
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigate(ROUTES.tradeDetails)
+                      setUserOpen(false)
+                    }}
+                  >
+                    <Settings size={16} />{' '}
+                    {language === 'zh'
+                      ? 'Trade Details · 历史与分析'
+                      : 'Trade Details'}
                   </button>
                   {[
                     { name: 'GitHub', href: OFFICIAL_LINKS.github },

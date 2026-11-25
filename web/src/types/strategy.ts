@@ -44,6 +44,7 @@ export interface StrategyConfig {
   // Language setting: "zh" for Chinese, "en" for English
   // Determines the language used for data formatting and prompt generation
   language?: 'zh' | 'en';
+  copy_config?: { source_url: string; leverage: number };
   // AI trading configuration. Legacy flat fields below are accepted only for
   // old data returned before the schema was split by strategy type.
   ai_config?: AIStrategyConfig;

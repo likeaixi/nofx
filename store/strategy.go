@@ -661,7 +661,8 @@ func (Strategy) TableName() string { return "strategies" }
 // StrategyConfig strategy configuration details (JSON structure)
 type StrategyConfig struct {
 	// Strategy type: "ai_trading" (default) or "grid_trading"
-	StrategyType string `json:"strategy_type,omitempty"`
+	StrategyType string              `json:"strategy_type,omitempty"`
+	CopyConfig   *CopyStrategyConfig `json:"copy_config,omitempty"`
 
 	// language setting: "zh" for Chinese, "en" for English
 	// This determines the language used for data formatting and prompt generation
@@ -709,12 +710,14 @@ func (c StrategyConfig) MarshalJSON() ([]byte, error) {
 	out := struct {
 		StrategyType  string                 `json:"strategy_type"`
 		Language      string                 `json:"language,omitempty"`
+		CopyConfig    *CopyStrategyConfig    `json:"copy_config,omitempty"`
 		AIConfig      *AIStrategyConfig      `json:"ai_config,omitempty"`
 		GridConfig    *GridStrategyConfig    `json:"grid_config,omitempty"`
 		PublishConfig *PublishStrategyConfig `json:"publish_config,omitempty"`
 	}{
 		StrategyType:  strategyType,
 		Language:      c.Language,
+		CopyConfig:    c.CopyConfig,
 		PublishConfig: c.PublishConfig,
 	}
 
@@ -739,6 +742,7 @@ func (c *StrategyConfig) UnmarshalJSON(data []byte) error {
 	type rawStrategyConfig struct {
 		StrategyType  string                 `json:"strategy_type"`
 		Language      string                 `json:"language"`
+		CopyConfig    *CopyStrategyConfig    `json:"copy_config,omitempty"`
 		AIConfig      *AIStrategyConfig      `json:"ai_config"`
 		GridConfig    *GridStrategyConfig    `json:"grid_config"`
 		PublishConfig *PublishStrategyConfig `json:"publish_config"`
@@ -758,6 +762,7 @@ func (c *StrategyConfig) UnmarshalJSON(data []byte) error {
 	c.StrategyType = raw.StrategyType
 	c.Language = raw.Language
 	c.GridConfig = raw.GridConfig
+	c.CopyConfig = raw.CopyConfig
 	c.PublishConfig = raw.PublishConfig
 
 	if raw.AIConfig != nil {

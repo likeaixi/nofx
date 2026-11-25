@@ -43,7 +43,7 @@ func TestHistorySinceRequiresCoverageAndStablePages(t *testing.T) {
 				fmt.Fprint(w, `]}}`)
 			}))
 			defer srv.Close()
-			c := Client{srv.URL, srv.Client(), 2}
+			c := Client{BaseURL: srv.URL, HTTP: srv.Client(), PageSize: 2}
 			got, err := c.HistorySince(context.Background(), 10)
 			if mode != "ok" {
 				if err == nil {
@@ -69,7 +69,7 @@ func TestHistorySinceSinglePageDoesNotRequireSecondRead(t *testing.T) {
 		fmt.Fprint(w, `{"code":"000000","success":true,"data":{"list":[{"symbol":"BTCUSDT","baseAsset":"BTC","quoteAsset":"USDT","side":"BUY","positionSide":"LONG","executedQty":1,"avgPrice":100,"orderTime":20,"orderUpdateTime":20},{"symbol":"BTCUSDT","baseAsset":"BTC","quoteAsset":"USDT","side":"BUY","positionSide":"LONG","executedQty":1,"avgPrice":100,"orderTime":9,"orderUpdateTime":9}]}}`)
 	}))
 	defer srv.Close()
-	c := Client{srv.URL, srv.Client(), 50}
+	c := Client{BaseURL: srv.URL, HTTP: srv.Client(), PageSize: 50}
 	got, err := c.HistorySince(context.Background(), 10)
 	if err != nil || len(got.Events) != 2 {
 		t.Fatal("one complete response is already consistent", got, err)
