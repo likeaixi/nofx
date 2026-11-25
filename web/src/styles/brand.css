@@ -2035,15 +2035,15 @@ html {
 
 /* Keep closed-position records compact without hiding column values. */
 .ledger-closed-positions table {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.4;
 }
 .ledger-closed-positions th {
-  font-size: 10px;
+  font-size: 11px;
 }
 .ledger-closed-positions td,
 .ledger-closed-positions th {
-  padding: 9px 6px;
+  padding: 9px 3px;
 }
 .ledger-closed-positions tr > :first-child {
   padding-left: 14px;
@@ -2058,5 +2058,5 @@ html {
   margin-top: 0;
   margin-left: 4px;
   padding: 1px 4px;
-  font-size: 10px;
+  font-size: 11px;
 }
