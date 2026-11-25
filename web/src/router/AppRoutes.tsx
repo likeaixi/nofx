@@ -244,9 +244,9 @@ function TradeDetailsRoute() {
     traderId ? `status-${traderId}` : null,
     () => api.getStatus(traderId!, true),
     {
-      refreshInterval: 15000,
+      refreshInterval: 5000,
       revalidateOnFocus: false,
-      dedupingInterval: 10000,
+      dedupingInterval: 4000,
     }
   )
   return (
@@ -363,9 +363,9 @@ function DashboardRoute() {
     selectedTraderId ? `status-${selectedTraderId}` : null,
     () => api.getStatus(selectedTraderId, true),
     {
-      refreshInterval: 15000,
+      refreshInterval: 5000,
       revalidateOnFocus: false,
-      dedupingInterval: 10000,
+      dedupingInterval: 4000,
     }
   )
 

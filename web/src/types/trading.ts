@@ -8,6 +8,9 @@ export interface SystemStatus {
   call_count: number
   initial_balance: number
   scan_interval: string
+  next_cycle_at?: string
+  cycle_in_progress?: boolean
+  server_time?: string
   stop_until: string
   last_reset_time: string
   ai_provider: string

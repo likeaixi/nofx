@@ -95,6 +95,7 @@ func (at *AutoTrader) GetStatus() map[string]interface{} {
 		"ai_model":        at.aiModel,
 		"exchange":        at.exchange,
 		"is_running":      isRunning,
+		"server_time":     time.Now().UTC().Format(time.RFC3339Nano),
 		"start_time":      at.startTime.Format(time.RFC3339),
 		"runtime_minutes": int(time.Since(at.startTime).Minutes()),
 		"call_count":      at.callCount,
@@ -118,6 +119,10 @@ func (at *AutoTrader) GetStatus() map[string]interface{} {
 	safeMode, safeModeReason := at.safeModeState()
 	result["safe_mode"] = safeMode
 	at.runtimeHealthMu.RLock()
+	result["cycle_in_progress"] = isRunning && at.cycleInProgress
+	if isRunning && !at.nextCycleAt.IsZero() {
+		result["next_cycle_at"] = at.nextCycleAt.UTC().Format(time.RFC3339Nano)
+	}
 	result["trading_blocked"] = at.tradingBlocked
 	result["trading_error"] = at.tradingError
 	if !at.tradingCheckedAt.IsZero() {

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import type { CSSProperties } from 'react'
 import useSWR, { mutate } from 'swr'
 import { api } from '../../lib/api'
+import { cycleCountdown } from '../../lib/cycleCountdown'
 import { confirmToast, notify } from '../../lib/notify'
 import type {
   SystemStatus,
@@ -241,20 +242,18 @@ export function TerminalDashboard({
     return (sym: string): 'long' | 'short' => dec.get(baseLabel(sym)) ?? 'long'
   }, [latest])
 
-  const scanMin = config?.scan_interval_minutes || parseScanMinutes(status?.scan_interval)
-  const nextCycleMs = useMemo(() => {
-    if (!latest?.timestamp) return null
-    return new Date(latest.timestamp).getTime() + scanMin * 60_000
-  }, [latest?.timestamp, scanMin])
-  let countdown = '—'
-  if (nextCycleMs) {
-    const ms = nextCycleMs - Date.now()
-    if (ms <= 0) countdown = 'due now'
-    else {
-      const s = Math.floor(ms / 1000)
-      countdown = `${Math.floor(s / 60)}m ${s % 60}s`
-    }
-  }
+  const scanMin = status?.strategy_type === 'allincrypto' ? 1 : config?.scan_interval_minutes || parseScanMinutes(status?.scan_interval)
+  const clockOffset = useMemo(() => {
+    if (on || !status?.server_time) return 0
+    const serverNow = Date.parse(status.server_time)
+    return Number.isFinite(serverNow) ? Date.now() - serverNow : 0
+  }, [on, status?.server_time])
+  // The isolated demo has no server scheduler; only demo mode uses its log clock.
+  const countdownStatus = on && latest?.timestamp && status ? {
+    ...status,
+    next_cycle_at: new Date(new Date(latest.timestamp).getTime() + scanMin * 60_000).toISOString(),
+  } : status
+  const countdown = cycleCountdown(countdownStatus, Date.now() - clockOffset)
 
   const recentTrades = (history?.positions ?? []).slice(0, 8)
   const symbolStats = useMemo(
@@ -358,7 +357,7 @@ export function TerminalDashboard({
           <span><span className="tm-sc">scan </span>{scanMin}m</span>
           <span><span className="tm-sc">universe </span>{candidateCoins.length}</span>
           <span><span className="tm-sc">positions </span>{positions?.length ?? 0}</span>
-          <span style={{ marginLeft: 'auto' }}><span className="tm-sc">next cycle </span>{countdown}</span>
+          <span style={{ marginLeft: 'auto' }}><span className="tm-sc">{status?.strategy_type === 'allincrypto' ? 'next check ' : 'next cycle '}</span>{countdown}</span>
         </div>
         <div className="tm-rule" />
 

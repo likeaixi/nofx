@@ -206,6 +206,8 @@ type AutoTrader struct {
 	tradingBlocked            bool
 	tradingError              string
 	tradingCheckedAt          time.Time
+	nextCycleAt               time.Time
+	cycleInProgress           bool
 	safeMode                  bool      // Safe mode: no new positions, protect existing ones
 	safeModeReason            string    // Why safe mode was activated
 	aiWalletStatus            string    // "ok"|"low"|"empty"|"unknown" — see runtime_health.go
@@ -732,6 +734,8 @@ func (at *AutoTrader) runReady(ready chan<- error) (runErr error) {
 		}
 	}
 
+	defer at.setCycleSchedule(time.Time{}, false)
+	at.setCycleSchedule(time.Time{}, true)
 	// Execute immediately on first run
 	at.logInfof("▶️ Running first trading cycle immediately; next cycle starts after %v", at.config.ScanInterval)
 	if isGridStrategy {
@@ -746,6 +750,7 @@ func (at *AutoTrader) runReady(ready chan<- error) (runErr error) {
 
 	ticker := time.NewTicker(at.config.ScanInterval)
 	defer ticker.Stop()
+	at.setCycleSchedule(time.Now().Add(at.config.ScanInterval), false)
 
 	for {
 		at.isRunningMutex.RLock()
@@ -757,7 +762,8 @@ func (at *AutoTrader) runReady(ready chan<- error) (runErr error) {
 		}
 
 		select {
-		case <-ticker.C:
+		case tick := <-ticker.C:
+			at.setCycleSchedule(time.Time{}, true)
 			if isGridStrategy {
 				if err := at.RunGridCycle(); err != nil {
 					at.logErrorf("❌ Grid execution failed: %v", err)
@@ -767,6 +773,7 @@ func (at *AutoTrader) runReady(ready chan<- error) (runErr error) {
 					at.logErrorf("❌ Execution failed: %v", err)
 				}
 			}
+			at.setCycleSchedule(tick.Add(at.config.ScanInterval), false)
 		case <-at.stopMonitorCh:
 			at.logInfof("⏹ Stop signal received, exiting automatic trading main loop")
 			return nil

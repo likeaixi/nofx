@@ -107,6 +107,7 @@ func (at *AutoTrader) runAllinCrypto(account string) error {
 }
 
 func (at *AutoTrader) runCopyCycles(runner *allincrypto.Runner) error {
+	defer at.setCycleSchedule(time.Time{}, false)
 	runner.Stopping = func() bool {
 		select {
 		case <-at.stopMonitorCh:
@@ -119,10 +120,15 @@ func (at *AutoTrader) runCopyCycles(runner *allincrypto.Runner) error {
 	// Finish reconciling any in-flight order on stop. Context deadlines bound
 	// external requests; stopping never cancels a venue's standing protective SL.
 	poll := time.NewTicker(time.Minute)
+	nextPoll := time.Now().Add(time.Minute)
 	defer poll.Stop()
 	reconcile := time.NewTicker(5 * time.Second)
 	defer reconcile.Stop()
 	update := func(full bool) {
+		if full {
+			at.setCycleSchedule(time.Time{}, true)
+			defer func() { at.setCycleSchedule(nextPoll, false) }()
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 		defer cancel()
 		var err error
@@ -156,7 +162,8 @@ func (at *AutoTrader) runCopyCycles(runner *allincrypto.Runner) error {
 	for !runner.Stopping() {
 		select {
 		case <-at.stopMonitorCh:
-		case <-poll.C:
+		case tick := <-poll.C:
+			nextPoll = tick.Add(time.Minute)
 			if !runner.Stopping() {
 				update(true)
 			}
@@ -164,6 +171,7 @@ func (at *AutoTrader) runCopyCycles(runner *allincrypto.Runner) error {
 			update(false)
 		}
 	}
+	at.setCycleSchedule(time.Time{}, false)
 	for {
 		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 		done, err := runner.Drain(ctx)
