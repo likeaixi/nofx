@@ -787,38 +787,40 @@ export function StrategyStudioPage() {
 
       <div className="grid min-h-[calc(100vh-137px)] grid-cols-1 md:grid-cols-[280px_1fr]">
         <aside className="border-r border-[rgba(25,36,52,0.14)] bg-nofx-bg-deeper p-3">
-          <div className="mb-2 flex items-center justify-between px-2">
-            <span className="text-xs font-medium uppercase tracking-wide text-nofx-text-muted">
-              {text(
-                language,
-                '我的策略与内置模板',
-                'My strategies & built-ins'
-              )}
-            </span>
+          <h2 className="mb-3 px-2 text-xs font-medium uppercase tracking-wide text-nofx-text-muted">
+            {text(language, '策略列表', 'Strategies')}
+          </h2>
+          <div className="mb-3 grid grid-cols-2 gap-2">
             <button
               type="button"
-              title={text(language, 'New strategy', 'New strategy')}
+              title={text(language, '新建通用策略', 'New general strategy')}
               onClick={() => {
                 setShowCopyCreate(false)
                 setShowMarket(false)
                 void createStrategy()
               }}
-              className="inline-flex items-center gap-1 rounded-md border border-[rgba(25,36,52,0.14)] bg-nofx-bg-lighter px-2 py-1 text-[11px] font-semibold text-nofx-gold hover:border-nofx-gold/40"
+              className="inline-flex min-h-9 items-center justify-center gap-1 whitespace-nowrap rounded-md border border-[rgba(25,36,52,0.14)] bg-nofx-bg-lighter px-2 py-2 text-xs font-semibold text-nofx-gold hover:border-nofx-gold/40"
             >
-              <Plus className="h-3 w-3" />
-              {text(language, '+ 通用策略', '+ General')}
+              <Plus className="h-3 w-3 shrink-0" />
+              {text(language, '通用策略', 'General')}
+            </button>
+            <button
+              type="button"
+              title={text(
+                language,
+                '新建影子跟单策略',
+                'New shadow copy strategy'
+              )}
+              onClick={() => {
+                setShowMarket(false)
+                setShowCopyCreate(true)
+              }}
+              className="inline-flex min-h-9 items-center justify-center gap-1 whitespace-nowrap rounded-md border border-[rgba(25,36,52,0.14)] bg-nofx-bg-lighter px-2 py-2 text-xs font-semibold text-nofx-gold hover:border-nofx-gold/40"
+            >
+              <Plus className="h-3 w-3 shrink-0" />
+              {text(language, '影子跟单', 'Shadow Copy')}
             </button>
           </div>
-          <button
-            type="button"
-            className="copy-create-entry"
-            onClick={() => {
-              setShowMarket(false)
-              setShowCopyCreate(true)
-            }}
-          >
-            {text(language, '+ 影子跟单策略', '+ Shadow Copy')}
-          </button>
           <p className="mb-3 px-2 text-xs leading-relaxed text-nofx-text-muted">
             {text(
               language,
