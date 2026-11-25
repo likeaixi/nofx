@@ -291,7 +291,7 @@ func (s *Server) handlePositionHistory(c *gin.Context) {
 	}
 
 	// Get closed positions
-	positions, err := store.Position().GetClosedPositionsByTraderFilters(traderIDs, traderIDPatterns, limit)
+	positions, err := store.Position().GetClosedPositionsByTraderFilters(traderIDs, traderIDPatterns, limit, detailOffset(c))
 	if err != nil {
 		SafeInternalError(c, "Get position history", err)
 		return
@@ -405,7 +405,7 @@ func (s *Server) handleOrders(c *gin.Context) {
 	}
 
 	// Get orders with filters applied at database level
-	orders, err := store.Order().GetTraderOrdersFiltered(trader.GetID(), symbol, statusFilter, limit)
+	orders, err := store.Order().GetTraderOrdersFiltered(trader.GetID(), symbol, statusFilter, min(limit, 500), detailOffset(c))
 	if err != nil {
 		SafeInternalError(c, "Get orders", err)
 		return
@@ -480,4 +480,12 @@ func (s *Server) handleOpenOrders(c *gin.Context) {
 		openOrders = make([]types.OpenOrder, 0)
 	}
 	c.JSON(http.StatusOK, openOrders)
+}
+
+func detailOffset(c *gin.Context) int {
+	n, _ := strconv.Atoi(c.Query("offset"))
+	if n < 0 {
+		return 0
+	}
+	return n
 }

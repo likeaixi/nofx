@@ -37,9 +37,9 @@ type TraderOrder struct {
 	PriceProtect      bool    `gorm:"column:price_protect;default:false" json:"price_protect"`
 	OrderAction       string  `gorm:"column:order_action;default:''" json:"order_action"`
 	RelatedPositionID int64   `gorm:"column:related_position_id;default:0" json:"related_position_id"`
-	CreatedAt         int64   `gorm:"column:created_at" json:"created_at"`         // Unix milliseconds UTC
-	UpdatedAt         int64   `gorm:"column:updated_at" json:"updated_at"`         // Unix milliseconds UTC
-	FilledAt          int64   `gorm:"column:filled_at" json:"filled_at"`           // Unix milliseconds UTC
+	CreatedAt         int64   `gorm:"column:created_at" json:"created_at"` // Unix milliseconds UTC
+	UpdatedAt         int64   `gorm:"column:updated_at" json:"updated_at"` // Unix milliseconds UTC
+	FilledAt          int64   `gorm:"column:filled_at" json:"filled_at"`   // Unix milliseconds UTC
 }
 
 // TableName returns the table name for TraderOrder
@@ -238,7 +238,7 @@ func (s *OrderStore) GetTraderOrders(traderID string, limit int) ([]*TraderOrder
 }
 
 // GetTraderOrdersFiltered gets trader's order list with optional symbol and status filters
-func (s *OrderStore) GetTraderOrdersFiltered(traderID string, symbol string, status string, limit int) ([]*TraderOrder, error) {
+func (s *OrderStore) GetTraderOrdersFiltered(traderID string, symbol string, status string, limit int, offsets ...int) ([]*TraderOrder, error) {
 	var orders []*TraderOrder
 	query := s.db.Where("trader_id = ?", traderID)
 
@@ -249,7 +249,10 @@ func (s *OrderStore) GetTraderOrdersFiltered(traderID string, symbol string, sta
 		query = query.Where("status = ?", status)
 	}
 
-	err := query.Order("created_at DESC").
+	if len(offsets) > 0 && offsets[0] > 0 {
+		query = query.Offset(offsets[0])
+	}
+	err := query.Order("created_at DESC, id DESC").
 		Limit(limit).
 		Find(&orders).Error
 	if err != nil {

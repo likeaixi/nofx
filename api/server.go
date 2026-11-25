@@ -412,6 +412,7 @@ Returns: {"is_running":<bool>,"trader_id":"<string>"}`,
 				`Query: ?trader_id=<EXACT trader_id from GET /api/my-traders>
 Returns: {"balance":<float>,"equity":<float>,"unrealized_pnl":<float>,"initial_balance":<float>,"total_return_pct":<float>}`,
 				s.handleAccount)
+			s.route(protected, "GET", "/trader-equity-history", "Owned trader equity history", s.handleTraderEquityHistory)
 			s.routeWithSchema(protected, "GET", "/positions", "Current open positions",
 				`Query: ?trader_id=<EXACT trader_id from GET /api/my-traders>
 Returns: [{"symbol":"<string>","side":"long|short","quantity":<float>,"entry_price":<float>,"mark_price":<float>,"unrealized_pnl":<float>,"leverage":<int>,"stop_loss_status":"available|none|unknown","stop_loss_orders":[{"order_id":"<string>","symbol":"<string>","side":"BUY|SELL","position_side":"LONG|SHORT|BOTH|NET","type":"STOP_MARKET|STOP|STOP_LOSS|STOP_LOSS_LIMIT","stop_price":<float>,"quantity":<float>,"status":"<string>","reduce_only":<bool>,"close_position":<bool>}]}]

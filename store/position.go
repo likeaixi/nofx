@@ -443,9 +443,12 @@ func (s *PositionStore) closedPositionsByTraderFilters(traderIDs []string, trade
 // GetClosedPositionsByTraderFilters gets closed positions for explicit trader IDs
 // and legacy trader ID patterns. Patterns are used only for same-user Autopilot
 // history continuity when an old trader row was deleted but its position records remain.
-func (s *PositionStore) GetClosedPositionsByTraderFilters(traderIDs []string, traderIDPatterns []string, limit int) ([]*TraderPosition, error) {
+func (s *PositionStore) GetClosedPositionsByTraderFilters(traderIDs []string, traderIDPatterns []string, limit int, offsets ...int) ([]*TraderPosition, error) {
 	var positions []*TraderPosition
-	query := s.closedPositionsByTraderFilters(traderIDs, traderIDPatterns).Order("exit_time DESC")
+	query := s.closedPositionsByTraderFilters(traderIDs, traderIDPatterns).Order("exit_time DESC, id DESC")
+	if len(offsets) > 0 && offsets[0] > 0 {
+		query = query.Offset(offsets[0])
+	}
 	if limit > 0 {
 		query = query.Limit(limit)
 	}

@@ -26,8 +26,8 @@ import {
 interface EquityPoint {
   timestamp: string
   total_equity: number
-  pnl: number
-  pnl_pct: number
+  total_pnl: number
+  total_pnl_pct: number
   cycle_number: number
 }
 
@@ -42,8 +42,8 @@ export function EquityChart({ traderId, embedded = false }: EquityChartProps) {
   const [displayMode, setDisplayMode] = useState<'dollar' | 'percent'>('dollar')
 
   const { data: history, error, isLoading } = useSWR<EquityPoint[]>(
-    user && token && traderId ? `equity-history-${traderId}` : null,
-    () => api.getEquityHistory(traderId, true),
+    user && token && traderId ? `owned-equity-history-${traderId}` : null,
+    () => api.getTraderEquityHistory(traderId!),
     {
       refreshInterval: 30000, // Refresh every 30s (historical data updates less frequently)
       revalidateOnFocus: false,
@@ -101,8 +101,8 @@ export function EquityChart({ traderId, embedded = false }: EquityChartProps) {
     )
   }
 
-  // Filter out invalid data: points where total_equity is 0 or less than 1 (caused by API failures)
-  const validHistory = history?.filter((point) => point.total_equity > 1) || []
+  // Keep valid zero and small balances; failed samples are omitted by the backend.
+  const validHistory = history?.filter((point) => Number.isFinite(point.total_equity) && point.total_equity >= 0) || []
 
   if (!validHistory || validHistory.length === 0) {
     return (
@@ -137,16 +137,17 @@ export function EquityChart({ traderId, embedded = false }: EquityChartProps) {
   const initialBalance =
     account?.initial_balance || // Read the real initial balance from the trader config
     (validHistory[0]
-      ? validHistory[0].total_equity - validHistory[0].pnl
+      ? validHistory[0].total_equity - validHistory[0].total_pnl
       : undefined) || // Fallback: equity - pnl
-    1000 // Default value (matches the default config used when creating a trader)
+    validHistory[0]?.total_equity || 1
 
   // Transform the data format
   const chartData = displayHistory.map((point, index) => {
     const pnl = point.total_equity - initialBalance
     const pnlPct = ((pnl / initialBalance) * 100).toFixed(2)
     return {
-      time: new Date(point.timestamp).toLocaleTimeString('zh-CN', {
+      time: new Date(point.timestamp).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US', {
+        month: '2-digit', day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
       }),

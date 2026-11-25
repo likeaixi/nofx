@@ -336,6 +336,10 @@ function PositionRow({ position }: { position: HistoricalPosition }) {
 export function PositionHistory({ traderId }: PositionHistoryProps) {
   const { language } = useLanguage()
   const [loading, setLoading] = useState(true)
+  const [hasMore,setHasMore]=useState(false)
+  const [loadingMore,setLoadingMore]=useState(false)
+  const [nextOffset,setNextOffset]=useState(0)
+  const [moreError,setMoreError]=useState('')
   const [error, setError] = useState<string | null>(null)
   const [positions, setPositions] = useState<HistoricalPosition[]>([])
   const [stats, setStats] = useState<TraderStats | null>(null)
@@ -360,10 +364,12 @@ export function PositionHistory({ traderId }: PositionHistoryProps) {
         // Fetch more data than needed to support filtering, but respect pageSize for initial load
         const data = await api.getPositionHistory(
           traderId,
-          Math.max(200, pageSize * 5),
+          500,
           true
         )
         setPositions(data.positions || [])
+        setNextOffset((data.positions || []).length)
+        setHasMore((data.positions || []).length === 500)
         setStats(data.stats)
         setSymbolStats(data.symbol_stats || [])
         setDirectionStats(data.direction_stats || [])
@@ -377,7 +383,18 @@ export function PositionHistory({ traderId }: PositionHistoryProps) {
     if (traderId) {
       fetchData()
     }
-  }, [traderId, pageSize])
+  }, [traderId])
+
+  const loadOlder = async () => {
+    setLoadingMore(true); setMoreError('')
+    try {
+      const data=await api.getPositionHistory(traderId,500,true,nextOffset)
+      const rows=data.positions || []
+      setPositions(prev=>{const ids=new Set(prev.map(p=>p.id));return [...prev,...rows.filter(p=>!ids.has(p.id))]})
+      setNextOffset(n=>n+rows.length);setHasMore(rows.length===500)
+    } catch { setMoreError('读取更早记录失败，请重试 / Could not load earlier records') }
+    finally {setLoadingMore(false)}
+  }
 
   // Get unique symbols for filter
   const uniqueSymbols = useMemo(() => {
@@ -517,6 +534,11 @@ export function PositionHistory({ traderId }: PositionHistoryProps) {
 
   return (
     <div className="space-y-6">
+      <div className="flex gap-3 items-center flex-wrap text-sm">
+        <span>{language === 'zh' ? `已加载 ${positions.length} 笔；筛选作用于已加载记录` : `${positions.length} loaded; filters apply to loaded records`}</span>
+        {hasMore && <button type="button" disabled={loadingMore} onClick={loadOlder} className="px-3 py-2 border rounded">{loadingMore ? '…' : language === 'zh' ? '加载更早记录' : 'Load earlier records'}</button>}
+        {moreError && <span role="alert">{moreError}</span>}
+      </div>
       {/* Overall Stats - Row 1: Core Metrics */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">

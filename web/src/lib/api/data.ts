@@ -42,6 +42,21 @@ export interface SymbolListResponse {
 }
 
 export const dataApi = {
+  async getTraderOrders(traderId: string, offset=0): Promise<any[]> {
+    const result=await httpClient.request<any[]>(`${API_BASE}/orders?${new URLSearchParams({trader_id:traderId,limit:'50',offset:String(offset)})}`,{silent:true})
+    if(!result.success) throw new Error('Failed to load orders')
+    return result.data || []
+  },
+  async getTraderOrderFills(traderId: string, orderId: number): Promise<any[]> {
+    const result=await httpClient.request<any[]>(`${API_BASE}/orders/${orderId}/fills?${new URLSearchParams({trader_id:traderId})}`,{silent:true})
+    if(!result.success) throw new Error('Failed to load fills')
+    return result.data || []
+  },
+  async getTraderEquityHistory(traderId: string): Promise<any[]> {
+    const result=await httpClient.request<any[]>(`${API_BASE}/trader-equity-history?${new URLSearchParams({trader_id:traderId})}`,{silent:true})
+    if(!result.success) throw new Error('Failed to load equity history')
+    return result.data || []
+  },
   async getSymbols(exchange = 'hyperliquid-xyz'): Promise<SymbolListResponse> {
     const result = await httpClient.get<SymbolListResponse>(
       `${API_BASE}/symbols?exchange=${encodeURIComponent(exchange)}`
@@ -219,10 +234,11 @@ export const dataApi = {
   async getPositionHistory(
     traderId: string,
     limit: number = 100,
-    silent?: boolean
+    silent?: boolean,
+    offset=0
   ): Promise<PositionHistoryResponse> {
     const result = await httpClient.request<PositionHistoryResponse>(
-      `${API_BASE}/positions/history?trader_id=${traderId}&limit=${limit}`,
+      `${API_BASE}/positions/history?trader_id=${traderId}&limit=${limit}&offset=${offset}`,
       { silent }
     )
     if (!result.success) throw new Error('Failed to fetch position history')

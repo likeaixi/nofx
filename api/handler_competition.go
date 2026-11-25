@@ -126,7 +126,19 @@ func (s *Server) handleCompetition(c *gin.Context) {
 // authenticated getTraderFromQuery helper. Instead, it validates that the
 // requested trader has explicitly opted into the public competition via
 // show_in_competition=true. Traders without that flag are not exposed.
-func (s *Server) handleEquityHistory(c *gin.Context) {
+func (s *Server) handleEquityHistory(c *gin.Context) { s.serveEquityHistory(c, false) }
+
+func (s *Server) handleTraderEquityHistory(c *gin.Context) {
+	user := c.GetString("user_id")
+	trader, err := s.store.Trader().GetByID(c.Query("trader_id"))
+	if user == "" || err != nil || trader == nil || trader.UserID != user {
+		SafeNotFound(c, "Trader")
+		return
+	}
+	s.serveEquityHistory(c, true)
+}
+
+func (s *Server) serveEquityHistory(c *gin.Context, owned bool) {
 	traderID := c.Query("trader_id")
 	if traderID == "" {
 		SafeBadRequest(c, "trader_id is required")
@@ -137,7 +149,7 @@ func (s *Server) handleEquityHistory(c *gin.Context) {
 		SafeNotFound(c, "Trader")
 		return
 	}
-	if !trader.ShowInCompetition {
+	if !owned && !trader.ShowInCompetition {
 		// Do not leak that a private trader exists; report not found.
 		SafeNotFound(c, "Trader")
 		return
