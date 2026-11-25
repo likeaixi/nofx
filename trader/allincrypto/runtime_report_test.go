@@ -73,3 +73,22 @@ func TestRuntimeReportShowsFailureRecoveryAndDraining(t *testing.T) {
 		t.Fatal(row.ExecutionLog)
 	}
 }
+
+func TestRuntimeReportUsesGenericCopyTitle(t *testing.T) {
+	r, _, _, _ := setup(t)
+	r.StrategyName = "自定义跟单"
+	r.SourceID = "123"
+	if err := r.RecordRuntimeStatus(nil, false); err != nil {
+		t.Fatal(err)
+	}
+	var row store.DecisionRecordDB
+	if err := r.db.Order("id desc").First(&row).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(row.ExecutionLog, "策略名称：自定义跟单") || !strings.Contains(row.ExecutionLog, "跟单来源：123") {
+		t.Fatal("missing configured identity", row.ExecutionLog)
+	}
+	if !strings.Contains(row.ExecutionLog, "跟单 · 15 分钟运行日志（固定规则）") || strings.Contains(row.ExecutionLog, "AllinCrypto ·") {
+		t.Fatal("hardcoded source title", row.ExecutionLog)
+	}
+}

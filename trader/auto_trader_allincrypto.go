@@ -88,6 +88,9 @@ func (at *AutoTrader) runAllinCrypto(account string) error {
 		return err
 	}
 	runner.SourceID = sourceID
+	if strategy, readErr := at.store.Strategy().Get(at.userID, at.config.StrategyID); readErr == nil {
+		runner.StrategyName = strategy.Name
+	}
 	runner.Leverage = settings.Leverage
 	if value := os.Getenv("NOFX_AOYING_FLAT_BASELINE"); value != "" && sourceID == store.DefaultCopyPortfolioID {
 		baseline, parseErr := time.Parse(time.RFC3339, value)

@@ -41,8 +41,13 @@ func (r *Runner) RecordRuntimeStatus(checkErr error, stopping bool) error {
 	if checkErr != nil {
 		status = "检查异常，暂不执行新跟单，等待后续检查恢复"
 	}
+	name := strings.TrimSpace(r.StrategyName)
+	if name == "" {
+		name = "跟单策略"
+	}
 	logs := []string{
-		"AllinCrypto · 15 分钟运行决策日志（固定规则）",
+		"跟单 · 15 分钟运行日志（固定规则）",
+		"策略名称：" + name,
 		"本次检查：" + now.Format(time.RFC3339),
 		"跟单来源：" + r.sourceID(),
 		"跟单周期：" + s.PeriodID,

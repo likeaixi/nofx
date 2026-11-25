@@ -38,6 +38,7 @@ type Venue interface {
 	CancelExecutionOrder(context.Context, execution.Order) error
 }
 type Runner struct {
+	StrategyName            string
 	SourceID                string
 	Leverage                int
 	ConfirmedSourceBaseline time.Time
