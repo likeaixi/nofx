@@ -73,6 +73,31 @@ export function TradeLedgerPage() {
   })
   const id = params.get('trader')
   const trader = id ? traders?.find((t) => t.trader_id === id) : traders?.[0]
+  const traderSelector = (
+    <label className="ledger-trader-select">
+      Trader{' '}
+      <select
+        value={trader?.trader_id || ''}
+        onChange={(e) => setParams({ trader: e.target.value })}
+      >
+        {!trader && (
+          <option value="">{zh ? '请选择交易员' : 'Select trader'}</option>
+        )}
+        {traders?.map((t) => (
+          <option key={t.trader_id} value={t.trader_id}>
+            {t.trader_name} · {t.ai_model} ·{' '}
+            {t.is_running
+              ? zh
+                ? '运行中'
+                : 'Running'
+              : zh
+                ? '已停止'
+                : 'Stopped'}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
   return (
     <div className="nofx-ledger-page">
       <div className="ledger-title">
@@ -84,31 +109,7 @@ export function TradeLedgerPage() {
           <Link to={ROUTES.dashboard}>Dashboard</Link>
         </div>
       </div>
-      <div className="ledger-trader">
-        <label>
-          Trader{' '}
-          <select
-            value={trader?.trader_id || ''}
-            onChange={(e) => setParams({ trader: e.target.value })}
-          >
-            {!trader && (
-              <option value="">{zh ? '请选择交易员' : 'Select trader'}</option>
-            )}
-            {traders?.map((t) => (
-              <option key={t.trader_id} value={t.trader_id}>
-                {t.trader_name} · {t.ai_model} ·{' '}
-                {t.is_running
-                  ? zh
-                    ? '运行中'
-                    : 'Running'
-                  : zh
-                    ? '已停止'
-                    : 'Stopped'}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      {!trader && <div className="ledger-filters">{traderSelector}</div>}
       {error ? (
         <button onClick={() => mutate()}>
           {zh ? '交易员读取失败，重试' : 'Could not load traders. Retry'}
@@ -118,7 +119,11 @@ export function TradeLedgerPage() {
       ) : !traders.length ? (
         <p>{zh ? '请先创建交易员。' : 'Create a trader first.'}</p>
       ) : trader ? (
-        <Ledger key={trader.trader_id} trader={trader} />
+        <Ledger
+          key={trader.trader_id}
+          trader={trader}
+          traderSelector={traderSelector}
+        />
       ) : (
         <p>
           {zh
@@ -129,7 +134,13 @@ export function TradeLedgerPage() {
     </div>
   )
 }
-function Ledger({ trader }: { trader: TraderInfo }) {
+function Ledger({
+  trader,
+  traderSelector,
+}: {
+  trader: TraderInfo
+  traderSelector: React.ReactNode
+}) {
   const { language } = useLanguage()
   const zh = language === 'zh'
   const tr = (cn: string, en: string) => (zh ? cn : en)
@@ -265,7 +276,8 @@ function Ledger({ trader }: { trader: TraderInfo }) {
   return (
     <>
       <div className="ledger-filters">
-        <label>
+        {traderSelector}
+        <label className="ledger-symbol-search">
           {tr('搜索币种', 'Search symbol')}
           <input
             value={symbol}

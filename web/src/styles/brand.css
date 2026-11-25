@@ -1793,18 +1793,11 @@ html {
 .nofx-ledger-page button:disabled {
   opacity: 0.45;
 }
-.ledger-trader,
 .ledger-filters {
   background: white;
   border: 1px solid var(--line);
   padding: 20px;
   border-radius: 14px;
-}
-.ledger-trader {
-  margin-bottom: 12px;
-}
-.ledger-trader label {
-  max-width: 720px;
 }
 .ledger-filters {
   display: flex;
@@ -1813,7 +1806,6 @@ html {
   align-items: end;
   margin-bottom: 18px;
 }
-.ledger-trader label,
 .ledger-filters label {
   display: flex;
   flex-direction: column;
@@ -1821,7 +1813,6 @@ html {
   color: var(--muted);
   font-size: 13px;
 }
-.ledger-trader select,
 .ledger-filters input:not([type='checkbox']),
 .ledger-filters select {
   height: 42px;
@@ -1850,21 +1841,27 @@ html {
 .ledger-stat {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 18px;
+  gap: 4px;
+  padding: 12px 14px;
   background: white;
   border: 1px solid var(--line);
   border-radius: 14px;
   box-shadow: var(--shadow-sm);
   min-width: 0;
 }
-.ledger-stat > span,
+.ledger-stat > span {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+}
 .ledger-stat small {
-  font-size: 12px;
+  font-size: 10px;
+  line-height: 1.35;
   color: var(--muted);
 }
 .ledger-stat strong {
-  font-size: 24px;
+  font-size: 20px;
+  line-height: 1.3;
   font-weight: 650;
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
@@ -2006,9 +2003,32 @@ html {
     font-size: 24px;
   }
   .ledger-stat strong {
-    font-size: 21px;
+    font-size: 18px;
   }
   .ledger-section > header {
     padding: 16px;
+  }
+}
+
+.ledger-filters .ledger-trader-select {
+  flex: 1 1 220px;
+  max-width: 360px;
+  min-width: 0;
+}
+.ledger-trader-select select {
+  width: 100%;
+  text-overflow: ellipsis;
+}
+.ledger-filters .ledger-symbol-search {
+  flex: 0 1 150px;
+  min-width: 130px;
+}
+.ledger-symbol-search input {
+  width: 100%;
+}
+@media (max-width: 640px) {
+  .ledger-filters .ledger-trader-select {
+    flex-basis: 100%;
+    max-width: none;
   }
 }
