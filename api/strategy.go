@@ -347,29 +347,6 @@ func (s *Server) handleUpdateStrategy(c *gin.Context) {
 		SafeBadRequest(c, err.Error())
 		return
 	}
-	if existing.IsAllinCrypto() {
-		var old store.StrategyConfig
-		if err := json.Unmarshal([]byte(existing.Config), &old); err != nil {
-			SafeInternalError(c, "Read copy configuration", err)
-			return
-		}
-		oldID, _ := store.ParseCopySourceURL(old.CopySettings().SourceURL)
-		newID, _ := store.ParseCopySourceURL(mergedConfig.CopySettings().SourceURL)
-		if oldID != newID {
-			var count int64
-			if s.store.GormDB().Migrator().HasTable("allincrypto_checkpoints") {
-				err := s.store.GormDB().Table("allincrypto_checkpoints").Where("trader_id IN (?)", s.store.GormDB().Table("traders").Select("id").Where("user_id = ? AND strategy_id = ?", userID, strategyID)).Count(&count).Error
-				if err != nil {
-					SafeInternalError(c, "Check source history", err)
-					return
-				}
-			}
-			if count > 0 {
-				SafeBadRequest(c, "已有跟单历史，请为新来源创建独立策略和 trader / Create a new strategy and trader for a different source")
-				return
-			}
-		}
-	}
 	beforeClamp := mergedConfig
 	mergedConfig.ClampLimits()
 

@@ -21,10 +21,11 @@ import (
 const PortfolioID = "5075281354358777856"
 
 type Client struct {
-	BaseURL  string
-	HTTP     *http.Client
-	PageSize int
-	LeadID   string
+	BaseURL      string
+	HTTP         *http.Client
+	PageSize     int
+	LeadID       string
+	historyPacer *historyPacer
 }
 
 func NewForPortfolio(id string) *Client { c := New(); c.LeadID = id; return c }
@@ -36,7 +37,7 @@ func (c *Client) portfolioID() string {
 }
 
 func New() *Client {
-	return &Client{"https://www.binance.com/bapi/futures/v1/friendly/future/copy-trade/lead-portfolio", &http.Client{Timeout: 10 * time.Second}, 50, PortfolioID}
+	return &Client{BaseURL: "https://www.binance.com/bapi/futures/v1/friendly/future/copy-trade/lead-portfolio", HTTP: &http.Client{Timeout: 10 * time.Second}, PageSize: 50, LeadID: PortfolioID, historyPacer: publicHistoryPacer}
 }
 
 type Event struct {
@@ -61,6 +62,13 @@ type Snapshot struct {
 }
 
 func (c *Client) request(ctx context.Context, method, path string, body []byte, out any) error {
+	if c.historyPacer != nil && (path == "/order-history" || path == "/position-history") {
+		release, err := c.historyPacer.acquire(ctx)
+		if err != nil {
+			return err
+		}
+		defer release()
+	}
 	req, err := http.NewRequestWithContext(ctx, method, c.BaseURL+path, bytes.NewReader(body))
 	if err != nil {
 		return err

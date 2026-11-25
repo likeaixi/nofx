@@ -54,7 +54,7 @@ func New(db *gorm.DB, id, account string, source Source, venue Venue, markets Ma
 	if db == nil || id == "" || account == "" || source == nil || venue == nil || markets == nil {
 		return nil, errors.New("missing fixed strategy dependency")
 	}
-	if err := db.AutoMigrate(&checkpoint{}, &signal{}, &sourceLedgerEntry{}); err != nil {
+	if err := db.AutoMigrate(&checkpoint{}, &signal{}, &sourceLedgerEntry{}, &sourcePeriod{}); err != nil {
 		return nil, err
 	}
 	return &Runner{db: db, id: id, account: account, source: source, venue: venue, markets: markets, now: time.Now}, nil
@@ -75,6 +75,9 @@ func targetSymbol(venue string, e binancecopy.Event) (string, error) {
 	return "", errors.New("unsupported target venue")
 }
 func (r *Runner) Poll(ctx context.Context) error {
+	if err := r.prepareSourcePeriod(ctx); err != nil {
+		return err
+	}
 	s, err := r.load()
 	if err != nil {
 		return err

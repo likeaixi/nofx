@@ -73,7 +73,7 @@ func TestCopyStrategyConfigPersistsAndRejectsInvalidChanges(t *testing.T) {
 	st.GormDB().Exec(`CREATE TABLE IF NOT EXISTS allincrypto_checkpoints (trader_id TEXT PRIMARY KEY, account TEXT, revision INTEGER, body TEXT)`)
 	st.GormDB().Exec(`INSERT INTO allincrypto_checkpoints VALUES (?, ?, 0, ?)`, tr.ID, "account", `{"Positions":{},"Waiting":{},"SourceID":"123"}`)
 	bad = call(result.ID, `{"config":{"copy_config":{"source_url":"https://www.binance.com/en/copy-trading/lead-details/456"}}}`)
-	if bad.Code != 400 || !strings.Contains(bad.Body.String(), "new strategy") {
-		t.Fatalf("source mutation accepted: %d %s", bad.Code, bad.Body.String())
+	if bad.Code != 200 {
+		t.Fatalf("flat source mutation rejected: %d %s", bad.Code, bad.Body.String())
 	}
 }

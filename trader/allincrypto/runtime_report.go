@@ -45,6 +45,7 @@ func (r *Runner) RecordRuntimeStatus(checkErr error, stopping bool) error {
 		"AllinCrypto · 15 分钟运行决策日志（固定规则）",
 		"本次检查：" + now.Format(time.RFC3339),
 		"跟单来源：" + r.sourceID(),
+		"跟单周期：" + s.PeriodID,
 		"运行状态：" + status,
 		fmt.Sprintf("固定规则：%d 倍杠杆；实际成交均价反向 %d%% 止损", r.leverage(), store.AllinCryptoStopPercent),
 		fmt.Sprintf("已记录跟单持仓：%d；待处理订单流程：%d", len(s.Positions), waiting),
@@ -63,7 +64,11 @@ func (r *Runner) RecordRuntimeStatus(checkErr error, stopping bool) error {
 	}
 	// Keep the latest actual signal outcome visible even after many heartbeats.
 	var recent store.DecisionRecordDB
-	q := r.db.Where("trader_id = ? AND decisions LIKE ?", r.id, `%"action":"allincrypto"%`).Order("id desc").Limit(1).Find(&recent)
+	query := r.db.Where("trader_id = ? AND decisions LIKE ?", r.id, `%"action":"allincrypto"%`)
+	if s.PeriodDecisionFloor > 0 {
+		query = query.Where("id > ?", s.PeriodDecisionFloor)
+	}
+	q := query.Order("id desc").Limit(1).Find(&recent)
 	if q.Error != nil {
 		return q.Error
 	}

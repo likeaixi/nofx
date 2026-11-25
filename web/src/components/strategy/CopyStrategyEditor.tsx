@@ -136,8 +136,8 @@ export function CopyStrategyEditor({
         </label>
         <p className="strategy-field-wide">
           {zh
-            ? '支持 Binance / OKX 的 USDT 永续目标账户。按净权益比例计算名义仓位，杠杆影响保证金；实际成交均价反向 4% 止损。更改已有策略须先停止关联 trader 并处理完其持仓及订单。'
-            : 'Supports Binance / OKX USDT perpetual accounts. Notional follows equity ratio; leverage changes required margin. Exchange stop: 4% from actual average fill. Stop linked traders and resolve exposure before editing.'}
+            ? '支持 Binance / OKX 的 USDT 永续目标账户。按净权益比例计算名义仓位，杠杆影响保证金；实际成交均价反向 4% 止损。更改已有策略须先停止关联 trader 并处理完其持仓及订单。更换带单人后，下次启动建立独立跟单周期，保留旧历史，不补开历史订单。'
+            : 'Supports Binance / OKX USDT perpetual accounts. Notional follows equity ratio; leverage changes required margin. Exchange stop: 4% from actual average fill. Stop linked traders and resolve exposure before editing. Changing the lead starts a separate copy period on next start, preserves previous history and never backfills old entries.'}
         </p>
         {error && (
           <p role="alert" className="strategy-field-wide text-red-600">

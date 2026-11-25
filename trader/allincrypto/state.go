@@ -60,6 +60,9 @@ type pending struct {
 	StopSubmitError                        string `json:",omitempty"`
 }
 type state struct {
+	PeriodID            string
+	PeriodStartedAt     int64
+	PeriodDecisionFloor int64
 	SourceID            string
 	LedgerSequence      int64
 	LedgerHead          string
@@ -83,7 +86,7 @@ func (r *Runner) load() (*state, error) {
 	var row checkpoint
 	err := r.db.First(&row, "trader_id = ?", r.id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		s := state{SourceID: r.sourceID(), Positions: map[string]*position{}}
+		s := state{SourceID: r.sourceID(), PeriodID: newPeriodID(), PeriodStartedAt: r.now().UnixMilli(), Positions: map[string]*position{}}
 		b, _ := json.Marshal(s)
 		row = checkpoint{TraderID: r.id, Account: r.account, Body: string(b)}
 		if err = r.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error; err != nil {
@@ -110,7 +113,7 @@ func (r *Runner) load() (*state, error) {
 		sourceID = store.DefaultCopyPortfolioID
 	}
 	if sourceID != r.sourceID() {
-		return nil, errors.New("copy source differs from persisted history; create a new trader")
+		return nil, errors.New("copy source differs from active period; full poll must validate and initialize a new period")
 	}
 	s.SourceID = sourceID
 	if s.Positions == nil {
