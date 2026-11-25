@@ -156,6 +156,11 @@ function Ledger({
     [more, setMore] = useState(true),
     [busy, setBusy] = useState(false),
     [moreError, setMoreError] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  useEffect(() => {
+    setPage(1)
+  }, [symbol, side, outcome, range, hide, pageSize])
   const options = {
     refreshInterval: auto ? 10000 : 0,
     revalidateOnFocus: false,
@@ -220,6 +225,13 @@ function Ledger({
     since,
     hideReconciled: hide,
   })
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const currentPage = Math.min(page, pageCount)
+  const pageStart = (currentPage - 1) * pageSize
+  const pageRows = filtered.slice(pageStart, pageStart + pageSize)
+  useEffect(() => {
+    setPage((prev) => Math.min(prev, pageCount))
+  }, [pageCount])
   const stats = ledgerStats(filtered)
   const current = positions.data?.filter(
     (p) =>
@@ -246,6 +258,7 @@ function Ledger({
     }
   }
   async function refresh() {
+    setPage(1)
     setOlder([])
     setHistoryWindow([])
     setOffset(500)
@@ -591,7 +604,7 @@ function Ledger({
               </tr>
             </thead>
             <tbody>
-              {filtered.map((p) => {
+              {pageRows.map((p) => {
                 const qty = p.entry_quantity || p.quantity
                 const margin = (qty * p.entry_price) / p.leverage
                 return (
@@ -643,6 +656,59 @@ function Ledger({
           </p>
         )}
         <footer>
+          <nav
+            className="ledger-pagination"
+            aria-label={tr('平仓记录分页', 'Closed positions pagination')}
+          >
+            <label>
+              {tr('每页条数', 'Rows per page')}
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+              >
+                {[20, 50, 100].map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span>
+              {tr(
+                `已加载匹配记录 ${filtered.length} 条，显示 ${filtered.length ? pageStart + 1 : 0}–${Math.min(pageStart + pageSize, filtered.length)}`,
+                `${filtered.length} loaded matches · Showing ${filtered.length ? pageStart + 1 : 0}–${Math.min(pageStart + pageSize, filtered.length)}`
+              )}
+            </span>
+            <div className="ledger-page-buttons">
+              <button disabled={currentPage === 1} onClick={() => setPage(1)}>
+                {tr('首页', 'First')}
+              </button>
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setPage(currentPage - 1)}
+              >
+                {tr('上一页', 'Previous')}
+              </button>
+              <span aria-live="polite">
+                {tr(
+                  `第 ${currentPage} / ${pageCount} 页`,
+                  `Page ${currentPage} / ${pageCount}`
+                )}
+              </span>
+              <button
+                disabled={currentPage === pageCount}
+                onClick={() => setPage(currentPage + 1)}
+              >
+                {tr('下一页', 'Next')}
+              </button>
+              <button
+                disabled={currentPage === pageCount}
+                onClick={() => setPage(pageCount)}
+              >
+                {tr('末页', 'Last')}
+              </button>
+            </div>
+          </nav>
           <span>{missing}</span>
           {more && history.data?.positions.length === 500 && (
             <button disabled={busy} onClick={() => void loadMore()}>

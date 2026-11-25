@@ -2060,3 +2060,41 @@ html {
   padding: 1px 4px;
   font-size: 11px;
 }
+
+.ledger-closed-positions {
+  max-height: none;
+}
+.ledger-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  width: 100%;
+}
+.ledger-pagination label,
+.ledger-page-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ledger-pagination select {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  color: var(--ink);
+  font-size: 12px;
+}
+.ledger-page-buttons {
+  margin-left: auto;
+}
+.ledger-page-buttons button {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .ledger-page-buttons {
+    margin-left: 0;
+  }
+}
