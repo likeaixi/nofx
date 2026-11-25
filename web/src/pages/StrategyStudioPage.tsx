@@ -761,7 +761,7 @@ export function StrategyStudioPage() {
               {text(
                 language,
                 '配置影子实盘跟单，或自定义通用 AI 策略参数。',
-                'Configure live shadow copying or tune a general AI strategy.'
+                'Configure live copy trading or tune a general AI strategy.'
               )}
             </p>
           </div>
@@ -808,8 +808,8 @@ export function StrategyStudioPage() {
               type="button"
               title={text(
                 language,
-                '新建影子跟单策略',
-                'New shadow copy strategy'
+                '新建跟单策略',
+                'New copy trading strategy'
               )}
               onClick={() => {
                 setShowMarket(false)
@@ -818,7 +818,7 @@ export function StrategyStudioPage() {
               className="inline-flex min-h-9 items-center justify-center gap-1 whitespace-nowrap rounded-md border border-[rgba(25,36,52,0.14)] bg-nofx-bg-lighter px-2 py-2 text-xs font-semibold text-nofx-gold hover:border-nofx-gold/40"
             >
               <Plus className="h-3 w-3 shrink-0" />
-              {text(language, '影子跟单', 'Shadow Copy')}
+              {text(language, '跟单', 'Copy Trading')}
             </button>
           </div>
           <p className="mb-3 px-2 text-xs leading-relaxed text-nofx-text-muted">

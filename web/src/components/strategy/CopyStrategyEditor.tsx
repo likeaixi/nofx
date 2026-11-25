@@ -19,7 +19,7 @@ export function CopyStrategyEditor({
   const zh = language === 'zh'
   const navigate = useNavigate()
   const [name, setName] = useState(
-    strategy?.name || (zh ? '影子跟单' : 'Shadow Copy')
+    strategy?.name || (zh ? '跟单' : 'Copy Trading')
   )
   const [url, setURL] = useState(
     strategy?.config.copy_config?.source_url || (strategy ? defaultURL : '')
@@ -81,7 +81,7 @@ export function CopyStrategyEditor({
   }
   return (
     <section className="strategy-config-card">
-      <h2>{zh ? '影子跟单 · 实盘' : 'Shadow Copy · Live'}</h2>
+      <h2>{zh ? '跟单 · 实盘' : 'Copy Trading · Live'}</h2>
       <p>
         {zh
           ? '填写币安带单人的主页网址即可识别来源。首次只建立基线，之后跟随新成交，不补开历史仓位。'
@@ -150,7 +150,7 @@ export function CopyStrategyEditor({
               ? '…'
               : strategy?.is_default
                 ? zh
-                  ? '另存为影子策略'
+                  ? '另存为跟单策略'
                   : 'Save as new copy strategy'
                 : zh
                   ? '保存策略'

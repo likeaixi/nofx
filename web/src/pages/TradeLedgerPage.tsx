@@ -416,7 +416,7 @@ function Ledger({
         <p className="ledger-empty">
           {isCopy
             ? tr(
-                '影子跟单由源成交触发，不生成 AI 计划单。',
+                '跟单由源成交触发，不生成 AI 计划单。',
                 'Copy trading is triggered by source fills, without AI planned orders.'
               )
             : tr(
