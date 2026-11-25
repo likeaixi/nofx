@@ -2032,3 +2032,31 @@ html {
     max-width: none;
   }
 }
+
+/* Keep closed-position records compact without hiding column values. */
+.ledger-closed-positions table {
+  font-size: 11px;
+  line-height: 1.4;
+}
+.ledger-closed-positions th {
+  font-size: 10px;
+}
+.ledger-closed-positions td,
+.ledger-closed-positions th {
+  padding: 9px 6px;
+}
+.ledger-closed-positions tr > :first-child {
+  padding-left: 14px;
+}
+.ledger-closed-positions tr > :last-child {
+  padding-right: 14px;
+}
+.ledger-closed-positions td strong {
+  display: inline;
+}
+.ledger-closed-positions .ledger-tag {
+  margin-top: 0;
+  margin-left: 4px;
+  padding: 1px 4px;
+  font-size: 10px;
+}

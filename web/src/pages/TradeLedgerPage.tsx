@@ -564,7 +564,7 @@ function Ledger({
           'Newest first; stored records survive restarts'
         )}
       >
-        <div className="ledger-scroll">
+        <div className="ledger-scroll ledger-closed-positions">
           <table>
             <thead>
               <tr>
