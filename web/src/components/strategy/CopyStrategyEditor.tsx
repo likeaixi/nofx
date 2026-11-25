@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useLanguage } from '../../contexts/LanguageContext'
 import type { Strategy } from '../../types'
+import { confirmToast } from '../../lib/notify'
 import { ROUTES } from '../../router/paths'
 
 const defaultURL =
@@ -10,9 +11,11 @@ const defaultURL =
 export function CopyStrategyEditor({
   strategy,
   onSaved,
+  onDeleted,
 }: {
   strategy?: Strategy
   onSaved: (id: string) => Promise<void>
+  onDeleted?: () => Promise<void>
 }) {
   const { token } = useAuth()
   const { language } = useLanguage()
@@ -73,6 +76,49 @@ export function CopyStrategyEditor({
       await onSaved(update ? strategy!.id : result.id)
       setSaved(true)
       setDirty(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  const remove = async () => {
+    if (
+      !strategy ||
+      strategy.is_default ||
+      strategy.is_builtin ||
+      strategy.is_active ||
+      busy
+    )
+      return
+    setBusy(true)
+    setError('')
+    try {
+      const confirmed = await confirmToast(
+        zh
+          ? `确定删除策略“${strategy.name}”？`
+          : `Delete strategy “${strategy.name}”?`,
+        {
+          title: zh ? '确认删除' : 'Confirm delete',
+          okText: zh ? '删除' : 'Delete',
+          cancelText: zh ? '取消' : 'Cancel',
+        }
+      )
+      if (!confirmed) return
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE || ''}/api/strategies/${encodeURIComponent(strategy.id)}`,
+        {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      )
+      if (!response.ok) {
+        const result = await response.json()
+        throw new Error(
+          result.error || (zh ? '删除失败' : 'Could not delete strategy')
+        )
+      }
+      await onDeleted?.()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -169,8 +215,36 @@ export function CopyStrategyEditor({
               {zh ? '配置跟单账户' : 'Configure trader account'}
             </button>
           )}
+          {strategy && !strategy.is_default && onDeleted && (
+            <button
+              type="button"
+              disabled={busy || strategy.is_active || strategy.is_builtin}
+              onClick={() => void remove()}
+              className="text-nofx-danger"
+              title={
+                strategy.is_active
+                  ? zh
+                    ? '请先将其他策略设为账户默认'
+                    : 'Set another strategy as account default first'
+                  : undefined
+              }
+            >
+              {zh ? '删除策略' : 'Delete strategy'}
+            </button>
+          )}
           {saved && <span role="status">{zh ? '已保存' : 'Saved'}</span>}
         </div>
+        {strategy && !strategy.is_default && onDeleted && (
+          <p className="strategy-field-wide text-xs text-nofx-text-muted">
+            {strategy.is_builtin
+              ? zh
+                ? '内置策略由系统自动保留，不能在此删除。'
+                : 'Built-in strategies are retained by the system and cannot be deleted here.'
+              : zh
+                ? '删除前需解除所有机器人对该策略的关联；账户默认策略需先切换默认选择。'
+                : 'Reassign all linked traders before deleting. Choose another account default if this is the current default.'}
+          </p>
+        )}
       </form>
     </section>
   )

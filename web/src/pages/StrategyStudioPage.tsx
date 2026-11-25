@@ -952,6 +952,9 @@ export function StrategyStudioPage() {
               selectedStrategy?.config.strategy_type === 'allincrypto' ? (
                 <CopyStrategyEditor
                   key={showCopyCreate ? 'new-copy' : selectedStrategy?.id}
+                  onDeleted={async () => {
+                    await loadStrategies(selectedStrategyID.current)
+                  }}
                   strategy={
                     showCopyCreate ? undefined : selectedStrategy || undefined
                   }
