@@ -21,7 +21,6 @@ import { formatRequestError } from '../../lib/requestErrors'
 import { RiskRadar } from './RiskRadar'
 import { EdgeProfile } from './EdgeProfile'
 import { useDemoEngine } from '../../lib/demo/useDemoEngine'
-import { TraderDetails } from '../trader/TraderDetails'
 import './terminal.css'
 
 // crypto majors trade on the Hyperliquid main dex (no hip3 namespace);
@@ -638,7 +637,6 @@ export function TerminalDashboard({
             <EdgeProfile positions={history?.positions} />
           </div>
         </div>
-        {!on && traderId && <TraderDetails key={traderId} traderId={traderId} strategyType={propStatus?.strategy_type}/>}
       </div>
     </div>
   )

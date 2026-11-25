@@ -25,6 +25,7 @@ import { DataPage } from '../pages/DataPage'
 import { SettingsPage } from '../pages/SettingsPage'
 import { StrategyStudioPage } from '../pages/StrategyStudioPage'
 import { TradingPlanningPage } from '../pages/TradingPlanningPage'
+import { TraderDetails } from '../components/trader/TraderDetails'
 import { TerminalDashboard } from '../components/terminal/TerminalDashboard'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
@@ -217,6 +218,96 @@ function TradersRoute() {
           )
         }}
       />
+    </AppChrome>
+  )
+}
+
+function TradeDetailsRoute() {
+  const { language } = useLanguage()
+  const zh = language === 'zh'
+  const [searchParams, setSearchParams] = useSearchParams()
+  const {
+    data: traders,
+    error,
+    isLoading,
+    mutate,
+  } = useSWR<TraderInfo[]>('traders-dashboard', () => api.getTraders(true), {
+    refreshInterval: 10000,
+    shouldRetryOnError: false,
+  })
+  const slug = searchParams.get('trader')
+  const selectedTrader =
+    traders && (slug ? findTraderBySlug(slug, traders) : traders[0])
+  const traderId = selectedTrader?.trader_id
+  const { data: status } = useSWR<SystemStatus>(
+    traderId ? `status-${traderId}` : null,
+    () => api.getStatus(traderId!, true),
+    {
+      refreshInterval: 15000,
+      revalidateOnFocus: false,
+      dedupingInterval: 10000,
+    }
+  )
+  return (
+    <AppChrome currentPage="trade-details">
+      <div className="max-w-7xl mx-auto py-6 px-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <h1 className="text-2xl font-semibold">
+            {zh ? '交易详情' : 'Trade Details'}
+          </h1>
+          {!!traders?.length && (
+            <label className="flex items-center gap-3">
+              <span>{zh ? '交易员' : 'Trader'}</span>
+              <select
+                className="border rounded px-3 py-2 bg-white"
+                value={traderId || ''}
+                onChange={(event) => {
+                  const trader = traders.find(
+                    (item) => item.trader_id === event.target.value
+                  )
+                  if (trader) setSearchParams({ trader: getTraderSlug(trader) })
+                }}
+              >
+                {!selectedTrader && (
+                  <option value="" disabled>
+                    {zh ? '请选择交易员' : 'Select a trader'}
+                  </option>
+                )}
+                {traders.map((trader) => (
+                  <option key={trader.trader_id} value={trader.trader_id}>
+                    {trader.trader_name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+        {isLoading ? (
+          <p role="status">{zh ? '正在加载…' : 'Loading…'}</p>
+        ) : error ? (
+          <button onClick={() => mutate()}>
+            {zh ? '读取失败，点击重试' : 'Could not load traders. Retry'}
+          </button>
+        ) : !traders?.length ? (
+          <p>
+            {zh
+              ? '暂无交易员，请先在配置页面创建。'
+              : 'No traders yet. Create one in Configuration.'}
+          </p>
+        ) : !selectedTrader ? (
+          <p>
+            {zh
+              ? '未找到指定交易员，请重新选择。'
+              : 'Trader not found. Please select a trader.'}
+          </p>
+        ) : (
+          <TraderDetails
+            key={traderId}
+            traderId={traderId!}
+            strategyType={status?.strategy_type}
+          />
+        )}
+      </div>
     </AppChrome>
   )
 }
@@ -513,6 +604,16 @@ export function AppRoutes() {
               >
                 <TraderLaunchGuestPage />
               </AppChrome>
+            )
+          }
+        />
+        <Route
+          path={ROUTES.tradeDetails}
+          element={
+            isAuthenticated ? (
+              <TradeDetailsRoute />
+            ) : (
+              <Navigate to={ROUTES.login} replace />
             )
           }
         />

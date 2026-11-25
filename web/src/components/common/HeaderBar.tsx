@@ -81,6 +81,12 @@ export default function HeaderBar({
       auth: true,
     },
     {
+      page: 'trade-details',
+      path: ROUTES.tradeDetails,
+      label: language === 'zh' ? '交易详情' : 'Trade Details',
+      auth: true,
+    },
+    {
       page: 'strategy',
       path: ROUTES.strategy,
       label: t('strategyNav', language),
@@ -100,7 +106,17 @@ export default function HeaderBar({
       return
     }
     onPageChange?.(tab.page)
-    navigate(tab.path)
+    const trader = new URLSearchParams(location.search).get('trader')
+    const traderPages: string[] = [ROUTES.dashboard, ROUTES.tradeDetails]
+    const preserveTrader =
+      trader &&
+      traderPages.includes(location.pathname) &&
+      traderPages.includes(tab.path)
+    navigate(
+      preserveTrader
+        ? `${tab.path}?${new URLSearchParams({ trader })}`
+        : tab.path
+    )
   }
   return (
     <nav className="header-bar nofx-navigation" aria-label="Main navigation">
