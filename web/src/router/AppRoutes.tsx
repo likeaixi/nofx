@@ -250,8 +250,8 @@ function TradeDetailsRoute() {
   )
   return (
     <AppChrome currentPage="trade-details">
-      <div className="max-w-7xl mx-auto py-6 px-4">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+      <div className="nofx-trade-details-page">
+        <div className="nofx-trade-details-heading">
           <h1 className="text-2xl font-semibold">
             {zh ? '交易详情' : 'Trade Details'}
           </h1>

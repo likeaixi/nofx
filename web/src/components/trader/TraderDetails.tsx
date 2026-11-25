@@ -56,7 +56,7 @@ function Fills({ traderId, orderId }: { traderId: string; orderId: number }) {
       <p>{zh ? '暂无已同步的成交记录' : 'No synced fills for this order.'}</p>
     )
   return (
-    <div className="overflow-x-auto">
+    <div className="nofx-trade-fills overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr>
@@ -121,7 +121,7 @@ function OrderHistory({ traderId }: { traderId: string }) {
             <p>{zh ? '暂无已同步订单' : 'No synced orders.'}</p>
           )}
           {data?.map((o) => (
-            <div key={o.id} className="border rounded p-3">
+            <div key={o.id} className="nofx-trade-order">
               <button
                 className="w-full text-left flex flex-wrap gap-x-5 gap-y-2 text-sm"
                 aria-expanded={expanded === o.id}
@@ -204,23 +204,23 @@ export function TraderDetails({
   ]
   return (
     <section
-      className="border-t px-4 py-6 md:px-6 space-y-5"
+      className="nofx-trade-details-panel"
       aria-label={zh ? '交易员详情' : 'Trader details'}
     >
-      <div role="tablist" className="flex gap-2 flex-wrap">
+      <div role="tablist" className="nofx-trade-details-tabs">
         {tabs.map(([id, label]) => (
           <button
             key={id}
             role="tab"
             aria-selected={tab === id}
-            className={`px-4 py-2 border rounded ${tab === id ? 'font-bold bg-nofx-bg-lighter' : ''}`}
+            className="nofx-trade-details-tab"
             onClick={() => setTab(id)}
           >
             {label}
           </button>
         ))}
       </div>
-      <div role="tabpanel">
+      <div role="tabpanel" className="nofx-trade-details-content">
         {tab === 'history' && (
           <PositionHistory key={traderId} traderId={traderId} />
         )}

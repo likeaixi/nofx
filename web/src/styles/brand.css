@@ -1532,3 +1532,150 @@ html {
 .nofx-shell .config-next small {
   color: var(--muted);
 }
+
+/* Trader detail workspace: shared Flow type, surfaces and table spacing. */
+.nofx-trade-details-page {
+  max-width: 1344px;
+  margin: 0 auto;
+  padding: 32px 32px 48px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+.nofx-trade-details-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.nofx-trade-details-heading h1 {
+  font-size: 28px;
+  font-weight: 650;
+}
+.nofx-trade-details-heading label {
+  font-size: 13px;
+  color: var(--muted);
+}
+.nofx-trade-details-heading select {
+  min-width: 180px;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  font-size: 13px;
+}
+.nofx-trade-details-panel {
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.nofx-trade-details-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-bottom: 20px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.nofx-trade-details-tab {
+  padding: 9px 16px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--muted);
+}
+.nofx-trade-details-tab:hover {
+  background: var(--canvas);
+  color: var(--ink);
+}
+.nofx-trade-details-tab[aria-selected='true'] {
+  background: var(--brand-soft);
+  color: var(--brand);
+  border-color: #d9e3fc;
+}
+.nofx-trade-details-content {
+  min-width: 0;
+}
+.nofx-trade-details-content .text-sm {
+  font-size: 13px;
+}
+.nofx-trade-details-content .text-xs {
+  font-size: 12px;
+}
+.nofx-trade-details-content .font-mono {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.nofx-trade-details-content .rounded-lg {
+  border-radius: 12px;
+}
+.nofx-trade-details-content button:not([aria-expanded]) {
+  border-radius: 8px;
+  font-size: 13px;
+}
+.nofx-trade-details-content button:disabled {
+  opacity: 0.45;
+}
+.nofx-trade-details-content table {
+  font-size: 13px;
+}
+.nofx-trade-details-content th {
+  background: var(--canvas);
+  color: var(--muted);
+}
+.nofx-trade-details-content td {
+  font-variant-numeric: tabular-nums;
+}
+.nofx-trade-details-content .nofx-position-history-list > .p-4 {
+  padding: 20px 24px;
+}
+.nofx-trade-details-content .nofx-position-history-list th,
+.nofx-trade-details-content .nofx-position-history-list td {
+  padding: 14px 20px;
+}
+.nofx-trade-details-content .nofx-position-history-list tr > :first-child {
+  padding-left: 28px;
+}
+.nofx-trade-details-content .nofx-position-history-list tr > :last-child {
+  padding-right: 28px;
+}
+.nofx-trade-order {
+  padding: 20px 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.nofx-trade-order > button {
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.nofx-trade-fills th,
+.nofx-trade-fills td {
+  padding: 12px 20px;
+  white-space: nowrap;
+}
+.nofx-trade-fills tbody tr {
+  border-bottom: 1px solid var(--line);
+}
+@media (max-width: 640px) {
+  .nofx-trade-details-page {
+    padding: 24px 16px 32px;
+  }
+  .nofx-trade-details-heading h1 {
+    font-size: 24px;
+  }
+  .nofx-trade-details-panel {
+    padding: 16px;
+  }
+  .nofx-trade-details-tab {
+    padding: 8px 12px;
+  }
+  .nofx-trade-order {
+    padding: 16px;
+  }
+}

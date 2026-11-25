@@ -675,7 +675,7 @@ export function PositionHistory({ traderId }: PositionHistoryProps) {
 
       {/* Position List */}
       <div
-        className="rounded-lg overflow-hidden"
+        className="nofx-position-history-list rounded-lg overflow-hidden"
         style={{
           background: '#ffffff',
           border: '1px solid rgba(25,36,52,0.14)',
