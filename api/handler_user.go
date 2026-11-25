@@ -570,6 +570,7 @@ func createDefaultStrategiesFor(userID string, lang string, st *store.Store) err
 			Description: def.description,
 			IsActive:    def.isActive,
 			IsDefault:   false,
+			IsBuiltin:   true,
 		}
 		if err := strategy.SetConfig(&config); err != nil {
 			return fmt.Errorf("failed to set config for strategy %q: %w", def.name, err)
@@ -607,6 +608,11 @@ func createDefaultStrategiesFor(userID string, lang string, st *store.Store) err
 			var existing store.Strategy
 			query := tx.Where("user_id = ? AND name = ?", userID, strategy.Name).First(&existing)
 			if query.Error == nil {
+				if !existing.IsBuiltin {
+					if err := tx.Model(&store.Strategy{}).Where("id = ? AND user_id = ?", existing.ID, userID).Update("is_builtin", true).Error; err != nil {
+						return err
+					}
+				}
 				config, err := existing.ParseConfig()
 				if err != nil {
 					return fmt.Errorf("failed to parse existing strategy %q: %w", strategy.Name, err)

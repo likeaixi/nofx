@@ -648,6 +648,7 @@ type Strategy struct {
 	Name          string    `gorm:"not null" json:"name"`
 	Description   string    `gorm:"default:''" json:"description"`
 	IsActive      bool      `gorm:"column:is_active;default:false;index" json:"is_active"`
+	IsBuiltin     bool      `gorm:"column:is_builtin;default:false" json:"is_builtin"`
 	IsDefault     bool      `gorm:"column:is_default;default:false" json:"is_default"`
 	IsPublic      bool      `gorm:"column:is_public;default:false;index" json:"is_public"`    // whether visible in strategy market
 	ConfigVisible bool      `gorm:"column:config_visible;default:true" json:"config_visible"` // whether config details are visible
@@ -1245,24 +1246,27 @@ func (s *StrategyStore) SetActive(userID, strategyID string) error {
 
 // Duplicate duplicate a strategy (used to create custom strategy based on default strategy)
 func (s *StrategyStore) Duplicate(userID, sourceID, newID, newName string) error {
-	// get source strategy
-	source, err := s.Get(userID, sourceID)
-	if err != nil {
-		return fmt.Errorf("failed to get source strategy: %w", err)
-	}
-
-	// create new strategy
-	newStrategy := &Strategy{
-		ID:          newID,
-		UserID:      userID,
-		Name:        newName,
-		Description: "Created based on [" + source.Name + "]",
-		IsActive:    false,
-		IsDefault:   false,
-		Config:      source.Config,
-	}
-
-	return s.Create(newStrategy)
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		var source Strategy
+		if err := tx.Where("id = ? AND (user_id = ? OR is_default = ? OR (is_public = ? AND config_visible = ?))", sourceID, userID, true, true, true).First(&source).Error; err != nil {
+			return err
+		}
+		config, err := source.ParseConfig()
+		if err != nil {
+			return err
+		}
+		config = config.PublicCopy()
+		config.PublishConfig = &PublishStrategyConfig{}
+		cloned := &Strategy{ID: newID, UserID: userID, Name: newName, Description: "Created based on [" + source.Name + "]"}
+		if err := cloned.SetConfig(config); err != nil {
+			return err
+		}
+		if err := tx.Create(cloned).Error; err != nil {
+			return err
+		}
+		// Explicit false overrides the legacy config_visible=true insert default.
+		return tx.Model(cloned).Update("config_visible", false).Error
+	})
 }
 
 // ParseConfig parse strategy configuration JSON

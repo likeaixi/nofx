@@ -5,6 +5,7 @@ export interface Strategy {
   description: string;
   is_active: boolean;
   is_default: boolean;
+  is_builtin?: boolean;
   is_public: boolean;           // Whether published in the strategy marketplace
   config_visible: boolean;      // Whether the config parameters are publicly visible
   config: StrategyConfig;
@@ -210,4 +211,14 @@ export interface RiskControlConfig {
   min_position_size: number;       // Min position size in USDT (CODE ENFORCED)
   min_risk_reward_ratio: number;   // Min take_profit / stop_loss ratio (AI guided)
   min_confidence: number;          // Min AI confidence to open position (AI guided)
+}
+
+export interface PublicStrategy {
+  id: string
+  name: string
+  description: string
+  is_public: boolean
+  config_visible: boolean
+  is_builtin?: boolean
+  config?: StrategyConfig
 }

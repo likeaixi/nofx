@@ -399,8 +399,10 @@ No request body needed. Sets this strategy as is_active=true (and deactivates th
 After activating, create or update a trader with this strategy_id to apply it.`,
 				s.handleActivateStrategy)
 			s.routeWithSchema(protected, "POST", "/strategies/:id/duplicate", "Duplicate an existing strategy",
-				`:id = EXACT id from GET /api/strategies. Creates a copy with " (copy)" appended to the name.`,
+				`:id = an owned/system strategy ID or a public strategy with visible parameters. Body: {"name":"My copy"}. Creates a private, inactive copy with no credentials.`,
 				s.handleDuplicateStrategy)
+
+			s.route(protected, "PUT", "/strategies/:id/publication", "Update owned strategy publication without changing trading parameters", s.handleStrategyPublication)
 
 			// Data for specified trader (using query parameter ?trader_id=xxx)
 			// IMPORTANT: All ?trader_id= values must be the EXACT "trader_id" field from GET /api/my-traders

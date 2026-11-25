@@ -77,6 +77,7 @@ func (s *Server) handlePublicStrategies(c *gin.Context) {
 			"description":    st.Description,
 			"author_email":   "", // Will be filled if we have user info
 			"is_public":      st.IsPublic,
+			"is_builtin":     st.IsBuiltin,
 			"config_visible": st.ConfigVisible,
 			"created_at":     st.CreatedAt,
 			"updated_at":     st.UpdatedAt,
@@ -87,7 +88,7 @@ func (s *Server) handlePublicStrategies(c *gin.Context) {
 			var config store.StrategyConfig
 			json.Unmarshal([]byte(st.Config), &config)
 			attachPublishConfig(&config, st)
-			item["config"] = config
+			item["config"] = config.PublicCopy()
 		}
 
 		result = append(result, item)
@@ -134,6 +135,7 @@ func (s *Server) handleGetStrategies(c *gin.Context) {
 			"is_active":      st.IsActive,
 			"is_default":     st.IsDefault,
 			"is_public":      st.IsPublic,
+			"is_builtin":     st.IsBuiltin,
 			"config_visible": st.ConfigVisible,
 			"config":         config,
 			"created_at":     st.CreatedAt,
@@ -473,7 +475,7 @@ func (s *Server) handleDuplicateStrategy(c *gin.Context) {
 
 	newID := uuid.New().String()
 	if err := s.store.Strategy().Duplicate(userID, sourceID, newID, req.Name); err != nil {
-		SafeInternalError(c, "Failed to duplicate strategy", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Strategy is unavailable or does not allow copying"})
 		return
 	}
 
