@@ -178,6 +178,7 @@ func (r *Runner) Poll(ctx context.Context) error {
 			}
 			continue
 		}
+		previousLast, hadPreviousLast := s.Last[e.Symbol+"/"+e.PositionSide]
 		s.Last[e.Symbol+"/"+e.PositionSide] = e
 		validDirection := (p.Side == "long" || p.Side == "short") && (e.Side == "BUY" || e.Side == "SELL")
 		pos := s.Positions[e.Symbol]
@@ -200,6 +201,22 @@ func (r *Runner) Poll(ctx context.Context) error {
 						reason += ": " + proofErr.Error()
 					} else {
 						reason += ": negative reconstructed position"
+					}
+					var busy *binancecopy.HistoryBusyError
+					if errors.As(proofErr, &busy) || errors.Is(proofErr, context.Canceled) || errors.Is(proofErr, context.DeadlineExceeded) {
+						// Preserve ordering and the cursor: retry this signal before
+						// later fills. plan() still rejects openings older than 5m.
+						lastKey := e.Symbol + "/" + e.PositionSide
+						if hadPreviousLast {
+							s.Last[lastKey] = previousLast
+						} else {
+							delete(s.Last, lastKey)
+						}
+						reason += "; signal retained for next poll; expired openings will not execute"
+						if err = r.save(s, nil, r.record(p, reason, false)); err != nil {
+							return err
+						}
+						return fmt.Errorf("source history verification deferred: %w", proofErr)
 					}
 					if err = r.save(s, []binancecopy.Event{e}, r.record(p, reason, false)); err != nil {
 						return err

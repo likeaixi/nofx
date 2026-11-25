@@ -61,7 +61,32 @@ type Snapshot struct {
 	Events []Event
 }
 
+// HistoryBusyError is a transient provider failure, not evidence of a flat source.
+// Callers must preserve an unprocessed signal when the bounded retry is exhausted.
+type HistoryBusyError struct{ Path string }
+
+func (e *HistoryBusyError) Error() string {
+	return fmt.Sprintf("lead history temporarily busy from %s (code=11012005)", e.Path)
+}
+
 func (c *Client) request(ctx context.Context, method, path string, body []byte, out any) error {
+	for attempt := 0; ; attempt++ {
+		err := c.requestOnce(ctx, method, path, body, out)
+		var busy *HistoryBusyError
+		if !errors.As(err, &busy) || attempt >= 3 {
+			return err
+		}
+		timer := time.NewTimer(time.Duration(2<<attempt) * time.Second)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+}
+
+func (c *Client) requestOnce(ctx context.Context, method, path string, body []byte, out any) error {
 	if c.historyPacer != nil && (path == "/order-history" || path == "/position-history") {
 		release, err := c.historyPacer.acquire(ctx)
 		if err != nil {
@@ -94,7 +119,11 @@ func (c *Client) request(ctx context.Context, method, path string, body []byte, 
 	if err != nil {
 		return err
 	}
-	if json.Unmarshal(b, &envelope) != nil || !envelope.Success || envelope.Code != "000000" || len(envelope.Data) == 0 || string(envelope.Data) == "null" {
+	decodeErr := json.Unmarshal(b, &envelope)
+	if decodeErr == nil && envelope.Code == "11012005" && (path == "/order-history" || path == "/position-history") {
+		return &HistoryBusyError{Path: path}
+	}
+	if decodeErr != nil || !envelope.Success || envelope.Code != "000000" || len(envelope.Data) == 0 || string(envelope.Data) == "null" {
 		return fmt.Errorf("invalid lead data response from %s (code=%s)", path, envelope.Code)
 	}
 	return json.Unmarshal(envelope.Data, out)
